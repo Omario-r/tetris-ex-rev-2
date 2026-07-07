@@ -81,4 +81,32 @@ void main() {
       expect(find.byType(ShipScreen), findsNothing);
     },
   );
+
+  // Регресс на возврат Гейта 2: без SafeArea кнопка «Корабль» уходила под
+  // системный статус-бар (верхний inset) и не нажималась.
+  testWidgets(
+    'Кнопка корабля ниже верхнего inset (статус-бар) и нажимается',
+    (tester) async {
+      const topInset = 100.0;
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      tester.view.padding = const FakeViewPadding(top: topInset);
+      addTearDown(tester.view.reset);
+
+      SharedPreferences.setMockInitialValues({'current_level': 1});
+      await tester.pumpWidget(
+        const MaterialApp(home: GameScreen(levelIndex: 1)),
+      );
+      await tester.pump();
+
+      final button = find.byKey(const Key('ship_button'));
+      // Верх кнопки — ниже статус-бара (иначе тап уходит в систему).
+      expect(tester.getTopLeft(button).dy, greaterThanOrEqualTo(topInset));
+
+      // И она реально нажимается по своим координатам → открывает экран корабля.
+      await tester.tap(button);
+      await _pumpFrames(tester);
+      expect(find.byType(ShipScreen), findsOneWidget);
+    },
+  );
 }

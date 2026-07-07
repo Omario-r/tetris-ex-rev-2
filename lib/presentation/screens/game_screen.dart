@@ -122,9 +122,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             completedObjectId: completedLevel ~/ 4,
             onNext: () => navigator.pushReplacement(
               MaterialPageRoute(
-                builder: (_) => GameScreen(
-                  levelIndex: nextLevel <= 15 ? nextLevel : 0,
-                ),
+                builder: (_) =>
+                    GameScreen(levelIndex: nextLevel <= 15 ? nextLevel : 0),
               ),
             ),
           ),
@@ -133,9 +132,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     } else {
       navigator.pushReplacement(
         MaterialPageRoute(
-          builder: (_) => GameScreen(
-            levelIndex: nextLevel <= 15 ? nextLevel : 0,
-          ),
+          builder: (_) =>
+              GameScreen(levelIndex: nextLevel <= 15 ? nextLevel : 0),
         ),
       );
     }
@@ -151,80 +149,81 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Column(
-        children: [
-          // HUD: уровень + вход на экран корабля
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Level ${widget.levelIndex + 1}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  key: const Key('ship_button'),
-                  tooltip: 'Корабль',
-                  icon: const Icon(Icons.rocket_launch, color: Colors.white),
-                  onPressed: () => Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const ShipScreen()),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Game board with overlay
-          SizedBox(
-            width: boardPixelWidth,
-            height: boardPixelHeight,
-            child: Stack(
-              children: [
-                // Board painter
-                CustomPaint(
-                  size: Size(boardPixelWidth, boardPixelHeight),
-                  painter: BoardPainter(
-                    state: state,
-                    cellSize: _cellSize,
-                    theme: BlockTheme.defaultTheme,
-                    levelMaterial: LevelSkin.materialForLevelIndex(
-                      widget.levelIndex,
+      // SafeArea: у экрана нет AppBar — без него шапка (в т.ч. кнопка «Корабль»)
+      // уходит под системный статус-бар/вырез и не нажимается.
+      body: SafeArea(
+        child: Column(
+          children: [
+            // HUD: уровень + вход на экран корабля
+            Padding(
+              padding: const EdgeInsets.all(8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Level ${widget.levelIndex + 1}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
                     ),
-                    animValue: _animController.value,
                   ),
-                ),
-                // Win/Lose overlay
-                if (state.isWin || state.isLost)
-                  Container(
-                    width: boardPixelWidth,
-                    height: boardPixelHeight,
-                    color: Colors.black54,
-                    child: Center(
-                      child: Text(
-                        state.isWin ? 'YOU WIN 🎉' : 'GAME OVER',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
+                  IconButton(
+                    key: const Key('ship_button'),
+                    tooltip: 'Корабль',
+                    icon: const Icon(Icons.rocket_launch, color: Colors.white),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ShipScreen()),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Game board with overlay
+            SizedBox(
+              width: boardPixelWidth,
+              height: boardPixelHeight,
+              child: Stack(
+                children: [
+                  // Board painter
+                  CustomPaint(
+                    size: Size(boardPixelWidth, boardPixelHeight),
+                    painter: BoardPainter(
+                      state: state,
+                      cellSize: _cellSize,
+                      theme: BlockTheme.defaultTheme,
+                      levelMaterial: LevelSkin.materialForLevelIndex(
+                        widget.levelIndex,
+                      ),
+                      animValue: _animController.value,
+                    ),
+                  ),
+                  // Win/Lose overlay
+                  if (state.isWin || state.isLost)
+                    Container(
+                      width: boardPixelWidth,
+                      height: boardPixelHeight,
+                      color: Colors.black54,
+                      child: Center(
+                        child: Text(
+                          state.isWin ? 'YOU WIN 🎉' : 'GAME OVER',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 32,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-          // Control panel
-          Expanded(
-            child: GameHud(
-              controller: _controller,
-              state: state,
+            // Control panel
+            Expanded(
+              child: GameHud(controller: _controller, state: state),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
