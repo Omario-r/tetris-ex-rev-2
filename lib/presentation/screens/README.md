@@ -45,4 +45,5 @@
 ## Как проверить
 
 `flutter test test/presentation/game_screen_test.dart test/navigation_test.dart
-test/level_complete_screen_test.dart test/object_complete_screen_test.dart`.
+test/level_complete_screen_test.dart test/object_complete_screen_test.dart
+test/presentation/ship_screen_test.dart`.
