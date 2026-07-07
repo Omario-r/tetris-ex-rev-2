@@ -12,6 +12,7 @@ import '../widgets/board_painter.dart';
 import '../widgets/hud.dart';
 import 'level_complete_screen.dart';
 import 'object_complete_screen.dart';
+import 'ship_screen.dart';
 
 /// The main game screen widget that displays the Tetris game.
 ///
@@ -152,16 +153,29 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       backgroundColor: Colors.black,
       body: Column(
         children: [
-          // HUD
+          // HUD: уровень + вход на экран корабля
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: Text(
-              'Level ${widget.levelIndex + 1}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-              ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Level ${widget.levelIndex + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  key: const Key('ship_button'),
+                  tooltip: 'Корабль',
+                  icon: const Icon(Icons.rocket_launch, color: Colors.white),
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const ShipScreen()),
+                  ),
+                ),
+              ],
             ),
           ),
           // Game board with overlay
