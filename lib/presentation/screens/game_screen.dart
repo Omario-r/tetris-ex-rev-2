@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../game_engine/game/game_controller.dart';
@@ -10,6 +11,7 @@ import '../theme/block_theme.dart';
 import '../theme/level_skin.dart';
 import '../widgets/board_painter.dart';
 import '../widgets/hud.dart';
+import 'cheat_menu.dart';
 import 'level_complete_screen.dart';
 import 'object_complete_screen.dart';
 import 'ship_screen.dart';
@@ -139,6 +141,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
   }
 
+  // --- Читы (только dev-сборка, вход под kDebugMode) ---
+
+  void _openCheatMenu() {
+    showCheatMenu(context, onSetShipParts: _cheatSetShipParts);
+  }
+
+  /// Чит «установка состояния корабля»: собрано N деталей (N = 0..3).
+  /// На мета-уровне — просто сохранённый прогресс (ключ `current_level`).
+  Future<void> _cheatSetShipParts(int parts) async {
+    Navigator.of(context).pop(); // закрыть bottom sheet
+    await ProgressService().setCurrentLevel(parts);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Корабль: собрано $parts'),
+        duration: const Duration(seconds: 1),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = _controller.state;
@@ -168,13 +190,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  IconButton(
-                    key: const Key('ship_button'),
-                    tooltip: 'Корабль',
-                    icon: const Icon(Icons.rocket_launch, color: Colors.white),
-                    onPressed: () => Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => const ShipScreen()),
-                    ),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Вход в чит-меню — только в дев-сборке.
+                      if (kDebugMode)
+                        IconButton(
+                          key: const Key('cheat_button'),
+                          tooltip: 'Читы',
+                          icon: const Icon(
+                            Icons.bug_report,
+                            color: Colors.white,
+                          ),
+                          onPressed: _openCheatMenu,
+                        ),
+                      IconButton(
+                        key: const Key('ship_button'),
+                        tooltip: 'Корабль',
+                        icon: const Icon(
+                          Icons.rocket_launch,
+                          color: Colors.white,
+                        ),
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(builder: (_) => const ShipScreen()),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

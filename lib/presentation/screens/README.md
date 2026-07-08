@@ -19,6 +19,9 @@
 - `ObjectCompleteScreen({completedObjectId, onNext})` — экран собранного объекта.
 - `ShipScreen()` — статичный экран корабля: `ShipPainter` по `min(current_level, kShipPartCount)`;
   читает `ProgressService.getCurrentLevel()`. Вход — кнопка-иконка `Key('ship_button')` на `GameScreen`.
+- `CheatMenu({onSetShipParts})` / `showCheatMenu(context, {...})` — дев-читы (bottom sheet).
+  Только вид: логика — колбэки в `GameScreen`. Вход — кнопка `Key('cheat_button')`, видна лишь
+  под `kDebugMode`. Чит «состояние корабля»: N=0..3 → `ProgressService.setCurrentLevel(N)`.
 
 ## Зависит от
 
@@ -43,9 +46,11 @@
   под стеком, «Назад» из `AppBar` возвращает в ту же партию.
 - У `GameScreen` нет `AppBar` → его `body` обёрнут в `SafeArea` вручную; иначе шапка
   (в т.ч. кнопка «Корабль») уходит под системный статус-бар/вырез и не нажимается.
+- Чит-меню — только дев-сборка: вход рисуется под `if (kDebugMode)`; читы имитируются на
+  мета-уровне (`ProgressService` + навигация), движок (`game_engine`) не трогают.
 
 ## Как проверить
 
 `flutter test test/presentation/game_screen_test.dart test/navigation_test.dart
 test/level_complete_screen_test.dart test/object_complete_screen_test.dart
-test/presentation/ship_screen_test.dart`.
+test/presentation/ship_screen_test.dart test/presentation/cheat_menu_test.dart`.
