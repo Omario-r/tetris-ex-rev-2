@@ -15,10 +15,10 @@
 | models | `lib/game_engine/models/` | Структуры данных ядра (поле, фигура, маска, шаблоны уровня/объекта) | rules ¹ |
 | rules | `lib/game_engine/rules/` | Чистые правила: коллизии, halo/победа, взрыв, генерация фигур | models ¹ |
 | game | `lib/game_engine/game/` | Состояние партии + оркестрация (`tick`, команды игрока) | models, rules |
-| data | `lib/game_engine/data/` | Контент: `LevelMap` — 4 объекта × 4 фрагмента = 16 уровней | models |
+| data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (16 уровней) | models |
 | application | `lib/application/` | Персист прогресса (`ProgressService`) | — |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
-| widgets | `lib/presentation/widgets/` | Пейнтеры поля/объекта, HUD | game, models, theme |
+| widgets | `lib/presentation/widgets/` | Пейнтеры поля и корабля, HUD | game, models, data, theme |
 | screens | `lib/presentation/screens/` | Экраны + игровой цикл (композиционный корень партии) | game, models, data, rules, application, theme, widgets |
 
 ¹ **models ↔ rules — взаимная зависимость:** `models/level_template` при создании зовёт
@@ -46,6 +46,8 @@ lib/main.dart (вход)
 
 - `screens` — единственный композиционный корень: тянет ядро, данные и виджеты.
 - `application` тонкий: игровой цикл фактически в `screens/game_screen`, не в `application/game_loop` (стуб).
+- `widgets → data`: `ShipPainter` берёт форму деталей из `ShipParts` — тот же источник, что
+  и мишени дев-уровней (`LevelMap`), поэтому «собранное на уровне» = «деталь корабля».
 
 ## Сквозные соглашения
 

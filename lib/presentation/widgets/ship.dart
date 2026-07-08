@@ -1,41 +1,19 @@
 import 'package:flutter/material.dart';
 
-/// Число деталей-заглушек единого корабля (дев-контент).
+import '../../game_engine/data/ship_parts.dart';
+
+/// Число деталей-заглушек единого корабля (дев-контент). == `ShipParts.parts.length`.
 ///
-/// Единый источник истины для связки «3 уровня ↔ 3 детали» (Стори 01).
-/// Прогресс сборки клампится этим числом: собрано = `min(current_level, kShipPartCount)`.
+/// Единый источник истины для связки «3 уровня ↔ 3 детали» (Стори 01). Прогресс
+/// сборки клампится этим числом: собрано = `min(current_level, kShipPartCount)`.
 const int kShipPartCount = 3;
 
-/// Деталь-заглушка корабля: прямоугольник в нормализованной сетке 10×10.
+/// Рисует единый корабль из деталей `ShipParts.parts`: первые [collectedCount]
+/// деталей установлены (залиты), остальные — контуром.
 ///
-/// Реального дизайна деталей здесь нет — это временные заглушки (эпик «Контент»
-/// заменит их боевыми деталями). Порядок в [Ship.parts] = порядок сборки:
-/// деталь i встаёт после прохождения уровня i.
-class ShipPart {
-  /// Имя детали (для отладки/тестов).
-  final String name;
-
-  /// Область детали в сетке 10×10 (левый-верх — (0,0), y растёт вниз).
-  final Rect unit;
-
-  const ShipPart({required this.name, required this.unit});
-}
-
-/// Корабль = упорядоченный список деталей-заглушек.
-///
-/// Ровно [kShipPartCount] деталей, сложенных в грубый силуэт «ракеты» (нос → корпус →
-/// основание), чтобы читалось «строю что-то большое».
-class Ship {
-  /// Детали в порядке сборки. Длина == [kShipPartCount].
-  static const List<ShipPart> parts = <ShipPart>[
-    ShipPart(name: 'нос', unit: Rect.fromLTWH(4, 1, 2, 2)),
-    ShipPart(name: 'корпус', unit: Rect.fromLTWH(3, 3, 4, 4)),
-    ShipPart(name: 'основание', unit: Rect.fromLTWH(2, 7, 6, 2)),
-  ];
-}
-
-/// Рисует единый корабль из [Ship.parts]: первые [collectedCount] деталей —
-/// установлены (залиты), остальные — ещё не собраны (контур).
+/// Каждая деталь — это форма-маска (та же, что мишень уровня в `LevelMap`), поэтому
+/// собранное на уровне совпадает с деталью на корабле. Деталь [revealPartIndex]
+/// рисуется масштабом [revealProgress] от центра — эффект появления (Стори 03).
 class ShipPainter extends CustomPainter {
   /// Сколько деталей уже собрано (0..[kShipPartCount]). Клампится в конструкторе.
   final int collectedCount;
@@ -44,7 +22,6 @@ class ShipPainter extends CustomPainter {
   final int? revealPartIndex;
 
   /// Прогресс появления детали [revealPartIndex]: 0 (нет) .. 1 (на месте).
-  /// Остальные детали рисуются всегда полным размером.
   final double revealProgress;
 
   ShipPainter({
@@ -55,10 +32,10 @@ class ShipPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    // Квадратная сетка 10×10, вписанная в canvas и отцентрованная.
-    final cell = (size.width < size.height ? size.width : size.height) / 10;
-    final dx = (size.width - cell * 10) / 2;
-    final dy = (size.height - cell * 10) / 2;
+    const grid = ShipParts.gridSize;
+    final cell = (size.width < size.height ? size.width : size.height) / grid;
+    final ox = (size.width - cell * grid) / 2;
+    final oy = (size.height - cell * grid) / 2;
 
     final fillPaint = Paint()..color = Colors.deepOrange;
     final installedStroke = Paint()
@@ -70,30 +47,36 @@ class ShipPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
-    for (int i = 0; i < Ship.parts.length; i++) {
-      final u = Ship.parts[i].unit;
-      final rect = Rect.fromLTWH(
-        dx + u.left * cell,
-        dy + u.top * cell,
-        u.width * cell,
-        u.height * cell,
-      );
-      if (i < collectedCount) {
-        // Только заработанная деталь (revealPartIndex) масштабируется от центра.
-        final scale = i == revealPartIndex ? revealProgress : 1.0;
-        if (scale <= 0) continue;
-        final drawRect = scale == 1.0
-            ? rect
-            : Rect.fromCenter(
-                center: rect.center,
-                width: rect.width * scale,
-                height: rect.height * scale,
-              );
-        canvas.drawRect(drawRect, fillPaint);
-        canvas.drawRect(drawRect, installedStroke);
-      } else {
-        canvas.drawRect(rect, ghostStroke);
+    for (int i = 0; i < ShipParts.parts.length; i++) {
+      final part = ShipParts.parts[i];
+      final collected = i < collectedCount;
+      // Только заработанная деталь (revealPartIndex) масштабируется от центра.
+      final scale = collected && i == revealPartIndex ? revealProgress : 1.0;
+      if (scale <= 0) continue;
+
+      canvas.save();
+      if (scale != 1.0) {
+        final cx = ox + (part.shipX + part.mask.width / 2) * cell;
+        final cy = oy + (part.shipY + part.mask.height / 2) * cell;
+        canvas.translate(cx, cy);
+        canvas.scale(scale);
+        canvas.translate(-cx, -cy);
       }
+      for (final c in part.mask.cells) {
+        final rect = Rect.fromLTWH(
+          ox + (part.shipX + c.x) * cell,
+          oy + (part.shipY + c.y) * cell,
+          cell,
+          cell,
+        );
+        if (collected) {
+          canvas.drawRect(rect, fillPaint);
+          canvas.drawRect(rect, installedStroke);
+        } else {
+          canvas.drawRect(rect, ghostStroke);
+        }
+      }
+      canvas.restore();
     }
   }
 

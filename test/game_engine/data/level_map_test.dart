@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/data/level_map.dart';
+import 'package:explosive_tetris/game_engine/data/ship_parts.dart';
 
 void main() {
   group('LevelMap structure', () {
@@ -89,6 +90,25 @@ void main() {
       final fragment = LevelMap.objects[2].fragments[3];
       expect(fragment.anchorX, equals(5));
       expect(fragment.anchorY, equals(5));
+    });
+  });
+
+  group('Дев-уровни = детали корабля (единый источник формы)', () {
+    for (int i = 0; i < ShipParts.parts.length; i++) {
+      test('levelAt($i).targetMask == ShipParts.parts[$i].mask', () {
+        final target = LevelMap.levelAt(i).targetMask;
+        final part = ShipParts.parts[i].mask;
+        expect(target.width, equals(part.width));
+        expect(target.height, equals(part.height));
+        expect(target.mask, equals(part.mask));
+      });
+    }
+
+    test('дев-уровни маршрутизируются как object 0, fragment i', () {
+      for (int i = 0; i < ShipParts.parts.length; i++) {
+        expect(LevelMap.levelAt(i).objectId, equals(0));
+        expect(LevelMap.levelAt(i).fragmentIndex, equals(i));
+      }
     });
   });
 }

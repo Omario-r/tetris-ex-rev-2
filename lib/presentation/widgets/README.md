@@ -15,20 +15,20 @@
   drop-ghost (normal), падающая фигура.
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`.
-- `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из 3
-  деталей-заглушек: первые `collectedCount` установлены (залиты), остальные — контуром;
-  `collectedCount` клампится 0..3. Деталь `revealPartIndex` рисуется масштабом
+- `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из
+  `kShipPartCount` деталей: первые `collectedCount` установлены (залиты), остальные —
+  контуром; `collectedCount` клампится 0..3. Каждая деталь — маска `ShipParts.parts[i].mask`
+  (та же, что мишень уровня → совпадают). Деталь `revealPartIndex` рисуется масштабом
   `revealProgress` (0..1) от центра — эффект появления (Стори 03); по умолчанию все статичны.
-- `Ship.parts` / `ShipPart` / `kShipPartCount` (`ship.dart`) — модель корабля: список из
-  `kShipPartCount = 3` деталей-заглушек (нормализованные `Rect` в сетке 10×10). Единый
-  источник истины «3 детали ↔ 3 уровня» для эпика «Мета-каркас».
+- `kShipPartCount` (`ship.dart`) = 3 — число деталей (== `ShipParts.parts.length`). Единый
+  источник «3 детали ↔ 3 уровня» для эпика. Форма деталей живёт в `game_engine/data/ship_parts`.
 
 ## Зависит от
 
 - `game_engine/game` — `GameState`, `GameController`.
 - `game_engine/models` — `Board`, `FallingPiece`.
+- `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
 - `presentation/theme` — `BlockMaterial`, `BlockTheme`, `TntSkin`, оверлеи.
-- `ship.dart` — только `flutter/material` (модель-заглушка без ядра).
 
 ## От него зависят
 
@@ -39,9 +39,11 @@
 - Только вид: пейнтеры не содержат игровой логики; ввод игрока идёт лишь через команды
   `GameController` (HUD зовёт `controller.*`).
 - `shouldRepaint` завязан на `state`/анимацию; мутабельное состояние в пейнтере не хранить.
-- `ShipPainter.collectedCount` всегда клампится 0..`kShipPartCount`; корабль-заглушка не
-  зависит от `LevelMap`/ядра. `revealProgress` масштабирует лишь деталь `revealPartIndex`.
+- `ShipPainter.collectedCount` всегда клампится 0..`kShipPartCount`. Форма деталей — из
+  `ShipParts` (data), та же, что мишень уровня → совпадают. `revealProgress` масштабирует
+  лишь деталь `revealPartIndex`.
 
 ## Как проверить
 
-`flutter test test/presentation/board_painter_test.dart test/presentation/hud_test.dart`.
+`flutter test test/presentation/board_painter_test.dart test/presentation/hud_test.dart
+test/presentation/ship_screen_test.dart test/game_engine/data/ship_parts_test.dart`.

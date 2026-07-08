@@ -2,6 +2,7 @@ import '../models/level_template.dart';
 import '../models/target_mask.dart';
 import '../models/fragment_def.dart';
 import '../models/object_template.dart';
+import 'ship_parts.dart';
 
 /// Карта всех уровней: 4 объекта × 4 фрагмента = 16 уровней.
 class LevelMap {
@@ -142,9 +143,29 @@ class LevelMap {
     ),
   ];
 
+  /// Дев-уровни мета-каркаса (0..2): мишень = форма детали корабля
+  /// (`ShipParts.parts[i].mask`), чтобы собранное на уровне совпадало с деталью.
+  /// Мишень центрируется по X и ставится у низа поля.
+  static final List<LevelTemplate> _devLevels = [
+    for (int i = 0; i < ShipParts.parts.length; i++)
+      LevelTemplate(
+        boardWidth: 10,
+        boardHeight: 20,
+        targetMask: ShipParts.parts[i].mask,
+        targetX: (10 - ShipParts.parts[i].mask.width) ~/ 2,
+        targetY: 20 - ShipParts.parts[i].mask.height - 2,
+        objectId: 0,
+        fragmentIndex: i,
+      ),
+  ];
+
   /// Возвращает LevelTemplate для уровня levelIndex (0..15).
+  ///
+  /// Дев-уровни 0..2 — детали корабля (`_devLevels`, единый источник формы
+  /// `ShipParts`); 3..15 — старая карта объектов (в дев-потоке недостижимы).
   static LevelTemplate levelAt(int levelIndex) {
     assert(levelIndex >= 0 && levelIndex < 16);
+    if (levelIndex < _devLevels.length) return _devLevels[levelIndex];
     final obj = objects[levelIndex ~/ 4];
     return obj.fragments[levelIndex % 4].level;
   }
