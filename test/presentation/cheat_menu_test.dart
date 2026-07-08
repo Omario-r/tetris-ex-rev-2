@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/presentation/screens/cheat_menu.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
+import 'package:explosive_tetris/presentation/screens/level_complete_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
@@ -66,5 +67,38 @@ void main() {
     await _pumpFrames(tester);
     expect(find.byType(ShipScreen), findsOneWidget);
     expect(_shipPainter(tester).collectedCount, 2);
+  });
+
+  testWidgets('Чит «выбор уровня»: тап уровня 3 → GameScreen(levelIndex=2)',
+      (tester) async {
+    await pumpGame(tester, level: 0);
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+
+    // cheat_level_2 → индекс 2 (подпись «3»).
+    await tester.tap(find.byKey(const Key('cheat_level_2')));
+    await _pumpFrames(tester);
+
+    final game = tester.widget<GameScreen>(find.byType(GameScreen));
+    expect(game.levelIndex, 2);
+    expect(find.text('Level 3'), findsOneWidget);
+  });
+
+  testWidgets('Чит «мгновенная победа»: прогресс +1 и пост-победный экран',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({'current_level': 0});
+    await pumpGame(tester, level: 0);
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+
+    await tester.tap(find.byKey(const Key('cheat_instant_win')));
+    await _pumpFrames(tester);
+
+    // Запустился тот же пост-победный поток, что после обычной победы.
+    expect(find.byType(LevelCompleteScreen), findsOneWidget);
+    // Прогресс засчитан: 0 → 1.
+    expect(await ProgressService().getCurrentLevel(), 1);
   });
 }

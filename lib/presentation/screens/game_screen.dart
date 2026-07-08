@@ -86,12 +86,19 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     // Check for win condition
     final state = _controller.state;
-    if (state.isWin && !_winHandled) {
-      _winHandled = true;
-      _onWin();
+    if (state.isWin) {
+      _handleWin();
     }
 
     setState(() {});
+  }
+
+  /// Единая точка обработки победы: и по игровому состоянию (тик), и по читу
+  /// «мгновенная победа». Идемпотентна (`_winHandled`) — победа обрабатывается один раз.
+  void _handleWin() {
+    if (_winHandled) return;
+    _winHandled = true;
+    _onWin();
   }
 
   Future<void> _onWin() async {
@@ -144,7 +151,27 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // --- Читы (только dev-сборка, вход под kDebugMode) ---
 
   void _openCheatMenu() {
-    showCheatMenu(context, onSetShipParts: _cheatSetShipParts);
+    showCheatMenu(
+      context,
+      onSelectLevel: _cheatSelectLevel,
+      onInstantWin: _cheatInstantWin,
+      onSetShipParts: _cheatSetShipParts,
+    );
+  }
+
+  /// Чит «выбор уровня»: перезапустить игру на уровне `levelIndex`.
+  void _cheatSelectLevel(int levelIndex) {
+    Navigator.of(context).pop(); // закрыть bottom sheet
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => GameScreen(levelIndex: levelIndex)),
+    );
+  }
+
+  /// Чит «мгновенная победа»: тот же пост-победный поток, что после обычной победы.
+  /// Движок не трогаем — засчитываем победу на мета-уровне (`_handleWin` → `advanceOnWin`).
+  void _cheatInstantWin() {
+    Navigator.of(context).pop(); // закрыть bottom sheet
+    _handleWin();
   }
 
   /// Чит «установка состояния корабля»: собрано N деталей (N = 0..3).
