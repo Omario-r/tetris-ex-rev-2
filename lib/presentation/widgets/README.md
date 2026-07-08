@@ -17,11 +17,14 @@
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`.
 - `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из
   `kShipPartCount` деталей: первые `collectedCount` установлены (залиты), остальные —
-  контуром; `collectedCount` клампится 0..3. Каждая деталь — маска `ShipParts.parts[i].mask`
-  (та же, что мишень уровня → совпадают). Деталь `revealPartIndex` рисуется масштабом
-  `revealProgress` (0..1) от центра — эффект появления (Стори 03); по умолчанию все статичны.
-- `kShipPartCount` (`ship.dart`) = 3 — число деталей (== `ShipParts.parts.length`). Единый
-  источник «3 детали ↔ 3 уровня» для эпика. Форма деталей живёт в `game_engine/data/ship_parts`.
+  контуром; `collectedCount` клампится 0..`kShipPartCount`. Каждая деталь — маска
+  `ShipParts.parts[i].mask` (та же, что мишень уровня → совпадают). Деталь `revealPartIndex`
+  рисуется масштабом `revealProgress` (0..1) от центра — эффект появления (Стори 03); по
+  умолчанию все статичны. Центрирование/масштаб — по `ShipParts.gridSize` (пейнтер не зависит
+  от числа деталей).
+- `kShipPartCount` (`ship.dart`) — **`final`, выводится из `ShipParts.parts.length`** (v1 = 7).
+  Единый источник «N деталей ↔ N уровней». Не `const` — только рантайм. Форма деталей живёт в
+  `game_engine/data/ship_parts`.
 
 ## Зависит от
 

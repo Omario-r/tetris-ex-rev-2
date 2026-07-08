@@ -17,16 +17,17 @@ class CheatMenu extends StatelessWidget {
   /// Задать «собрано N деталей» (N = 0..[kShipPartCount]).
   final void Function(int parts) onSetShipParts;
 
-  /// Сколько дев-уровней предлагать в «выборе уровня». По умолчанию — [kShipPartCount]
-  /// (связка «3 уровня ↔ 3 детали», единый источник истины).
-  final int levelCount;
+  /// Сколько дев-уровней предлагать в «выборе уровня». `null` (по умолчанию) —
+  /// все детали корабля [kShipPartCount] (не можем задать дефолтом: `kShipPartCount`
+  /// не `const`). Единый источник истины «N уровней ↔ N деталей».
+  final int? levelCount;
 
   const CheatMenu({
     super.key,
     required this.onSelectLevel,
     required this.onInstantWin,
     required this.onSetShipParts,
-    this.levelCount = kShipPartCount,
+    this.levelCount,
   });
 
   @override
@@ -44,7 +45,7 @@ class CheatMenu extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             _section(context, 'Выбор уровня', [
-              for (int i = 0; i < levelCount; i++)
+              for (int i = 0; i < (levelCount ?? kShipPartCount); i++)
                 ElevatedButton(
                   key: Key('cheat_level_$i'),
                   onPressed: () => onSelectLevel(i),

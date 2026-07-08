@@ -108,7 +108,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Capture navigator BEFORE pushReplacement while context is still valid
     final navigator = Navigator.of(context);
 
-    // Последний дев-уровень (индекс kShipPartCount-1) → корабль собран (3/3).
+    // Последний дев-уровень (индекс kShipPartCount-1) → корабль собран (N/N).
     final isLastDevLevel = completedLevel >= kShipPartCount - 1;
     final collected = isLastDevLevel ? kShipPartCount : completedLevel + 1;
 
@@ -171,7 +171,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _handleWin();
   }
 
-  /// Чит «установка состояния корабля»: собрано N деталей (N = 0..3).
+  /// Чит «установка состояния корабля»: собрано N деталей (N = 0..kShipPartCount).
   /// На мета-уровне — просто сохранённый прогресс (ключ `current_level`).
   Future<void> _cheatSetShipParts(int parts) async {
     Navigator.of(context).pop(); // закрыть bottom sheet

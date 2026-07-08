@@ -21,7 +21,8 @@
   (или «Начать заново», если `isComplete`), без «Назад».
 - `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts})` / `showCheatMenu(...)` — дев-читы
   (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`,
-  виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа, состояние корабля (N=0..3).
+  виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа, состояние корабля
+  (N=0..`kShipPartCount`). `levelCount` по умолчанию `null` → `kShipPartCount` уровней.
 
 ## Зависит от
 

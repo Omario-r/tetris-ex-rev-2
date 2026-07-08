@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../game_engine/data/ship_parts.dart';
 
-/// Число деталей-заглушек единого корабля (дев-контент). == `ShipParts.parts.length`.
+/// Число деталей единого корабля — **выводится** из `ShipParts.parts.length`
+/// (единый источник истины: добавили деталь в `ShipParts` → число выросло само).
 ///
-/// Единый источник истины для связки «3 уровня ↔ 3 детали» (Стори 01). Прогресс
-/// сборки клампится этим числом: собрано = `min(current_level, kShipPartCount)`.
-const int kShipPartCount = 3;
+/// Связка «N уровней ↔ N деталей»: прогресс сборки клампится этим числом,
+/// собрано = `min(current_level, kShipPartCount)`. Не `const` (длина списка не
+/// константа) — использовать только в рантайме, не в const-контексте.
+final int kShipPartCount = ShipParts.parts.length;
 
 /// Рисует единый корабль из деталей `ShipParts.parts`: первые [collectedCount]
 /// деталей установлены (залиты), остальные — контуром.

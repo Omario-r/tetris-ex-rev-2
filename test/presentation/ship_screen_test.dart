@@ -23,8 +23,8 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
-  group('ShipScreen — число деталей = min(current_level, 3)', () {
-    for (final entry in {0: 0, 1: 1, 2: 2, 3: 3, 5: 3, 15: 3}.entries) {
+  group('ShipScreen — число деталей = min(current_level, 7)', () {
+    for (final entry in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 7: 7, 15: 7}.entries) {
       final level = entry.key;
       final expected = entry.value;
       testWidgets('current_level=$level → собрано $expected', (tester) async {
@@ -34,7 +34,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(_shipPainter(tester).collectedCount, expected);
-        expect(find.text('Собрано $expected из 3'), findsOneWidget);
+        expect(find.text('Собрано $expected из 7'), findsOneWidget);
       });
     }
   });

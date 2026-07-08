@@ -32,10 +32,17 @@ void main() {
       expect(level.fragmentIndex, equals(3));
     });
 
-    test('levelAt(4) → objectId=1, fragmentIndex=0', () {
+    // 7 дев-уровней (0..6) = детали корабля; старая карта объектов — с индекса 7.
+    test('levelAt(4) → дев-уровень (objectId=0, fragmentIndex=4)', () {
       final level = LevelMap.levelAt(4);
+      expect(level.objectId, equals(0));
+      expect(level.fragmentIndex, equals(4));
+    });
+
+    test('levelAt(7) → старая карта: objectId=1, fragmentIndex=3', () {
+      final level = LevelMap.levelAt(7);
       expect(level.objectId, equals(1));
-      expect(level.fragmentIndex, equals(0));
+      expect(level.fragmentIndex, equals(3));
     });
 
     test('levelAt(15) → objectId=3, fragmentIndex=3', () {

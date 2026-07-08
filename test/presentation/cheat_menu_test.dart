@@ -42,13 +42,13 @@ void main() {
     await _pumpFrames(tester);
 
     expect(find.byType(CheatMenu), findsOneWidget);
-    // 4 кнопки состояния корабля: 0..3
+    // kShipPartCount+1 кнопок состояния корабля: 0..kShipPartCount
     for (int n = 0; n <= kShipPartCount; n++) {
       expect(find.byKey(Key('cheat_ship_parts_$n')), findsOneWidget);
     }
   });
 
-  testWidgets('Чит «состояние корабля»: N=2 → прогресс=2 → корабль 2/3',
+  testWidgets('Чит «состояние корабля»: N=2 → прогресс=2 → корабль 2/7',
       (tester) async {
     await pumpGame(tester);
 

@@ -7,7 +7,7 @@ import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 
 /// Пост-победный поток (Стори 03): победа → авто-показ корабля → следующий уровень;
-/// на последнем дев-уровне → 3/3 + «Начать заново» → сброс.
+/// на последнем дев-уровне → N/N + «Начать заново» → сброс.
 ///
 /// Победу инициируем читом «мгновенная победа» — это тот же `_handleWin`/`_onWin`,
 /// что и по игровому состоянию (без манипуляций движком в тесте).
@@ -44,7 +44,7 @@ void main() {
 
       // Авто-показ корабля, а не старые экраны; деталь +1.
       expect(find.byType(ShipScreen), findsOneWidget);
-      expect(find.text('Собрано 1 из 3'), findsOneWidget);
+      expect(find.text('Собрано 1 из 7'), findsOneWidget);
       expect(find.text('Далее'), findsOneWidget);
       expect(await ProgressService().getCurrentLevel(), 1);
 
@@ -57,13 +57,13 @@ void main() {
   );
 
   testWidgets(
-    'победа на 3-м уровне → 3/3 + «Начать заново» → сброс к уровню 1',
+    'победа на последнем (7-м) уровне → 7/7 + «Начать заново» → сброс к уровню 1',
     (t) async {
-      SharedPreferences.setMockInitialValues({'current_level': 2});
-      await pumpGame(t, 2);
+      SharedPreferences.setMockInitialValues({'current_level': 6});
+      await pumpGame(t, 6);
       await _instantWin(t);
 
-      expect(find.text('Собрано 3 из 3'), findsOneWidget);
+      expect(find.text('Собрано 7 из 7'), findsOneWidget);
       expect(find.text('Начать заново'), findsOneWidget);
 
       await t.tap(find.byKey(const Key('ship_next_button')));
