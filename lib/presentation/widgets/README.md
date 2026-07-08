@@ -5,8 +5,8 @@
 
 ## Назначение
 
-Переиспользуемые виджеты/пейнтеры: отрисовка поля, панель управления (HUD),
-отрисовка объекта-корабля и единого корабля мета-каркаса. Экраны (`screens`) собирают их вместе.
+Переиспользуемые виджеты/пейнтеры: отрисовка поля, панель управления (HUD) и
+единый корабль мета-каркаса. Экраны (`screens`) собирают их вместе.
 
 ## Публичный интерфейс
 
@@ -15,9 +15,6 @@
   drop-ghost (normal), падающая фигура.
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`.
-- `ObjectFragmentGridPainter(objectTemplate, completedFragmentIndex, animProgress)` —
-  сетка фрагментов объекта, новая деталь въезжает анимацией scale.
-- `ObjectFullPainter(objectTemplate)` — собранный объект целиком, статично.
 - `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из 3
   деталей-заглушек: первые `collectedCount` установлены (залиты), остальные — контуром;
   `collectedCount` клампится 0..3. Деталь `revealPartIndex` рисуется масштабом
@@ -29,24 +26,21 @@
 ## Зависит от
 
 - `game_engine/game` — `GameState`, `GameController`.
-- `game_engine/models` — `Board`, `FallingPiece`, `ObjectTemplate`.
+- `game_engine/models` — `Board`, `FallingPiece`.
 - `presentation/theme` — `BlockMaterial`, `BlockTheme`, `TntSkin`, оверлеи.
 - `ship.dart` — только `flutter/material` (модель-заглушка без ядра).
 
 ## От него зависят
 
-- `presentation/screens` — `game_screen` (board_painter + hud), `level_complete`
-  (grid painter), `object_complete` (full painter).
+- `presentation/screens` — `game_screen` (board_painter + hud), `ship_screen` (ship_painter).
 
 ## Инварианты
 
 - Только вид: пейнтеры не содержат игровой логики; ввод игрока идёт лишь через команды
   `GameController` (HUD зовёт `controller.*`).
-- Пейнтеры объекта считают сетку объекта 10×10, маску фрагмента 5×5 — привязка к текущей
-  раскладке `LevelMap`; при смене контента синхронизировать.
 - `shouldRepaint` завязан на `state`/анимацию; мутабельное состояние в пейнтере не хранить.
 - `ShipPainter.collectedCount` всегда клампится 0..`kShipPartCount`; корабль-заглушка не
-  зависит от `LevelMap`/ядра (в отличие от пейнтеров объекта).
+  зависит от `LevelMap`/ядра. `revealProgress` масштабирует лишь деталь `revealPartIndex`.
 
 ## Как проверить
 

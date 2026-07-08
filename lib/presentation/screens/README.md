@@ -19,11 +19,9 @@
 - `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
   победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
   (или «Начать заново», если `isComplete`), без «Назад».
-- `LevelCompleteScreen`/`ObjectCompleteScreen` — старые экраны «коллекции объектов»,
-  БОЛЬШЕ НЕ используются (заменены авто-показом корабля). Мёртвый код — удаляются в Стори 03 T3.
-- `CheatMenu({onSetShipParts})` / `showCheatMenu(context, {...})` — дев-читы (bottom sheet).
-  Только вид: логика — колбэки в `GameScreen`. Вход — кнопка `Key('cheat_button')`, видна лишь
-  под `kDebugMode`. Чит «состояние корабля»: N=0..3 → `ProgressService.setCurrentLevel(N)`.
+- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts})` / `showCheatMenu(...)` — дев-читы
+  (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`,
+  виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа, состояние корабля (N=0..3).
 
 ## Зависит от
 
@@ -55,5 +53,5 @@
 ## Как проверить
 
 `flutter test test/presentation/game_screen_test.dart test/navigation_test.dart
-test/level_complete_screen_test.dart test/object_complete_screen_test.dart
-test/presentation/ship_screen_test.dart test/presentation/cheat_menu_test.dart`.
+test/presentation/ship_screen_test.dart test/presentation/cheat_menu_test.dart
+test/presentation/win_flow_test.dart`.

@@ -21,7 +21,8 @@
 
 ## От него зависят
 
-- `presentation/screens` — `game_screen` (`levelAt`), `level_complete`/`object_complete` (`objects`).
+- `presentation/screens` — `game_screen` (`levelAt`). `LevelMap.objects` больше никем не
+  используется (старые экраны объекта удалены в Стори 03) — остаётся для эпика «Контент».
 
 ## Инварианты
 
