@@ -109,4 +109,23 @@ void main() {
       expect(find.byType(ShipScreen), findsOneWidget);
     },
   );
+
+  testWidgets('Авто-показ: заработанная деталь въезжает (revealProgress 0→1)',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ShipScreen.reveal(collectedCount: 2, onNext: () {}),
+      ),
+    );
+
+    // Первый кадр: деталь index 1 ещё не на месте (scale < 1).
+    await tester.pump();
+    final p0 = _shipPainter(tester);
+    expect(p0.revealPartIndex, 1);
+    expect(p0.revealProgress, lessThan(1.0));
+
+    // По завершении анимации — деталь на месте (scale == 1).
+    await tester.pumpAndSettle();
+    expect(_shipPainter(tester).revealProgress, 1.0);
+  });
 }

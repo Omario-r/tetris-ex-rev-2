@@ -10,9 +10,9 @@ import '../widgets/ship.dart';
 ///   `min(current_level, kShipPartCount)` деталей; читает [ProgressService];
 ///   есть «Назад» (Стори 01).
 /// - **авто-показ** (`ShipScreen.reveal(...)`) — после победы: фиксированное число
-///   деталей, кнопка «Далее»/«Начать заново», без «Назад» (Стори 03). Эффект
-///   появления детали добавляется в T2.
-class ShipScreen extends StatelessWidget {
+///   деталей, только что заработанная въезжает scale-in; кнопка «Далее»/«Начать
+///   заново», без «Назад» (Стори 03).
+class ShipScreen extends StatefulWidget {
   final int? _revealCount;
   final VoidCallback? _onNext;
   final bool _isComplete;
@@ -33,9 +33,40 @@ class ShipScreen extends StatelessWidget {
        _onNext = onNext,
        _isComplete = isComplete;
 
+  bool get _isReveal => _onNext != null;
+
+  @override
+  State<ShipScreen> createState() => _ShipScreenState();
+}
+
+class _ShipScreenState extends State<ShipScreen>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _revealController;
+  late final Animation<double> _revealAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget._isReveal) {
+      final c = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      );
+      _revealController = c;
+      _revealAnim = CurvedAnimation(parent: c, curve: Curves.easeOut);
+      c.forward();
+    }
+  }
+
+  @override
+  void dispose() {
+    _revealController?.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
-    return _onNext != null ? _buildReveal(context) : _buildManual(context);
+    return widget._isReveal ? _buildReveal(context) : _buildManual(context);
   }
 
   /// Ручной режим (Стори 01): читает прогресс, статичный вид, «Назад».
@@ -49,45 +80,62 @@ class ShipScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           final collected = math.min(snapshot.data!, kShipPartCount);
-          return _shipBody(context, collected);
+          return _column(
+            context,
+            collected,
+            CustomPaint(
+              size: const Size(300, 300),
+              painter: ShipPainter(collectedCount: collected),
+            ),
+          );
         },
       ),
     );
   }
 
-  /// Авто-показ (Стори 03): фиксированное число деталей + кнопка перехода.
+  /// Авто-показ (Стори 03): деталь `collected-1` въезжает scale-in + кнопка перехода.
   Widget _buildReveal(BuildContext context) {
+    final collected = widget._revealCount!;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Корабль'),
         automaticallyImplyLeading: false,
       ),
-      body: _shipBody(
+      body: _column(
         context,
-        _revealCount!,
+        collected,
+        AnimatedBuilder(
+          animation: _revealAnim,
+          builder: (_, _) => CustomPaint(
+            size: const Size(300, 300),
+            painter: ShipPainter(
+              collectedCount: collected,
+              revealPartIndex: collected - 1,
+              revealProgress: _revealAnim.value,
+            ),
+          ),
+        ),
         action: Padding(
           padding: const EdgeInsets.only(bottom: 16),
           child: ElevatedButton(
             key: const Key('ship_next_button'),
-            onPressed: _onNext,
-            child: Text(_isComplete ? 'Начать заново' : 'Далее'),
+            onPressed: widget._onNext,
+            child: Text(widget._isComplete ? 'Начать заново' : 'Далее'),
           ),
         ),
       ),
     );
   }
 
-  Widget _shipBody(BuildContext context, int collected, {Widget? action}) {
+  Widget _column(
+    BuildContext context,
+    int collected,
+    Widget shipPaint, {
+    Widget? action,
+  }) {
     return Column(
       children: [
-        Expanded(
-          child: Center(
-            child: CustomPaint(
-              size: const Size(300, 300),
-              painter: ShipPainter(collectedCount: collected),
-            ),
-          ),
-        ),
+        Expanded(child: Center(child: shipPaint)),
         Padding(
           padding: const EdgeInsets.all(16),
           child: Text(

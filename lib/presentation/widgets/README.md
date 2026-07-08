@@ -18,8 +18,10 @@
 - `ObjectFragmentGridPainter(objectTemplate, completedFragmentIndex, animProgress)` —
   сетка фрагментов объекта, новая деталь въезжает анимацией scale.
 - `ObjectFullPainter(objectTemplate)` — собранный объект целиком, статично.
-- `ShipPainter({collectedCount})` — единый корабль из 3 деталей-заглушек: первые
-  `collectedCount` установлены (залиты), остальные — контуром. `collectedCount` клампится 0..3.
+- `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из 3
+  деталей-заглушек: первые `collectedCount` установлены (залиты), остальные — контуром;
+  `collectedCount` клампится 0..3. Деталь `revealPartIndex` рисуется масштабом
+  `revealProgress` (0..1) от центра — эффект появления (Стори 03); по умолчанию все статичны.
 - `Ship.parts` / `ShipPart` / `kShipPartCount` (`ship.dart`) — модель корабля: список из
   `kShipPartCount = 3` деталей-заглушек (нормализованные `Rect` в сетке 10×10). Единый
   источник истины «3 детали ↔ 3 уровня» для эпика «Мета-каркас».

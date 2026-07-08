@@ -40,8 +40,18 @@ class ShipPainter extends CustomPainter {
   /// Сколько деталей уже собрано (0..[kShipPartCount]). Клампится в конструкторе.
   final int collectedCount;
 
-  ShipPainter({required int collectedCount})
-      : collectedCount = collectedCount.clamp(0, kShipPartCount);
+  /// Индекс детали, которая «въезжает» (scale-in). `null` — все статичны.
+  final int? revealPartIndex;
+
+  /// Прогресс появления детали [revealPartIndex]: 0 (нет) .. 1 (на месте).
+  /// Остальные детали рисуются всегда полным размером.
+  final double revealProgress;
+
+  ShipPainter({
+    required int collectedCount,
+    this.revealPartIndex,
+    this.revealProgress = 1.0,
+  }) : collectedCount = collectedCount.clamp(0, kShipPartCount);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -69,8 +79,18 @@ class ShipPainter extends CustomPainter {
         u.height * cell,
       );
       if (i < collectedCount) {
-        canvas.drawRect(rect, fillPaint);
-        canvas.drawRect(rect, installedStroke);
+        // Только заработанная деталь (revealPartIndex) масштабируется от центра.
+        final scale = i == revealPartIndex ? revealProgress : 1.0;
+        if (scale <= 0) continue;
+        final drawRect = scale == 1.0
+            ? rect
+            : Rect.fromCenter(
+                center: rect.center,
+                width: rect.width * scale,
+                height: rect.height * scale,
+              );
+        canvas.drawRect(drawRect, fillPaint);
+        canvas.drawRect(drawRect, installedStroke);
       } else {
         canvas.drawRect(rect, ghostStroke);
       }
@@ -79,5 +99,7 @@ class ShipPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(ShipPainter oldDelegate) =>
-      oldDelegate.collectedCount != collectedCount;
+      oldDelegate.collectedCount != collectedCount ||
+      oldDelegate.revealPartIndex != revealPartIndex ||
+      oldDelegate.revealProgress != revealProgress;
 }
