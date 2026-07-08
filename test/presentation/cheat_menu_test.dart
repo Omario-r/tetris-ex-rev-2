@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/presentation/screens/cheat_menu.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
-import 'package:explosive_tetris/presentation/screens/level_complete_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
@@ -96,8 +95,10 @@ void main() {
     await tester.tap(find.byKey(const Key('cheat_instant_win')));
     await _pumpFrames(tester);
 
-    // Запустился тот же пост-победный поток, что после обычной победы.
-    expect(find.byType(LevelCompleteScreen), findsOneWidget);
+    // Запустился тот же пост-победный поток, что после обычной победы —
+    // авто-показ корабля (Стори 03) с кнопкой перехода.
+    expect(find.byType(ShipScreen), findsOneWidget);
+    expect(find.byKey(const Key('ship_next_button')), findsOneWidget);
     // Прогресс засчитан: 0 → 1.
     expect(await ProgressService().getCurrentLevel(), 1);
   });

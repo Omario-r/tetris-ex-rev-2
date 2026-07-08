@@ -13,12 +13,14 @@
 
 - `GameScreen({levelIndex=0})` — `StatefulWidget`. Держит `AnimationController` (цикл ~60fps →
   `controller.tick(dt)`), `GameController`; рисует `BoardPainter` + `GameHud`; на победе
-  зовёт `ProgressService.advanceOnWin` и ведёт навигацию.
-- `LevelCompleteScreen({completedLevelIndex, onNext})` — сетка фрагментов объекта,
-  анимированная установка новой детали.
-- `ObjectCompleteScreen({completedObjectId, onNext})` — экран собранного объекта.
-- `ShipScreen()` — статичный экран корабля: `ShipPainter` по `min(current_level, kShipPartCount)`;
-  читает `ProgressService.getCurrentLevel()`. Вход — кнопка-иконка `Key('ship_button')` на `GameScreen`.
+  зовёт `ProgressService.advanceOnWin` и открывает авто-показ корабля.
+- `ShipScreen()` — ручной статичный экран корабля: `ShipPainter` по `min(current_level,
+  kShipPartCount)`; читает `ProgressService`. Вход — `Key('ship_button')` на `GameScreen`.
+- `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
+  победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
+  (или «Начать заново», если `isComplete`), без «Назад».
+- `LevelCompleteScreen`/`ObjectCompleteScreen` — старые экраны «коллекции объектов»,
+  БОЛЬШЕ НЕ используются (заменены авто-показом корабля). Мёртвый код — удаляются в Стори 03 T3.
 - `CheatMenu({onSetShipParts})` / `showCheatMenu(context, {...})` — дев-читы (bottom sheet).
   Только вид: логика — колбэки в `GameScreen`. Вход — кнопка `Key('cheat_button')`, видна лишь
   под `kDebugMode`. Чит «состояние корабля»: N=0..3 → `ProgressService.setCurrentLevel(N)`.
@@ -40,8 +42,9 @@
   `AnimationController.repeat` → `_onTick` → `controller.tick(dt)` → `setState`.
 - Навигация: захватить `NavigatorState` (`Navigator.of(context)`) ДО `pushReplacement`;
   после ухода с экрана `context` не трогать (проверка `mounted`). Победа обрабатывается один раз (`_winHandled`).
-- Поток экранов: Game → LevelComplete → (ObjectComplete в конце объекта) → Game(следующий).
-  После уровня 15 — переход на 0.
+- Поток после победы: Game → `ProgressService.advanceOnWin` → `ShipScreen.reveal`
+  (деталь +1) → «Далее» → Game(следующий). На последнем дев-уровне (индекс
+  `kShipPartCount-1`) → корабль 3/3 + «Начать заново» → `ProgressService.reset()` → Game(0).
 - Экран корабля открывается `Navigator.push` (НЕ `pushReplacement`): `GameScreen` остаётся
   под стеком, «Назад» из `AppBar` возвращает в ту же партию.
 - У `GameScreen` нет `AppBar` → его `body` обёрнут в `SafeArea` вручную; иначе шапка

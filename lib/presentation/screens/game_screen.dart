@@ -11,9 +11,8 @@ import '../theme/block_theme.dart';
 import '../theme/level_skin.dart';
 import '../widgets/board_painter.dart';
 import '../widgets/hud.dart';
+import '../widgets/ship.dart';
 import 'cheat_menu.dart';
-import 'level_complete_screen.dart';
-import 'object_complete_screen.dart';
 import 'ship_screen.dart';
 
 /// The main game screen widget that displays the Tetris game.
@@ -109,40 +108,38 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Capture navigator BEFORE pushReplacement while context is still valid
     final navigator = Navigator.of(context);
 
+    // Последний дев-уровень (индекс kShipPartCount-1) → корабль собран (3/3).
+    final isLastDevLevel = completedLevel >= kShipPartCount - 1;
+    final collected = isLastDevLevel ? kShipPartCount : completedLevel + 1;
+
+    // Авто-показ прироста: победа → экран корабля с новой деталью.
     navigator.pushReplacement(
       MaterialPageRoute(
-        builder: (_) => LevelCompleteScreen(
-          completedLevelIndex: completedLevel,
-          onNext: () => _afterLevelComplete(navigator, completedLevel),
+        builder: (_) => ShipScreen.reveal(
+          collectedCount: collected,
+          isComplete: isLastDevLevel,
+          onNext: () =>
+              _afterShipReveal(navigator, completedLevel, isLastDevLevel),
         ),
       ),
     );
   }
 
-  void _afterLevelComplete(NavigatorState navigator, int completedLevel) {
-    final isLastFragmentOfObject = (completedLevel + 1) % 4 == 0;
-    final nextLevel = completedLevel + 1;
-
-    if (isLastFragmentOfObject && nextLevel <= 15) {
-      // Show ObjectCompleteScreen
+  Future<void> _afterShipReveal(
+    NavigatorState navigator,
+    int completedLevel,
+    bool isLastDevLevel,
+  ) async {
+    if (isLastDevLevel) {
+      // Корабль собран → сброс прогресса и новый круг с уровня 1.
+      await ProgressService().reset();
       navigator.pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => ObjectCompleteScreen(
-            completedObjectId: completedLevel ~/ 4,
-            onNext: () => navigator.pushReplacement(
-              MaterialPageRoute(
-                builder: (_) =>
-                    GameScreen(levelIndex: nextLevel <= 15 ? nextLevel : 0),
-              ),
-            ),
-          ),
-        ),
+        MaterialPageRoute(builder: (_) => const GameScreen(levelIndex: 0)),
       );
     } else {
       navigator.pushReplacement(
         MaterialPageRoute(
-          builder: (_) =>
-              GameScreen(levelIndex: nextLevel <= 15 ? nextLevel : 0),
+          builder: (_) => GameScreen(levelIndex: completedLevel + 1),
         ),
       );
     }
