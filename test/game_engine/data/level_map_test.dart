@@ -42,4 +42,48 @@ void main() {
       });
     }
   });
+
+  group('Структурные проверки «уровень проходим» (T2, ⚠ хрупкое)', () {
+    for (int i = 0; i < ShipParts.parts.length; i++) {
+      final level = LevelMap.levelAt(i);
+      final cells = level.targetMask.cells;
+
+      test('уровень $i: мишень непуста', () {
+        expect(cells, isNotEmpty);
+      });
+
+      test('уровень $i: площадь мишени ≥ 4 (минимум одного тетромино)', () {
+        expect(cells.length, greaterThanOrEqualTo(4));
+      });
+
+      test('уровень $i: мишень достижима сверху (targetY в границах поля)', () {
+        // Мишень не «висит» выше верхней границы и не выходит за нижнюю —
+        // падающей фигуре есть куда падать от спавна (y=0) до цели.
+        expect(level.targetY, greaterThanOrEqualTo(0));
+        expect(
+          level.targetY + level.targetMask.height,
+          lessThanOrEqualTo(level.boardHeight),
+        );
+      });
+
+      test('уровень $i: клетки мишени образуют один связный кусок (4-связность)', () {
+        final set = cells.map((c) => (c.x, c.y)).toSet();
+        final start = set.first;
+        final seen = <(int, int)>{start};
+        final stack = [start];
+        while (stack.isNotEmpty) {
+          final (x, y) = stack.removeLast();
+          for (final n in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]) {
+            if (set.contains(n) && seen.add(n)) stack.add(n);
+          }
+        }
+        expect(seen.length, equals(set.length),
+            reason: 'мишень $i распадается на несвязные части');
+      });
+
+      test('уровень $i: halo H не пересекается с мишенью S', () {
+        expect(level.H.intersection(level.S), isEmpty);
+      });
+    }
+  });
 }
