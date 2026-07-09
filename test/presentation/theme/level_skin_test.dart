@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:explosive_tetris/game_engine/data/level_map.dart';
+import 'package:explosive_tetris/game_engine/models/level_template.dart';
+import 'package:explosive_tetris/game_engine/models/target_mask.dart';
 import 'package:explosive_tetris/presentation/theme/block_material.dart';
 import 'package:explosive_tetris/presentation/theme/level_skin.dart';
 
@@ -29,12 +30,25 @@ void main() {
     });
 
     test('materialForLevel_matches_levelIndex_table', () {
-      for (var i = 0; i < 16; i++) {
-        final level = LevelMap.levelAt(i);
-        expect(
-          LevelSkin.materialForLevel(level),
-          LevelSkin.materialForLevelIndex(i),
-        );
+      // Чистая функция темы (objectId/fragmentIndex → материал); level template
+      // строим напрямую, не завязываясь на реальное число уровней в LevelMap.
+      for (var objectId = 0; objectId < 4; objectId++) {
+        for (var fragmentIndex = 0; fragmentIndex < 4; fragmentIndex++) {
+          final levelIndex = objectId * 4 + fragmentIndex;
+          final level = LevelTemplate(
+            boardWidth: 10,
+            boardHeight: 20,
+            targetMask: defaultTargetMask,
+            targetX: 2,
+            targetY: 14,
+            objectId: objectId,
+            fragmentIndex: fragmentIndex,
+          );
+          expect(
+            LevelSkin.materialForLevel(level),
+            LevelSkin.materialForLevelIndex(levelIndex),
+          );
+        }
       }
     });
 
