@@ -68,4 +68,6 @@ lib/main.dart (вход)
   на нём написаны тесты движка, не удалять при чистке контента.
 - **Команды и смоук-тест:** `flutter pub get` / `flutter run` / `flutter test` / `flutter analyze`
   (analyze — ноль ошибок и предупреждений). Смоук/сквозной сценарий:
-  `flutter test test/widget_test.dart test/integration/golden_scenario_test.dart`.
+  `flutter test test/widget_test.dart test/integration/golden_scenario_test.dart
+  test/presentation/win_flow_test.dart` (последний — полный прогон всех уровней контента
+  до собранного корабля, эпик «Контент» Стори 03; `widget_test.dart` — пустая заглушка, см. BACKLOG).

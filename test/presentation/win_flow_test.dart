@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
+import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
 /// Пост-победный поток (Стори 03): победа → авто-показ корабля → следующий уровень;
 /// на последнем дев-уровне → N/N + «Начать заново» → сброс.
@@ -73,6 +74,35 @@ void main() {
       expect(game.levelIndex, 0);
       expect(find.text('Level 1'), findsOneWidget);
       expect(await ProgressService().getCurrentLevel(), 0);
+    },
+  );
+
+  testWidgets(
+    'полный прогон (Стори 03, смоук): все kShipPartCount уровней подряд → '
+    'сборка N/N → «Начать заново» → уровень 0',
+    (t) async {
+      SharedPreferences.setMockInitialValues({'current_level': 0});
+      await pumpGame(t, 0);
+
+      for (int level = 0; level < kShipPartCount; level++) {
+        await _instantWin(t);
+        final collected = level + 1;
+        final isLast = level == kShipPartCount - 1;
+
+        expect(find.text('Собрано $collected из $kShipPartCount'), findsOneWidget,
+            reason: 'после уровня $level должно быть собрано $collected деталей');
+        expect(find.text(isLast ? 'Начать заново' : 'Далее'), findsOneWidget);
+
+        await t.tap(find.byKey(const Key('ship_next_button')));
+        await _pump(t);
+
+        final game = t.widget<GameScreen>(find.byType(GameScreen));
+        expect(game.levelIndex, isLast ? 0 : level + 1);
+      }
+
+      // Полный круг завершён: прогресс сброшен, снова уровень 0.
+      expect(await ProgressService().getCurrentLevel(), 0);
+      expect(find.text('Level 1'), findsOneWidget);
     },
   );
 }

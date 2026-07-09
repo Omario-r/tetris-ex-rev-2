@@ -48,6 +48,21 @@ void main() {
     }
   });
 
+  testWidgets('Чит «выбор уровня» предлагает ровно kShipPartCount уровней',
+      (tester) async {
+    await pumpGame(tester);
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+
+    for (int i = 0; i < kShipPartCount; i++) {
+      expect(find.byKey(Key('cheat_level_$i')), findsOneWidget,
+          reason: 'уровень $i должен быть предложен читом');
+    }
+    expect(find.byKey(Key('cheat_level_$kShipPartCount')), findsNothing,
+        reason: 'уровней ровно kShipPartCount — лишнего быть не должно');
+  });
+
   testWidgets('Чит «состояние корабля»: N=2 → прогресс=2 → корабль 2/7',
       (tester) async {
     await pumpGame(tester);
