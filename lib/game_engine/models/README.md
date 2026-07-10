@@ -17,9 +17,9 @@
 - `TargetMask{width,height,mask}` c `contains(x,y)`, `cells`; `defaultTargetMask` (крест 6×6, `0x30CFFF30C`).
 - `LevelTemplate{boardWidth,boardHeight,targetMask,targetX,targetY,moveLimit?,objectId,fragmentIndex,chargeBudget}` — при создании вычисляет `S` и `H`; `defaultLevel`. `objectId`/`fragmentIndex` —
   ключ для `presentation/theme` (`LevelSkin.materialForObjectFragment`), не связаны с моделью
-  «объектов» (удалена в эпике «Контент», Стори 02). `chargeBudget` (дефолт 3) — заряды взрыва
-  на уровень (эпик «Взрыв», Стори 01); в `LevelMap` пока единый плейсхолдер, тюнинг per-level —
-  Стори 02.
+  «объектов» (удалена в эпике «Контент», Стори 02). `chargeBudget` (дефолт 3, используется
+  только тестовой фикстурой `defaultLevel`) — заряды взрыва на уровень (эпик «Взрыв»); в
+  `LevelMap` — per-level значения (`_chargeBudgets`, Стори 02), не единый дефолт.
 
 ## Зависит от
 
