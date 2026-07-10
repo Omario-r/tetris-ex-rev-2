@@ -115,6 +115,41 @@ void main() {
     expect(hud.state.charges, 5);
   });
 
+  testWidgets(
+      'Чит-меню не переполняется на маленьком экране (390×844, iPhone-like) '
+      'и все секции доступны через скролл',
+      (tester) async {
+    // Регрессия: на большом тестовом канвасе (1200×1600, см. pumpGame выше)
+    // переполнение не проявлялось — поймано PO на реальном устройстве
+    // (iPhone-эмулятор), не тестами. Здесь — реалистичный маленький вьюпорт.
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    await tester.pumpWidget(MaterialApp(home: GameScreen(levelIndex: 0)));
+    await tester.pump();
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+
+    expect(tester.takeException(), isNull,
+        reason: 'чит-меню не должно переполняться (RenderFlex overflow) на '
+            'маленьком экране — регрессия к hotfix 2026-07-11');
+
+    // Последняя секция («Заряды взрыва») не помещается без скролла на таком
+    // экране — но должна быть достижима и рабочей через scroll внутри sheet.
+    await tester.scrollUntilVisible(
+      find.byKey(const Key('cheat_charges_5')),
+      200.0,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(const Key('cheat_charges_5')));
+    await _pumpFrames(tester);
+
+    expect(tester.takeException(), isNull);
+    final hud = tester.widget<GameHud>(find.byType(GameHud));
+    expect(hud.state.charges, 5);
+  });
+
   testWidgets('Чит «мгновенная победа»: прогресс +1 и пост-победный экран',
       (tester) async {
     SharedPreferences.setMockInitialValues({'current_level': 0});

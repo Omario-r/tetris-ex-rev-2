@@ -43,47 +43,49 @@ class CheatMenu extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Чит-меню (dev)',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-            _section(context, 'Выбор уровня', [
-              for (int i = 0; i < (levelCount ?? kShipPartCount); i++)
-                ElevatedButton(
-                  key: Key('cheat_level_$i'),
-                  onPressed: () => onSelectLevel(i),
-                  child: Text('${i + 1}'),
-                ),
-            ]),
-            _section(context, 'Мгновенная победа', [
-              ElevatedButton(
-                key: const Key('cheat_instant_win'),
-                onPressed: onInstantWin,
-                child: const Text('Победить'),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Чит-меню (dev)',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-            ]),
-            _section(context, 'Состояние корабля', [
-              for (int n = 0; n <= kShipPartCount; n++)
+              const SizedBox(height: 16),
+              _section(context, 'Выбор уровня', [
+                for (int i = 0; i < (levelCount ?? kShipPartCount); i++)
+                  ElevatedButton(
+                    key: Key('cheat_level_$i'),
+                    onPressed: () => onSelectLevel(i),
+                    child: Text('${i + 1}'),
+                  ),
+              ]),
+              _section(context, 'Мгновенная победа', [
                 ElevatedButton(
-                  key: Key('cheat_ship_parts_$n'),
-                  onPressed: () => onSetShipParts(n),
-                  child: Text('$n'),
+                  key: const Key('cheat_instant_win'),
+                  onPressed: onInstantWin,
+                  child: const Text('Победить'),
                 ),
-            ]),
-            _section(context, 'Заряды взрыва', [
-              for (int n = 0; n <= _maxCheatCharges; n++)
-                ElevatedButton(
-                  key: Key('cheat_charges_$n'),
-                  onPressed: () => onSetCharges(n),
-                  child: Text('$n'),
-                ),
-            ]),
-          ],
+              ]),
+              _section(context, 'Состояние корабля', [
+                for (int n = 0; n <= kShipPartCount; n++)
+                  ElevatedButton(
+                    key: Key('cheat_ship_parts_$n'),
+                    onPressed: () => onSetShipParts(n),
+                    child: Text('$n'),
+                  ),
+              ]),
+              _section(context, 'Заряды взрыва', [
+                for (int n = 0; n <= _maxCheatCharges; n++)
+                  ElevatedButton(
+                    key: Key('cheat_charges_$n'),
+                    onPressed: () => onSetCharges(n),
+                    child: Text('$n'),
+                  ),
+              ]),
+            ],
+          ),
         ),
       ),
     );
@@ -114,6 +116,7 @@ Future<void> showCheatMenu(
 }) {
   return showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
     builder: (_) => CheatMenu(
       onSelectLevel: onSelectLevel,
       onInstantWin: onInstantWin,
