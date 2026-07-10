@@ -11,10 +11,12 @@
 ## Публичный интерфейс
 
 - `GamePhase{spawning,falling,won,lost}`.
-- `GameState{board,fallingPiece?,phase,generator,level}` c `copyWith(clearFallingPiece)`
-  и геттерами `dirtyHalo`, `canArm`, `canDetonate`, `isWin`, `isLost`.
+- `GameState{board,fallingPiece?,phase,generator,level,charges}` c `copyWith(clearFallingPiece)`
+  и геттерами `dirtyHalo`, `canArm`, `canDetonate`, `isWin`, `isLost`. `charges` — заряды взрыва
+  на партию; дефолт `level.chargeBudget` (не передан явно → берётся из уровня).
 - `GameController(initialState, gravityInterval=0.5)`: `state`; команды
-  `moveLeft/moveRight/rotateCW/softDrop/armExplosive/detonate`; `tick(dt)`.
+  `moveLeft/moveRight/rotateCW/softDrop/armExplosive/detonate/setCharges`; `tick(dt)`.
+  `setCharges(n)` — дев-чит, выставляет заряды напрямую (см. `presentation/screens/CheatMenu`).
 
 ## Зависит от
 
@@ -34,9 +36,12 @@
   `Board` при lock/взрыве мутируется на месте (тот же объект).
 - `tick(dt)`: `won/lost` → выход; `spawning` → спавн в `(x=3, y=0)`, занятость спавна → `lost`;
   `falling` → аккумулятор гравитации, затем lock (normal) или полёт/авто-детонация (explosive).
-- `armExplosive` — ровно раз на фигуру (`normal→explosive`, `armedUsed`, необратимо).
+- `armExplosive` — ровно раз на фигуру (`normal→explosive`, `armedUsed`, необратимо), списывает
+  1 заряд; на `charges == 0` — **no-op** (заряд не взводится, `charges` не уходит в минус).
   `detonate` — вручную или авто у пола. Победа проверяется после каждого lock и каждого взрыва.
 - Поражение — только переполнение спавна. Гравитации после взрыва нет.
+- `charges` не переносятся между уровнями/партиями: новый `GameState` (новый уровень —
+  `presentation/screens/GameScreen` пересоздаёт `GameController`) заново берёт `level.chargeBudget`.
 
 ## Как проверить
 

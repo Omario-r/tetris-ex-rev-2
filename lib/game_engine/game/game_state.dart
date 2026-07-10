@@ -11,14 +11,16 @@ class GameState {
   final GamePhase phase;
   final PieceGenerator generator;
   final LevelTemplate level;
+  final int charges;
 
-  const GameState({
+  GameState({
     required this.board,
     required this.fallingPiece,
     required this.phase,
     required this.generator,
     required this.level,
-  });
+    int? charges,
+  }) : charges = charges ?? level.chargeBudget;
 
   GameState copyWith({
     Board? board,
@@ -26,6 +28,7 @@ class GameState {
     GamePhase? phase,
     PieceGenerator? generator,
     LevelTemplate? level,
+    int? charges,
     bool clearFallingPiece = false,
   }) {
     return GameState(
@@ -34,6 +37,7 @@ class GameState {
       phase: phase ?? this.phase,
       generator: generator ?? this.generator,
       level: level ?? this.level,
+      charges: charges ?? this.charges,
     );
   }
 
@@ -43,7 +47,8 @@ class GameState {
   bool get canArm =>
       fallingPiece != null &&
       fallingPiece!.mode == PieceMode.normal &&
-      !fallingPiece!.armedUsed;
+      !fallingPiece!.armedUsed &&
+      charges > 0;
 
   bool get canDetonate =>
       fallingPiece != null &&

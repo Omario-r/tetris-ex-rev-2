@@ -55,9 +55,16 @@ class GameController {
     if (fp == null) return;
     if (fp.mode != PieceMode.normal) return;
     if (fp.armedUsed) return;
+    if (_state.charges <= 0) return;
     _state = _state.copyWith(
       fallingPiece: fp.copyWith(mode: PieceMode.explosive, armedUsed: true),
+      charges: _state.charges - 1,
     );
+  }
+
+  /// Дев-чит: выставляет число зарядов напрямую (см. `CheatMenu`).
+  void setCharges(int charges) {
+    _state = _state.copyWith(charges: charges);
   }
 
   void detonate() {

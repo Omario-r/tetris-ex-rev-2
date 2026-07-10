@@ -16,6 +16,9 @@ class LevelMap {
         targetY: 20 - ShipParts.parts[i].mask.height,
         objectId: 0,
         fragmentIndex: i,
+        // Плейсхолдер: единый бюджет зарядов для всех уровней (эпик «Взрыв», Стори 01).
+        // Тюнинг per-level значений — Стори 02.
+        chargeBudget: 3,
       ),
   ];
 

@@ -477,6 +477,62 @@ void main() {
     });
   });
 
+  group('заряды (экономика взрыва)', () {
+    test('заряды на старте == chargeBudget уровня', () {
+      final c = _makeController();
+      expect(c.state.charges, defaultLevel.chargeBudget);
+    });
+
+    test('armExplosive списывает 1 заряд', () {
+      final c = _makeController();
+      c.tick(0.1);
+      final before = c.state.charges;
+      c.armExplosive();
+      expect(c.state.charges, before - 1);
+    });
+
+    test('armExplosive на 0 зарядах — no-op (фигура остаётся normal)', () {
+      final level = LevelTemplate(
+        boardWidth: 10,
+        boardHeight: 20,
+        targetMask: defaultTargetMask,
+        targetX: 2,
+        targetY: 14,
+        chargeBudget: 0,
+      );
+      final c = GameController(
+        initialState: GameState(
+          board: Board(10, 20),
+          fallingPiece: null,
+          phase: GamePhase.spawning,
+          generator: FixedSequenceGenerator([PieceType.I]),
+          level: level,
+        ),
+      );
+      c.tick(0.1); // spawn → falling
+      c.armExplosive();
+      expect(c.state.fallingPiece!.mode, PieceMode.normal);
+      expect(c.state.fallingPiece!.armedUsed, isFalse);
+      expect(c.state.charges, 0);
+    });
+
+    test('новый GameController/уровень — заряды снова равны бюджету', () {
+      final c1 = _makeController();
+      c1.tick(0.1);
+      c1.armExplosive();
+      expect(c1.state.charges, defaultLevel.chargeBudget - 1);
+
+      final c2 = _makeController();
+      expect(c2.state.charges, defaultLevel.chargeBudget);
+    });
+
+    test('setCharges — дев-чит выставляет заряды напрямую', () {
+      final c = _makeController();
+      c.setCharges(7);
+      expect(c.state.charges, 7);
+    });
+  });
+
   group('dirtyHalo', () {
     test('все H пусты → dirtyHalo пустой', () {
       final c = _makeController();

@@ -10,6 +10,7 @@ class LevelTemplate {
   final int? moveLimit;
   final int objectId;       // индекс объекта (0..3), дефолт 0
   final int fragmentIndex;  // индекс фрагмента (0..3), дефолт 0
+  final int chargeBudget;   // заряды взрыва на уровень (эпик «Взрыв»); дефолт-плейсхолдер
 
   late final Set<(int, int)> S;
   late final Set<(int, int)> H;
@@ -23,6 +24,7 @@ class LevelTemplate {
     this.moveLimit,
     this.objectId = 0,
     this.fragmentIndex = 0,
+    this.chargeBudget = 3,
   }) {
     S = {
       for (final cell in targetMask.cells)
