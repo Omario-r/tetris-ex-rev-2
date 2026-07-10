@@ -43,20 +43,35 @@ class GameHud extends StatelessWidget {
             onPressed: () => controller.moveRight(),
           ),
           const SizedBox(width: 24),
-          Opacity(
-            opacity: state.canArm ? 1.0 : 0.3,
-            child: IconButton(
-              key: const Key('arm_button'),
-              icon: SizedBox(
-                width: 32,
-                height: 32,
-                child: CustomPaint(
-                  painter: const CreeperFacePainter(),
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Opacity(
+                opacity: state.canArm ? 1.0 : 0.3,
+                child: IconButton(
+                  key: const Key('arm_button'),
+                  icon: SizedBox(
+                    width: 32,
+                    height: 32,
+                    child: CustomPaint(
+                      painter: const CreeperFacePainter(),
+                    ),
+                  ),
+                  tooltip: 'Arm explosive',
+                  onPressed:
+                      state.canArm ? () => controller.armExplosive() : null,
                 ),
               ),
-              tooltip: 'Arm explosive',
-              onPressed: state.canArm ? () => controller.armExplosive() : null,
-            ),
+              Text(
+                '${state.charges}',
+                key: const Key('charges_indicator'),
+                style: TextStyle(
+                  color: state.charges > 0 ? Colors.white : Colors.redAccent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+            ],
           ),
           Opacity(
             opacity: state.canDetonate ? 1.0 : 0.3,

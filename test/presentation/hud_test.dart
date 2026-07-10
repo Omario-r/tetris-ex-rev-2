@@ -102,5 +102,72 @@ void main() {
 
       expect(find.byKey(const Key('arm_button')), findsOneWidget);
     });
+
+    testWidgets('charges_indicator показывает текущий остаток зарядов', (
+      WidgetTester tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GameHud(
+              controller: controller,
+              state: controller.state,
+            ),
+          ),
+        ),
+      );
+
+      final text = tester.widget<Text>(
+        find.byKey(const Key('charges_indicator')),
+      );
+      expect(text.data, '${controller.state.charges}');
+    });
+
+    testWidgets(
+      'charges_indicator читается без слов: цвет меняется на 0 зарядов',
+      (WidgetTester tester) async {
+        controller.setCharges(0);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: GameHud(
+                controller: controller,
+                state: controller.state,
+              ),
+            ),
+          ),
+        );
+
+        final text = tester.widget<Text>(
+          find.byKey(const Key('charges_indicator')),
+        );
+        expect(text.data, '0');
+        expect(text.style?.color, equals(Colors.redAccent));
+      },
+    );
+
+    testWidgets(
+      'charges_indicator обычный цвет, когда заряды есть',
+      (WidgetTester tester) async {
+        controller.setCharges(3);
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              body: GameHud(
+                controller: controller,
+                state: controller.state,
+              ),
+            ),
+          ),
+        );
+
+        final text = tester.widget<Text>(
+          find.byKey(const Key('charges_indicator')),
+        );
+        expect(text.style?.color, equals(Colors.white));
+      },
+    );
   });
 }

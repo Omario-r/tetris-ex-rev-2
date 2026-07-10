@@ -14,7 +14,10 @@
   поля: фон, ghost-мишень (незаполненные `S`), уложенные блоки, пульс dirty-halo,
   drop-ghost (normal), падающая фигура.
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
-  arm (крипер) + detonate; активность через `state.canArm/canDetonate`.
+  arm (крипер) + detonate; активность через `state.canArm/canDetonate`. Под кнопкой arm —
+  числовой индикатор `state.charges` (`Key('charges_indicator')`): белый при `charges > 0`,
+  `Colors.redAccent` на 0 (эпик «Взрыв», Стори 01). `canArm` уже учитывает `charges > 0` —
+  кнопка arm сама димится на 0 (см. `game_engine/game` README).
 - `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из
   `kShipPartCount` деталей: первые `collectedCount` установлены (залиты), остальные —
   контуром; `collectedCount` клампится 0..`kShipPartCount`. Каждая деталь — маска
