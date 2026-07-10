@@ -6,6 +6,7 @@ import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/presentation/screens/cheat_menu.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
+import 'package:explosive_tetris/presentation/widgets/hud.dart';
 import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
 ShipPainter _shipPainter(WidgetTester tester) => tester
@@ -97,6 +98,21 @@ void main() {
     final game = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(game.levelIndex, 2);
     expect(find.text('Level 3'), findsOneWidget);
+  });
+
+  testWidgets('Чит «заряды взрыва»: N=5 → заряды в HUD == 5',
+      (tester) async {
+    await pumpGame(tester);
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+
+    expect(find.byKey(const Key('cheat_charges_5')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('cheat_charges_5')));
+    await _pumpFrames(tester);
+
+    final hud = tester.widget<GameHud>(find.byType(GameHud));
+    expect(hud.state.charges, 5);
   });
 
   testWidgets('Чит «мгновенная победа»: прогресс +1 и пост-победный экран',

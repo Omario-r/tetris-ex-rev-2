@@ -153,6 +153,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       onSelectLevel: _cheatSelectLevel,
       onInstantWin: _cheatInstantWin,
       onSetShipParts: _cheatSetShipParts,
+      onSetCharges: _cheatSetCharges,
     );
   }
 
@@ -183,6 +184,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  /// Чит «заряды взрыва» (эпик «Взрыв»): выставить заряды в текущей партии напрямую.
+  void _cheatSetCharges(int charges) {
+    Navigator.of(context).pop(); // закрыть bottom sheet
+    setState(() => _controller.setCharges(charges));
   }
 
   @override

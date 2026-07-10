@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../widgets/ship.dart';
 
+/// Верхняя граница кнопок чита «заряды взрыва» (0.._maxCheatCharges) — с запасом
+/// над плейсхолдер-бюджетом (эпик «Взрыв», Стори 01/02).
+const _maxCheatCharges = 5;
+
 /// Оверлей чит-меню для дев-сборки: минимальный список кнопок.
 ///
 /// Показывается через [showCheatMenu] (bottom sheet). Вход на него — только под
@@ -17,6 +21,9 @@ class CheatMenu extends StatelessWidget {
   /// Задать «собрано N деталей» (N = 0..[kShipPartCount]).
   final void Function(int parts) onSetShipParts;
 
+  /// Задать число зарядов взрыва в текущей партии (эпик «Взрыв»).
+  final void Function(int charges) onSetCharges;
+
   /// Сколько дев-уровней предлагать в «выборе уровня». `null` (по умолчанию) —
   /// все детали корабля [kShipPartCount] (не можем задать дефолтом: `kShipPartCount`
   /// не `const`). Единый источник истины «N уровней ↔ N деталей».
@@ -27,6 +34,7 @@ class CheatMenu extends StatelessWidget {
     required this.onSelectLevel,
     required this.onInstantWin,
     required this.onSetShipParts,
+    required this.onSetCharges,
     this.levelCount,
   });
 
@@ -67,6 +75,14 @@ class CheatMenu extends StatelessWidget {
                   child: Text('$n'),
                 ),
             ]),
+            _section(context, 'Заряды взрыва', [
+              for (int n = 0; n <= _maxCheatCharges; n++)
+                ElevatedButton(
+                  key: Key('cheat_charges_$n'),
+                  onPressed: () => onSetCharges(n),
+                  child: Text('$n'),
+                ),
+            ]),
           ],
         ),
       ),
@@ -94,6 +110,7 @@ Future<void> showCheatMenu(
   required void Function(int levelIndex) onSelectLevel,
   required VoidCallback onInstantWin,
   required void Function(int parts) onSetShipParts,
+  required void Function(int charges) onSetCharges,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -101,6 +118,7 @@ Future<void> showCheatMenu(
       onSelectLevel: onSelectLevel,
       onInstantWin: onInstantWin,
       onSetShipParts: onSetShipParts,
+      onSetCharges: onSetCharges,
     ),
   );
 }

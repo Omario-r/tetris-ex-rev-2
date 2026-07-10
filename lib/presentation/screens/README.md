@@ -19,10 +19,12 @@
 - `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
   победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
   (или «Начать заново», если `isComplete`), без «Назад».
-- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts})` / `showCheatMenu(...)` — дев-читы
-  (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`,
-  виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа, состояние корабля
-  (N=0..`kShipPartCount`). `levelCount` по умолчанию `null` → `kShipPartCount` уровней.
+- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, onSetCharges})` / `showCheatMenu(...)`
+  — дев-читы (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход —
+  `Key('cheat_button')`, виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа,
+  состояние корабля (N=0..`kShipPartCount`), заряды взрыва (N=0..5, эпик «Взрыв», Стори 01;
+  выставляет `GameController.setCharges` напрямую в активной партии). `levelCount` по умолчанию
+  `null` → `kShipPartCount` уровней.
 
 ## Зависит от
 
