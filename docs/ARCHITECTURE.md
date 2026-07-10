@@ -15,8 +15,8 @@
 | models | `lib/game_engine/models/` | Структуры данных ядра (поле, фигура, маска, шаблоны уровня/объекта) | rules ¹ |
 | rules | `lib/game_engine/rules/` | Чистые правила: коллизии, halo/победа, взрыв, генерация фигур | models ¹ |
 | game | `lib/game_engine/game/` | Состояние партии + оркестрация (`tick`, команды игрока) | models, rules |
-| data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (16 уровней) | models |
-| application | `lib/application/` | Персист прогресса (`ProgressService`) | — |
+| data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (`ShipParts.parts.length` уровней, v1=7) | models |
+| application | `lib/application/` | Персист прогресса (`ProgressService`) | data ² |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
 | widgets | `lib/presentation/widgets/` | Пейнтеры поля и корабля, HUD | game, models, data, theme |
 | screens | `lib/presentation/screens/` | Экраны + игровой цикл (композиционный корень партии) | game, models, data, rules, application, theme, widgets |
@@ -24,6 +24,11 @@
 ¹ **models ↔ rules — взаимная зависимость:** `models/level_template` при создании зовёт
 `rules/halo` (`computeHalo8`), а `rules/*` работают над `models` (`Board`, `FallingPiece`).
 Цикл на уровне модулей; допустим в Dart, но держать в уме при рефакторинге (см. BACKLOG).
+
+² **application → game_engine/data:** `ProgressService._max` берёт `ShipParts.parts.length - 1`
+(единый источник истины числа уровней) вместо хардкода — импорт строго вниз по слоям, разрешён
+(hotfix 2026-07-11: хардкод `15` разошёлся с реальным числом уровней после эпика «Контент» и
+ронял приложение на холодном старте с устаревшим persist-значением).
 
 ## Схема связей
 
@@ -38,10 +43,10 @@ lib/main.dart (вход)
         ▼                                    │
    application  ◄────────────────────────────┘ (screens → ProgressService)
         │
-        ▼  (сейчас не импортирует game_engine)
+        ▼  (ProgressService._max ← ShipParts.parts.length, см. ²)
    game_engine:  game ──► rules ◄──► models
                   │                    ▲
-                  └──► data ───────────┘
+                  └──► data ◄──────────┴─── application
 ```
 
 - `screens` — единственный композиционный корень: тянет ядро, данные и виджеты.

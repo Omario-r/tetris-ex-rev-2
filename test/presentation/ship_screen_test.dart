@@ -24,7 +24,10 @@ void main() {
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   group('ShipScreen — число деталей = min(current_level, 7)', () {
-    for (final entry in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 7: 7, 15: 7}.entries) {
+    // ProgressService клампит персист к 0..6 на чтении (hotfix 2026-07-11: единый
+    // источник истины ShipParts.parts.length) — «сырые» 7/15 в SharedPreferences
+    // теперь читаются как 6 (последний валидный уровень), не проходят насквозь.
+    for (final entry in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 15: 6}.entries) {
       final level = entry.key;
       final expected = entry.value;
       testWidgets('current_level=$level → собрано $expected', (tester) async {
