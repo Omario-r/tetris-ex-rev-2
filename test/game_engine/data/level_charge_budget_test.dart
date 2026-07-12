@@ -9,17 +9,21 @@ import 'package:explosive_tetris/game_engine/rules/randomizer.dart';
 /// Тест «каждый уровень проходим в рамках своего бюджета зарядов» (эпик «Взрыв»,
 /// Стори 02, ⚠ хрупкое: расчёт экономики).
 ///
+/// Итоговый бюджет = база по форме + запас PO (+2 на уровень, возврат Гейта 2
+/// 2026-07-11) → `[4, 2, 2, 4, 4, 3, 2]`. Проверяем именно проходимость в рамках
+/// бюджета, а не минимальную достаточность.
+///
 /// Структурная часть — для всех 7 уровней (бюджет закреплён, неотрицателен).
-/// Реальный прогон через `GameController` (аналогично
-/// `level_playthrough_test.dart` из «Контента») — для показательных случаев:
-/// бюджет 0 (уровни 1, 2, 6 — доказано, что взрыв там не нужен вовсе) и бюджет > 0
-/// (уровень 0 — доказано, что ровно 1 взрыв закрывает неизбежный залёт в halo).
-/// Остальные уровни (3, 4) той же (ступенчатой) формы, что уже разобранный уровень 0 —
-/// полный солвер по всем 7 уровням сознательно не строился (тот же принцип, что и в
-/// «Контенте»: см. её «Заметки по выполнению», Стори 02).
+/// Реальный прогон через `GameController` (аналогично `level_playthrough_test.dart`
+/// из «Контента») — для показательных случаев: уровни, проходимые БЕЗ взрыва (1, 2, 6 —
+/// заряды не тратятся), и уровень, требующий взрыва (0 — ровно 1 взрыв закрывает
+/// неизбежный залёт в halo, остаток бюджета не тратится). Остальные уровни (3, 4)
+/// той же (ступенчатой) формы, что разобранный уровень 0 — полный солвер по всем 7
+/// уровням сознательно не строился (тот же принцип, что и в «Контенте»).
 void main() {
   group('Структурные проверки: бюджет закреплён и неотрицателен', () {
-    const expectedBudgets = [2, 0, 0, 2, 2, 1, 0];
+    // База [2,0,0,2,2,1,0] + запас PO (+2) → [4,2,2,4,4,3,2].
+    const expectedBudgets = [4, 2, 2, 4, 4, 3, 2];
 
     for (int i = 0; i < expectedBudgets.length; i++) {
       test('уровень $i: chargeBudget == ${expectedBudgets[i]}', () {
@@ -30,10 +34,9 @@ void main() {
     }
   });
 
-  group('Реальный прогон при budget == 0 (взрыв объективно не нужен)', () {
+  group('Реальный прогон: уровни проходимы без единого взрыва (заряды не тратятся)', () {
     test('уровень 1 (4×3 прямоугольник): 3×I внахлёст, заряды не расходуются', () {
       final level = LevelMap.levelAt(1);
-      expect(level.chargeBudget, 0);
 
       final controller = GameController(
         initialState: GameState(
@@ -60,13 +63,12 @@ void main() {
 
       expect(controller.state.phase, GamePhase.won);
       expect(controller.state.dirtyHalo, isEmpty);
-      expect(controller.state.charges, 0,
-          reason: 'взрыв ни разу не понадобился — заряды остались на нуле');
+      expect(controller.state.charges, level.chargeBudget,
+          reason: 'взрыв ни разу не понадобился — заряды остались на бюджете');
     });
 
     test('уровень 2 (4×3 прямоугольник, та же форма): 3×I внахлёст', () {
       final level = LevelMap.levelAt(2);
-      expect(level.chargeBudget, 0);
 
       final controller = GameController(
         initialState: GameState(
@@ -93,12 +95,11 @@ void main() {
 
       expect(controller.state.phase, GamePhase.won);
       expect(controller.state.dirtyHalo, isEmpty);
-      expect(controller.state.charges, 0);
+      expect(controller.state.charges, level.chargeBudget);
     });
 
     test('уровень 6 (2×2 квадрат): 1×O, гравитация без движений', () {
       final level = LevelMap.levelAt(6);
-      expect(level.chargeBudget, 0);
 
       final controller = GameController(
         initialState: GameState(
@@ -119,16 +120,16 @@ void main() {
 
       expect(controller.state.phase, GamePhase.won);
       expect(controller.state.dirtyHalo, isEmpty);
-      expect(controller.state.charges, 0);
+      expect(controller.state.charges, level.chargeBudget);
     });
   });
 
-  group('Реальный прогон при budget > 0 (взрыв нужен и укладывается в бюджет)', () {
+  group('Реальный прогон: уровень требует взрыва и укладывается в бюджет', () {
     test(
         'уровень 0 (нос: .##./####, floor-anchored): I + O переполняет halo '
-        'на 1 ряд, 1 взрыв чистит его, budget=2 хватает с запасом', () {
+        'на 1 ряд, 1 взрыв чистит его, budget=4 хватает с большим запасом', () {
       final level = LevelMap.levelAt(0);
-      expect(level.chargeBudget, 2);
+      expect(level.chargeBudget, 4);
       // Мишень: mask row1 (нижний, floor) = board-ряд targetY+1, cols targetX..+3
       // (все 4) — совпадает с I-фигурой без единого движения (спавн I тоже на
       // x=targetX). mask row0 (верхний) = cols targetX+1..targetX+2 (только 2 из 4) —
@@ -182,8 +183,8 @@ void main() {
       controller.tick(0.1); // spawn — fp.y=0, boardCells rows 0..1
       expect(controller.state.fallingPiece, isNotNull);
       controller.armExplosive();
-      expect(controller.state.charges, 1,
-          reason: 'списан 1 заряд из бюджета 2');
+      expect(controller.state.charges, level.chargeBudget - 1,
+          reason: 'списан 1 заряд из бюджета 4');
       for (int i = 0; i < 16; i++) {
         controller.tick(0.5); // explosive: свободно проходит сквозь блоки
       }
@@ -195,8 +196,8 @@ void main() {
           reason: 'взрыв расчистил залёт в halo');
       expect(controller.state.phase, GamePhase.won,
           reason: 'S по-прежнему полностью занят, halo теперь пуст — победа');
-      expect(controller.state.charges, 1,
-          reason: 'использован ровно 1 заряд из бюджета 2 — с запасом');
+      expect(controller.state.charges, level.chargeBudget - 1,
+          reason: 'использован ровно 1 заряд из бюджета 4 — с большим запасом');
     });
   });
 }
