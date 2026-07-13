@@ -7,6 +7,8 @@ import '../../game_engine/models/board.dart';
 import '../../game_engine/models/falling_piece.dart';
 import '../theme/block_material.dart';
 import '../theme/block_theme.dart';
+import '../theme/scrap_block_skin.dart';
+import '../theme/ship_materials.dart';
 import '../theme/tnt_skin.dart';
 
 /// Custom painter for the game board with Minecraft-style block skins.
@@ -17,6 +19,8 @@ class BoardPainter extends CustomPainter {
     required this.cellSize,
     required this.theme,
     required this.levelMaterial,
+    required this.shipMaterials,
+    this.scrapSkin = const ScrapBlockSkin(),
     this.tntSkin = BlockTheme.tnt,
     this.animValue = 0.0,
   });
@@ -38,6 +42,12 @@ class BoardPainter extends CustomPainter {
 
   /// Animation value for halo pulse (0..1).
   final double animValue;
+
+  /// Ship materials map for material-to-part mapping (T3, per-cell coloring).
+  final ShipMaterials shipMaterials;
+
+  /// Skin used for "scrap" cells outside the target mask.
+  final ScrapBlockSkin scrapSkin;
 
   Rect _cellRect(int x, int y) {
     return Rect.fromLTWH(
@@ -94,11 +104,30 @@ class BoardPainter extends CustomPainter {
     }
   }
 
+  void _paintPlacedBlock(
+    Canvas canvas,
+    Rect rect,
+    int boardX,
+    int boardY,
+  ) {
+    // Check if cell is inside the target mask (S region)
+    final isInTarget = state.level.S.contains((boardX, boardY));
+
+    if (isInTarget) {
+      // Cell is on target: paint with material for current level's object fragment
+      final partIndex = state.level.fragmentIndex;
+      final material = shipMaterials.materialForPart(partIndex);
+      theme.of(material).paint(canvas, rect, boardX: boardX, boardY: boardY);
+    } else {
+      // Cell is outside target: paint with scrap skin
+      scrapSkin.paint(canvas, rect, boardX: boardX, boardY: boardY);
+    }
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final board = state.board;
     final fp = state.fallingPiece;
-    final levelSkin = theme.of(levelMaterial);
 
     // 1. Background
     final bgPaint = Paint()..color = const Color(0xFF2A2A2A);
@@ -120,7 +149,7 @@ class BoardPainter extends CustomPainter {
     for (var y = 0; y < board.height; y++) {
       for (var x = 0; x < board.width; x++) {
         if (board.isOccupied(x, y)) {
-          levelSkin.paint(canvas, _cellRect(x, y), boardX: x, boardY: y);
+          _paintPlacedBlock(canvas, _cellRect(x, y), x, y);
         }
       }
     }
@@ -170,6 +199,8 @@ class BoardPainter extends CustomPainter {
         cellSize != oldDelegate.cellSize ||
         theme != oldDelegate.theme ||
         levelMaterial != oldDelegate.levelMaterial ||
+        shipMaterials != oldDelegate.shipMaterials ||
+        scrapSkin != oldDelegate.scrapSkin ||
         animValue != oldDelegate.animValue ||
         tntSkin != oldDelegate.tntSkin;
   }

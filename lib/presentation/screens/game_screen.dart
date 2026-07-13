@@ -9,6 +9,7 @@ import '../../game_engine/data/level_map.dart';
 import '../../application/progress_service.dart';
 import '../theme/block_theme.dart';
 import '../theme/level_skin.dart';
+import '../theme/ship_materials.dart';
 import '../widgets/board_painter.dart';
 import '../widgets/hud.dart';
 import '../widgets/ship.dart';
@@ -267,6 +268,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       levelMaterial: LevelSkin.materialForLevelIndex(
                         widget.levelIndex,
                       ),
+                      shipMaterials: ShipMaterials.defaultMaterials,
                       animValue: _animController.value,
                     ),
                   ),

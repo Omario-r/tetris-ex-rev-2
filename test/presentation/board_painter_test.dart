@@ -12,6 +12,8 @@ import 'package:explosive_tetris/game_engine/rules/randomizer.dart';
 import 'package:explosive_tetris/presentation/theme/block_material.dart';
 import 'package:explosive_tetris/presentation/theme/block_skin.dart';
 import 'package:explosive_tetris/presentation/theme/block_theme.dart';
+import 'package:explosive_tetris/presentation/theme/scrap_block_skin.dart';
+import 'package:explosive_tetris/presentation/theme/ship_materials.dart';
 import 'package:explosive_tetris/presentation/theme/tnt_skin.dart';
 import 'package:explosive_tetris/presentation/widgets/board_painter.dart';
 
@@ -82,6 +84,19 @@ GameState createStateWithPlacedBlock(int x, int y) {
   );
 }
 
+/// Creates a [GameState] with an occupied board cell inside the target mask S.
+GameState createStateWithPlacedBlockInTarget(int x, int y) {
+  final board = Board(defaultLevel.boardWidth, defaultLevel.boardHeight);
+  board.setCell(x, y, const Cell.occupied());
+  return GameState(
+    board: board,
+    fallingPiece: null,
+    phase: GamePhase.spawning,
+    generator: SevenBagGenerator(seed: 42),
+    level: defaultLevel,
+  );
+}
+
 /// Creates a [GameState] with an explosive I-piece at the specified position.
 GameState createStateWithExplosivePiece(int x, int y) {
   final board = Board(defaultLevel.boardWidth, defaultLevel.boardHeight);
@@ -106,16 +121,22 @@ BoardPainter createPainter(
   BlockTheme? theme,
   BlockMaterial levelMaterial = BlockMaterial.graphite,
   CountingSkin? levelSkinCounter,
+  ShipMaterials? shipMaterials,
+  ScrapBlockSkin? scrapSkin,
 }) {
   final levelSkin = levelSkinCounter ?? CountingSkin('level');
   final themeToUse = theme ??
       TestBlockTheme(levelSkin: levelSkin);
+  final materials = shipMaterials ?? ShipMaterials.defaultMaterials;
+  final scrap = scrapSkin ?? const ScrapBlockSkin();
 
   return BoardPainter(
     state: state,
     cellSize: 30.0,
     theme: themeToUse,
     levelMaterial: levelMaterial,
+    shipMaterials: materials,
+    scrapSkin: scrap,
   );
 }
 
@@ -143,12 +164,14 @@ void main() {
         cellSize: 30.0,
         theme: theme,
         levelMaterial: BlockMaterial.graphite,
+        shipMaterials: ShipMaterials.defaultMaterials,
       );
       final painter2 = BoardPainter(
         state: state,
         cellSize: 30.0,
         theme: theme,
         levelMaterial: BlockMaterial.graphite,
+        shipMaterials: ShipMaterials.defaultMaterials,
       );
 
       expect(painter1.shouldRepaint(painter2), isFalse);
@@ -192,7 +215,10 @@ void main() {
 
     test('placed_cells_use_level_material_skin', () {
       final levelSkin = CountingSkin('level');
-      final state = createStateWithPlacedBlock(3, 5);
+      // Cell (4, 15) is inside the target mask S for defaultLevel
+      // defaultLevel: targetX=2, targetY=14, targetMask is 6x6 cross
+      // Cell (4,15) = (2+2, 14+1) is in S (local coords 2,1 is in cross)
+      final state = createStateWithPlacedBlockInTarget(4, 15);
       final painter = createPainter(
         state,
         levelSkinCounter: levelSkin,
@@ -214,6 +240,7 @@ void main() {
         cellSize: 30.0,
         theme: TestBlockTheme(levelSkin: levelSkin),
         levelMaterial: BlockMaterial.graphite,
+        shipMaterials: ShipMaterials.defaultMaterials,
         tntSkin: tntSkin,
       );
 

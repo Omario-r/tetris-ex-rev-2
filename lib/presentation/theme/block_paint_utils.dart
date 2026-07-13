@@ -55,13 +55,13 @@ class BlockPaintUtils {
   }
 
   /// Draws a light top/left and dark bottom/right bevel (~10%).
-  static void drawBevel(Canvas canvas, Rect rect) {
+  static void drawBevel(Canvas canvas, Rect rect, {Color? lightEdge, Color? darkEdge}) {
     final light = Paint()
-      ..color = Colors.white.withValues(alpha: 0.10)
+      ..color = (lightEdge ?? Colors.white).withValues(alpha: 0.10)
       ..style = PaintingStyle.stroke
       ..strokeWidth = (rect.width * 0.10).clamp(1.0, 3.0);
     final dark = Paint()
-      ..color = Colors.black.withValues(alpha: 0.10)
+      ..color = (darkEdge ?? Colors.black).withValues(alpha: 0.10)
       ..style = PaintingStyle.stroke
       ..strokeWidth = (rect.width * 0.10).clamp(1.0, 3.0);
 

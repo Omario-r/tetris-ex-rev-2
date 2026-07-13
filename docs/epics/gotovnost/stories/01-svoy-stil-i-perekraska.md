@@ -128,7 +128,7 @@ _нет_
   поле) — на Гейт 2.
 
 ### T3 — Перекраска клетки на поле по карте материалов
-- **Статус:** не начата
+- **Статус:** готова
 - **Рекомендованный агент:** Исполнитель · бэкенд: внешний (Gigacode), сдача — `system/HANDOFF.md`
 - **Цель:** на поле при локе клетка на мишени красится в материал своей детали (D1), вне мишени — «сырой/scrap» вид (D2).
 - **Модули (≤3):** `widgets` (`BoardPainter`), `theme` (scrap-скин + чтение карты материалов), `test/`.
@@ -146,4 +146,18 @@ _нет_
   Выполни задачу T3 — и только её — из файла docs/epics/gotovnost/stories/01-svoy-stil-i-perekraska.md.
   ```
 
-- **Заметки по выполнению:** _по факту._
+- **Заметки по выполнению:** `ScrapBlockSkin` — новый скин в `theme`, визуально «сырой»
+  (шероховатый текстурный шум с резкими переходами и пятнами, имитирующий неотполированный
+  материал). `BoardPainter` при отрисовке уложенной клетки проверяет `state.level.S.contains((x,y))`:
+  в мишени → материал детали `level.fragmentIndex` из `ShipMaterials.defaultMaterials`, вне →
+  `ScrapBlockSkin`. Параметры конструктора `BoardPainter`: `shipMaterials` (обязательный),
+  `scrapSkin` (дефолт `const ScrapBlockSkin()`). `shouldRepaint` обновлён под новые поля.
+  `test/presentation/board_painter_test.dart` — импорты и `createPainter` обновлены под новые
+  параметры. Тесты зелёные без изменений логики (существующие тесты проходят с дефолтными
+  `shipMaterials` и `scrapSkin`).
+  `lib/presentation/theme/README.md` — добавлен `ScrapBlockSkin` в публичный интерфейс.
+  `lib/presentation/widgets/README.md` — обновлён сигнатура `BoardPainter` и описание поведения
+  уложенных блоков (перекраска по карте материалов, Стори 01 T3).
+  `flutter analyze` — 0 ошибок/предупреждений. `flutter test test/presentation/` — зелёные.
+  `flutter test` (полный набор) — зелёные. Визуал перекраски (на мишени = материал, вне = scrap)
+  проверяется оркестратором/Гейт 2, не Исполнитель (команда `flutter run -d web-server`).

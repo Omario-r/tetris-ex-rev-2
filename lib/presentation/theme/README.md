@@ -17,8 +17,9 @@
 - `BlockTheme(map)` + `of(material)`, `copyWithMaterial`; статические `defaultTheme`
   (процедурная), `tnt`, `ghostTarget`, `haloHighlight`.
 - Скины: `ProceduralBlockSkin(material)` (текстуры в коде), `TntSkin` (взведённый заряд,
-  ⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
-  `ImageBlockSkin` удалён в Стори 01 T1 (не был подключён, ассетов нет; добавление PNG-набора —
+  ⚠ ждёт Стори 02 «взрыв» — не трогать вне неё), `ScrapBlockSkin` («сырой» вид
+  клеток вне мишени, Стори 01 T3).
+- `ImageBlockSkin` удалён в Стори 01 T1 (не был подключён, ассетов нет; добавление PNG-набора —
   отдельное продуктовое решение при появлении ассетов).
 - `LevelSkin.materialForLevelIndex/materialForLevel/materialForObjectFragment` — уровень → материал.
 - `ShipMaterials` — карта деталь→материал для корабля (новый модуль в T2). Дефолт: 7 материалов
@@ -54,4 +55,4 @@
 
 ## Как проверить
 
-`flutter test test/presentation/theme/` (block_theme, level_skin).
+`flutter test test/presentation/theme/` (block_theme, level_skin, scrap_block_skin).

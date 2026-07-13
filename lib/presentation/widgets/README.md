@@ -10,9 +10,10 @@
 
 ## Публичный интерфейс
 
-- `BoardPainter(state, cellSize, theme, levelMaterial, {tntSkin, animValue})` — `CustomPainter`
+- `BoardPainter(state, cellSize, theme, levelMaterial, shipMaterials, {scrapSkin, tntSkin, animValue})` — `CustomPainter`
   поля: фон, ghost-мишень (незаполненные `S`), уложенные блоки, пульс dirty-halo,
-  drop-ghost (normal), падающая фигура.
+  drop-ghost (normal), падающая фигура. Уложенные блоки красятся материалом детали из
+  `shipMaterials` если в мишени (`S`), иначе `scrapSkin` («сырой» вид, Стори 01 T3).
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`. Под кнопкой arm —
   числовой индикатор `state.charges` (`Key('charges_indicator')`): белый при `charges > 0`,
@@ -34,7 +35,8 @@
 - `game_engine/game` — `GameState`, `GameController`.
 - `game_engine/models` — `Board`, `FallingPiece`.
 - `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
-- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `TntSkin`, оверлеи.
+- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `TntSkin`, `ScrapBlockSkin`,
+  `ShipMaterials`, оверлеи.
 
 ## От него зависят
 
