@@ -31,6 +31,19 @@ class CountingSkin implements BlockSkin {
   }
 }
 
+class ScrapCountingSkin extends ScrapBlockSkin {
+  ScrapCountingSkin();
+
+  int calls = 0;
+  final List<(int?, int?)> coords = [];
+
+  @override
+  void paint(Canvas canvas, Rect rect, {int? boardX, int? boardY}) {
+    calls++;
+    coords.add((boardX, boardY));
+  }
+}
+
 class TestBlockTheme extends BlockTheme {
   TestBlockTheme({required this.levelSkin})
       : super({
@@ -248,6 +261,24 @@ void main() {
       painter.paint(Canvas(recorder), const Size(300, 600));
 
       expect(tntSkin.calls, greaterThan(0));
+    });
+
+    test('placed_cells_outside_target_use_scrap_skin', () {
+      final scrapSkin = ScrapCountingSkin();
+      // Cell (0, 0) is outside the target mask S for defaultLevel
+      // defaultLevel: targetX=2, targetY=14, targetMask is 6x6 cross starting at (2,14)
+      // Cell (0,0) is far from S, should use scrap skin
+      final state = createStateWithPlacedBlock(0, 0);
+      final painter = createPainter(
+        state,
+        scrapSkin: scrapSkin,
+      );
+
+      final recorder = ui.PictureRecorder();
+      painter.paint(Canvas(recorder), const Size(300, 600));
+
+      expect(scrapSkin.calls, equals(1));
+      expect(scrapSkin.coords, equals([(0, 0)]));
     });
   });
 }
