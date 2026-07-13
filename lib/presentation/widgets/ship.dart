@@ -95,5 +95,6 @@ class ShipPainter extends CustomPainter {
   bool shouldRepaint(ShipPainter oldDelegate) =>
       oldDelegate.collectedCount != collectedCount ||
       oldDelegate.revealPartIndex != revealPartIndex ||
-      oldDelegate.revealProgress != revealProgress;
+      oldDelegate.revealProgress != revealProgress ||
+      oldDelegate.materials != materials;
 }

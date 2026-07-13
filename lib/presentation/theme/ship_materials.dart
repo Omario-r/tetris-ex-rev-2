@@ -9,10 +9,12 @@ class ShipMaterials {
   /// Карта деталь→материал. Индекс = индекс детали из `ShipParts.parts`.
   final List<BlockMaterial> _materials;
 
-  /// Создаёт карту из списка материалов. Длина списка должна совпадать с
-  /// `ShipParts.parts.length` (v1 = 7), иначе — `AssertionError`.
+  /// Создаёт карту из списка материалов. Длина списка должна совпадать с числом
+  /// деталей корабля (`ShipParts.parts.length`, v1 = 7) — за полноту отвечает
+  /// вызывающий; обращение к отсутствующей детали даёт `RangeError`.
   ShipMaterials(List<BlockMaterial> materials)
-      : _materials = List.unmodifiable(materials);
+      : assert(materials.isNotEmpty, 'ShipMaterials: карта не может быть пустой'),
+        _materials = List.unmodifiable(materials);
 
   /// Возвращает материал для детали с индексом [partIndex].
   BlockMaterial materialForPart(int partIndex) {
@@ -28,7 +30,7 @@ class ShipMaterials {
   /// - bandA (оранжевый пояс, детали 3-4): GRAF (крылья — базовый графит)
   /// - mid (средняя секция, деталь 5): GUN (двигатель — gunmetal)
   /// - bandB (задняя секция, деталь 6): BLACKM (хвост — матовый чёрный)
-  static ShipMaterials defaultMaterials = ShipMaterials([
+  static final ShipMaterials defaultMaterials = ShipMaterials([
     BlockMaterial.darkNiche,    // 0 — нос (DARK)
     BlockMaterial.graphiteDark, // 1 — верхний корпус (GRAF2)
     BlockMaterial.graphiteDark, // 2 — нижний корпус (GRAF2)
