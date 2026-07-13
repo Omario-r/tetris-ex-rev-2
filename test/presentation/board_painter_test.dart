@@ -32,13 +32,13 @@ class CountingSkin implements BlockSkin {
 class TestBlockTheme extends BlockTheme {
   TestBlockTheme({required this.levelSkin})
       : super({
-          BlockMaterial.grass: levelSkin,
-          BlockMaterial.cobble: levelSkin,
-          BlockMaterial.planks: levelSkin,
-          BlockMaterial.bricks: levelSkin,
-          BlockMaterial.sand: levelSkin,
-          BlockMaterial.stone: levelSkin,
-          BlockMaterial.dirt: levelSkin,
+          BlockMaterial.graphite: levelSkin,
+          BlockMaterial.graphiteDark: levelSkin,
+          BlockMaterial.darkNiche: levelSkin,
+          BlockMaterial.hazardOrange: levelSkin,
+          BlockMaterial.rust: levelSkin,
+          BlockMaterial.gunmetal: levelSkin,
+          BlockMaterial.matteBlack: levelSkin,
         });
 
   final CountingSkin levelSkin;
@@ -104,7 +104,7 @@ GameState createStateWithExplosivePiece(int x, int y) {
 BoardPainter createPainter(
   GameState state, {
   BlockTheme? theme,
-  BlockMaterial levelMaterial = BlockMaterial.planks,
+  BlockMaterial levelMaterial = BlockMaterial.graphite,
   CountingSkin? levelSkinCounter,
 }) {
   final levelSkin = levelSkinCounter ?? CountingSkin('level');
@@ -142,13 +142,13 @@ void main() {
         state: state,
         cellSize: 30.0,
         theme: theme,
-        levelMaterial: BlockMaterial.planks,
+        levelMaterial: BlockMaterial.graphite,
       );
       final painter2 = BoardPainter(
         state: state,
         cellSize: 30.0,
         theme: theme,
-        levelMaterial: BlockMaterial.planks,
+        levelMaterial: BlockMaterial.graphite,
       );
 
       expect(painter1.shouldRepaint(painter2), isFalse);
@@ -196,7 +196,7 @@ void main() {
       final painter = createPainter(
         state,
         levelSkinCounter: levelSkin,
-        levelMaterial: BlockMaterial.planks,
+        levelMaterial: BlockMaterial.graphite,
       );
 
       final recorder = ui.PictureRecorder();
@@ -213,7 +213,7 @@ void main() {
         state: state,
         cellSize: 30.0,
         theme: TestBlockTheme(levelSkin: levelSkin),
-        levelMaterial: BlockMaterial.planks,
+        levelMaterial: BlockMaterial.graphite,
         tntSkin: tntSkin,
       );
 

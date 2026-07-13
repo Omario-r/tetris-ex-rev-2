@@ -7,25 +7,25 @@ import 'package:explosive_tetris/presentation/theme/level_skin.dart';
 
 void main() {
   group('LevelSkin', () {
-    test('house_roof_fragments_use_planks', () {
-      expect(LevelSkin.materialForLevelIndex(0), BlockMaterial.planks);
-      expect(LevelSkin.materialForLevelIndex(1), BlockMaterial.planks);
+    test('early_fragments_use_graphite', () {
+      expect(LevelSkin.materialForLevelIndex(0), BlockMaterial.graphite);
+      expect(LevelSkin.materialForLevelIndex(1), BlockMaterial.graphite);
     });
 
-    test('house_wall_fragments_use_cobble', () {
-      expect(LevelSkin.materialForLevelIndex(2), BlockMaterial.cobble);
-      expect(LevelSkin.materialForLevelIndex(3), BlockMaterial.cobble);
+    test('next_fragments_use_graphite_dark', () {
+      expect(LevelSkin.materialForLevelIndex(2), BlockMaterial.graphiteDark);
+      expect(LevelSkin.materialForLevelIndex(3), BlockMaterial.graphiteDark);
     });
 
     test('placeholder_objects_use_single_material_each', () {
       for (var i = 4; i < 8; i++) {
-        expect(LevelSkin.materialForLevelIndex(i), BlockMaterial.sand);
+        expect(LevelSkin.materialForLevelIndex(i), BlockMaterial.gunmetal);
       }
       for (var i = 8; i < 12; i++) {
-        expect(LevelSkin.materialForLevelIndex(i), BlockMaterial.stone);
+        expect(LevelSkin.materialForLevelIndex(i), BlockMaterial.darkNiche);
       }
       for (var i = 12; i < 16; i++) {
-        expect(LevelSkin.materialForLevelIndex(i), BlockMaterial.bricks);
+        expect(LevelSkin.materialForLevelIndex(i), BlockMaterial.hazardOrange);
       }
     });
 

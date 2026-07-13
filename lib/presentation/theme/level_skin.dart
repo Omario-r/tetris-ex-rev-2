@@ -6,22 +6,22 @@ class LevelSkin {
   LevelSkin._();
 
   static const Map<int, BlockMaterial> _byLevelIndex = {
-    0: BlockMaterial.planks,
-    1: BlockMaterial.planks,
-    2: BlockMaterial.cobble,
-    3: BlockMaterial.cobble,
-    4: BlockMaterial.sand,
-    5: BlockMaterial.sand,
-    6: BlockMaterial.sand,
-    7: BlockMaterial.sand,
-    8: BlockMaterial.stone,
-    9: BlockMaterial.stone,
-    10: BlockMaterial.stone,
-    11: BlockMaterial.stone,
-    12: BlockMaterial.bricks,
-    13: BlockMaterial.bricks,
-    14: BlockMaterial.bricks,
-    15: BlockMaterial.bricks,
+    0: BlockMaterial.graphite,
+    1: BlockMaterial.graphite,
+    2: BlockMaterial.graphiteDark,
+    3: BlockMaterial.graphiteDark,
+    4: BlockMaterial.gunmetal,
+    5: BlockMaterial.gunmetal,
+    6: BlockMaterial.gunmetal,
+    7: BlockMaterial.gunmetal,
+    8: BlockMaterial.darkNiche,
+    9: BlockMaterial.darkNiche,
+    10: BlockMaterial.darkNiche,
+    11: BlockMaterial.darkNiche,
+    12: BlockMaterial.hazardOrange,
+    13: BlockMaterial.hazardOrange,
+    14: BlockMaterial.hazardOrange,
+    15: BlockMaterial.hazardOrange,
   };
 
   /// Returns the block material for [levelIndex] (0..15).

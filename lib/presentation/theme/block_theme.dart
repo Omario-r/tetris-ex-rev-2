@@ -11,15 +11,19 @@ class BlockTheme {
 
   final Map<BlockMaterial, BlockSkin> _skins;
 
-  /// Default Minecraft-style procedural theme.
+  /// Default voxel-space procedural theme (own style, "Ronin" palette).
   static final BlockTheme defaultTheme = BlockTheme({
-    BlockMaterial.grass: const ProceduralBlockSkin(BlockMaterial.grass),
-    BlockMaterial.cobble: const ProceduralBlockSkin(BlockMaterial.cobble),
-    BlockMaterial.planks: const ProceduralBlockSkin(BlockMaterial.planks),
-    BlockMaterial.bricks: const ProceduralBlockSkin(BlockMaterial.bricks),
-    BlockMaterial.sand: const ProceduralBlockSkin(BlockMaterial.sand),
-    BlockMaterial.stone: const ProceduralBlockSkin(BlockMaterial.stone),
-    BlockMaterial.dirt: const ProceduralBlockSkin(BlockMaterial.dirt),
+    BlockMaterial.graphite: const ProceduralBlockSkin(BlockMaterial.graphite),
+    BlockMaterial.graphiteDark:
+        const ProceduralBlockSkin(BlockMaterial.graphiteDark),
+    BlockMaterial.darkNiche:
+        const ProceduralBlockSkin(BlockMaterial.darkNiche),
+    BlockMaterial.hazardOrange:
+        const ProceduralBlockSkin(BlockMaterial.hazardOrange),
+    BlockMaterial.rust: const ProceduralBlockSkin(BlockMaterial.rust),
+    BlockMaterial.gunmetal: const ProceduralBlockSkin(BlockMaterial.gunmetal),
+    BlockMaterial.matteBlack:
+        const ProceduralBlockSkin(BlockMaterial.matteBlack),
   });
 
   /// TNT skin for armed explosive pieces.

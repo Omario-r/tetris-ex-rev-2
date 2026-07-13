@@ -9,13 +9,14 @@ class GhostTargetOverlay {
 
   /// Paints a semi-transparent ghost target cell.
   void paint(Canvas canvas, Rect rect) {
+    // Cool graphite/gunmetal tint (GUN hue family) — blueprint-on-hull look.
     final fill = Paint()
-      ..color = const Color.fromRGBO(120, 110, 90, 0.16)
+      ..color = const Color.fromRGBO(50, 54, 62, 0.20)
       ..style = PaintingStyle.fill;
     canvas.drawRect(rect, fill);
 
     final dash = Paint()
-      ..color = Colors.white.withValues(alpha: 0.35)
+      ..color = const Color.fromRGBO(190, 200, 215, 0.4)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
 
@@ -102,14 +103,16 @@ class HaloHighlightOverlay {
 
   /// Paints a warm highlight on a dirty halo cell.
   void paint(Canvas canvas, Rect rect, {double pulse = 0.0}) {
+    // Hazard-orange hue family (ORAN) — same warning language as block
+    // materials, kept warm to preserve the overlay's original function.
     final alphaBoost = pulse * 0.04;
     final fill = Paint()
-      ..color = Color.fromRGBO(255, 190, 80, 0.12 + alphaBoost)
+      ..color = Color.fromRGBO(190, 100, 45, 0.14 + alphaBoost)
       ..style = PaintingStyle.fill;
     canvas.drawRect(rect, fill);
 
     final stroke = Paint()
-      ..color = Color.fromRGBO(255, 205, 95, 0.6 + alphaBoost)
+      ..color = Color.fromRGBO(208, 115, 57, 0.6 + alphaBoost)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.0;
     canvas.drawRect(rect, stroke);

@@ -1,23 +1,26 @@
-/// Visual block materials for Minecraft-style rendering (presentation only).
+/// Visual block materials for the game's own voxel-space style
+/// (presentation only). Palette hues sourced from the "Ronin" ship
+/// reference (`ship_ronin_v4.html`) so board blocks, oversleeve materials
+/// and (later stories) the ship read as one consistent language.
 enum BlockMaterial {
-  /// Grass block with green top and dirt below.
-  grass,
+  /// Base graphite hull plating (mid-tone cool grey).
+  graphite,
 
-  /// Cobblestone with gray tones and mortar seams.
-  cobble,
+  /// Darker graphite plating variant, used for recessed/secondary panels.
+  graphiteDark,
 
-  /// Wooden planks with horizontal grain.
-  planks,
+  /// Dark recessed niche/inset panel (near-black cool grey).
+  darkNiche,
 
-  /// Red brick masonry pattern.
-  bricks,
+  /// Orange hazard/warning panel plating.
+  hazardOrange,
 
-  /// Sandy beige texture.
-  sand,
+  /// Oxidized rust panel.
+  rust,
 
-  /// Smooth gray stone.
-  stone,
+  /// Gunmetal mechanism plating.
+  gunmetal,
 
-  /// Brown dirt texture.
-  dirt,
+  /// Matte black surface.
+  matteBlack,
 }
