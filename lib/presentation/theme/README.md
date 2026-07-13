@@ -12,6 +12,7 @@
 
 - `BlockMaterial{graphite,graphiteDark,darkNiche,hazardOrange,rust,gunmetal,matteBlack}` —
   свой воксельно-космический набор (палитра по референсу «Ронин» v4, см. Инварианты).
+  Цвет материала — через `color` (extension).
 - `BlockSkin` (abstract): `paint(canvas, rect, {boardX, boardY})`.
 - `BlockTheme(map)` + `of(material)`, `copyWithMaterial`; статические `defaultTheme`
   (процедурная), `tnt`, `ghostTarget`, `haloHighlight`.
@@ -20,6 +21,8 @@
   `ImageBlockSkin` удалён в Стори 01 T1 (не был подключён, ассетов нет; добавление PNG-набора —
   отдельное продуктовое решение при появлении ассетов).
 - `LevelSkin.materialForLevelIndex/materialForLevel/materialForObjectFragment` — уровень → материал.
+- `ShipMaterials` — карта деталь→материал для корабля (новый модуль в T2). Дефолт: 7 материалов
+  по секциям корабля (нос/мостик/крылья/двигатель/хвост) из референса «Ронин» v4.
 - Оверлеи: `GhostTargetOverlay`, `HaloHighlightOverlay` (палитра выровнена под новый стиль
   в Стори 01 T1), `CreeperFacePainter` (⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
 - `BlockPaintUtils` — общие хелперы: `noise/pick/drawTexturedRect/drawBevel/paintBlock`.
@@ -31,7 +34,7 @@
 
 ## От него зависят
 
-- `presentation/widgets` — `board_painter`, `hud`.
+- `presentation/widgets` — `board_painter`, `hud`, `ship` (карта материалов).
 - `presentation/screens` — `game_screen` (тема, `LevelSkin`).
 
 ## Инварианты
@@ -46,6 +49,8 @@
   ±12 lightness, plate-jitter ±3.5). Один источник палитры для поля и (T2) корабля.
 - ⚠ `TntSkin`/`CreeperFacePainter` — ещё Minecraft-подобные (TNT/creeper); переработка —
   Стори 02 эпика «Готовность» (взрыв), не трогать раньше.
+- `ShipMaterials` — единый источник цвета для `ShipPainter` и (T3) перекраски клетки. Не хардкодит
+  единственный корабль (адресуемость под #6).
 
 ## Как проверить
 

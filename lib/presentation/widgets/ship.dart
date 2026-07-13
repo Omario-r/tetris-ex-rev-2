@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../game_engine/data/ship_parts.dart';
+import '../theme/block_material.dart';
+import '../theme/ship_materials.dart';
 
 /// Число деталей единого корабля — **выводится** из `ShipParts.parts.length`
 /// (единый источник истины: добавили деталь в `ShipParts` → число выросло само).
@@ -26,11 +28,16 @@ class ShipPainter extends CustomPainter {
   /// Прогресс появления детали [revealPartIndex]: 0 (нет) .. 1 (на месте).
   final double revealProgress;
 
+  /// Карта материалов деталей корабля.
+  final ShipMaterials materials;
+
   ShipPainter({
     required int collectedCount,
     this.revealPartIndex,
     this.revealProgress = 1.0,
-  }) : collectedCount = collectedCount.clamp(0, kShipPartCount);
+    ShipMaterials? materials,
+  }) : collectedCount = collectedCount.clamp(0, kShipPartCount),
+       materials = materials ?? ShipMaterials.defaultMaterials;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -39,7 +46,6 @@ class ShipPainter extends CustomPainter {
     final ox = (size.width - cell * grid) / 2;
     final oy = (size.height - cell * grid) / 2;
 
-    final fillPaint = Paint()..color = Colors.deepOrange;
     final installedStroke = Paint()
       ..color = Colors.black26
       ..style = PaintingStyle.stroke
@@ -72,7 +78,10 @@ class ShipPainter extends CustomPainter {
           cell,
         );
         if (collected) {
-          canvas.drawRect(rect, fillPaint);
+          // Красим деталь материалом из карты.
+          final material = materials.materialForPart(i);
+          final paint = Paint()..color = material.color;
+          canvas.drawRect(rect, paint);
           canvas.drawRect(rect, installedStroke);
         } else {
           canvas.drawRect(rect, ghostStroke);
