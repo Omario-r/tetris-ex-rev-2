@@ -102,26 +102,38 @@ class GhostTargetOverlay {
   }
 }
 
-/// Warm overlay for occupied halo cells.
+/// Pulse highlight for occupied dirty-halo cells — canonical `el-halo`
+/// (`docs/design/game-field.html`, каталог элементов поля, утверждён PO
+/// 2026-07-18): рамка `ghostTarget`-тона (hazardOrange @ 55%) + лёгкое
+/// свечение, без плоской заливки. Пульс альфы — прежний период (T1).
 class HaloHighlightOverlay {
   /// Shared halo highlight overlay instance.
   const HaloHighlightOverlay();
 
-  /// Paints a warm highlight on a dirty halo cell.
+  /// Paints a pulsing border highlight on a dirty halo cell.
   void paint(Canvas canvas, Rect rect, {double pulse = 0.0}) {
-    // Hazard-orange hue family (ORAN) — same warning language as block
-    // materials, kept warm to preserve the overlay's original function.
-    final alphaBoost = pulse * 0.04;
-    final fill = Paint()
-      ..color = Color.fromRGBO(190, 100, 45, 0.14 + alphaBoost)
-      ..style = PaintingStyle.fill;
-    canvas.drawRect(rect, fill);
+    final s = rect.width / BlockPaintUtils.baseCellSize;
+    // Inset ~2.5px / radius 3px at base cell 34px (el-halo annotation).
+    final inset = rect.deflate(2.5 * s);
+    final rrect = RRect.fromRectAndRadius(inset, Radius.circular(3.0 * s));
 
-    final stroke = Paint()
-      ..color = Color.fromRGBO(208, 115, 57, 0.6 + alphaBoost)
+    // ghostTarget token RGB (211,124,69 = #D37C45) — same hazard hue as the
+    // target overlay; alpha pulses on the existing period (T1), unchanged.
+    final alphaBoost = pulse * 0.04;
+
+    // Soft outer glow behind the crisp border.
+    final glow = Paint()
+      ..color = const Color.fromRGBO(211, 124, 69, 0.35)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.0;
-    canvas.drawRect(rect, stroke);
+      ..strokeWidth = 3.0 * s
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, 2.5 * s);
+    canvas.drawRRect(rrect, glow);
+
+    final border = Paint()
+      ..color = Color.fromRGBO(211, 124, 69, 0.55 + alphaBoost)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5 * s;
+    canvas.drawRRect(rrect, border);
   }
 }
 

@@ -294,7 +294,7 @@ _нет_
   оркестратору/PO пройти Гейт 2 (`system/AGENT.md` §6) с браузерной проверкой.
 
 ### T5 — Скины клеток по каталогу элементов (возврат Гейта 2)
-- **Статус:** не начата
+- **Статус:** готова
 - **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`) —
   отрисовка по готовой поэлементной спеке, не «тяжёлая».
 - **Добавлена:** возвратом Гейта 2 2026-07-18 — вид клеток не соответствовал
@@ -341,4 +341,45 @@ _нет_
   и `widgets` (если менялся); статус задачи в стори; `docs/STATUS.md`; один
   коммит `gotovnost/01-svoy-stil-i-perekraska T5: <суть> (возврат)`. Общий
   чек-лист — `system/AGENT.md` §5.
-- **Заметки по выполнению:** —
+- **Заметки по выполнению:** сессия перезапущена после обрыва предыдущей. `git status`
+  на старте показал незакоммиченные правки ровно по этому ТЗ в 6 файлах
+  (`block_paint_utils.dart`/`overlays.dart`/`procedural_block_skin.dart`/
+  `scrap_block_skin.dart`/`board_painter.dart`/`theme/README.md`) — почти-готовый
+  недоделок (`system/AGENT.md` §8). Сверил `git diff` построчно с каждым пунктом ТЗ
+  1–5 и с CSS-спекой мокапа (`docs/design/game-field.html`, блоки `.bblk`/`.bblk.mat`/
+  `.bblk.scr`/`.bblk.pc`/`.bigcell.dropg`/`.bigcell.halo`): совпадение точное —
+  `paintElBlock`/`paintElDrop` (новые в `block_paint_utils.dart`, `baseCellSize=34`,
+  все размеры масштабируются `rect.width/baseCellSize`) воспроизводят все альфы/band/
+  rivet-параметры каталога 1:1 (проверил и HSL→hex пересчётом rust-тонов питтинга
+  `ScrapBlockSkin` — `#793C20`/`#69341C` точно соответствуют `hsla(19,58%,30%)`/
+  `hsla(19,58%,26%)` из мокапа). `procedural_block_skin.dart` — старые 7 пер-материальных
+  текстур удалены, один канон-рендер `el-block` для любого материала. `scrap_block_skin.dart`
+  — `el-scrap`: `graphiteDark`, слабая фаска без боковых граней (`bandSize=2`, только
+  top/bottom), без риветов, 2 rust-пятна + 1 тёмная точка, позиции — `noise(bx,by,seed,·)`
+  (детерминированы от координат клетки). `overlays.dart` `HaloHighlightOverlay` → `el-halo`:
+  рамка `ghostTarget`-тона (`#D37C45`) 55% + мягкое свечение (blur-обводка), без плоской
+  заливки; период пульса (`alphaBoost = pulse*0.04`) не тронут. `board_painter.dart`:
+  падающая фигура (`_paintFallingPieceBlock`, normal mode) → `el-piece` через
+  `paintElBlock(graphite, topAlpha:0.12, leftAlpha:0, rightAlpha:0, glowAlpha:0.06)` —
+  сверил с CSS `.bblk.pc` (box-shadow не содержит inset-теней слева/справа, только
+  top/bottom + внешний glow) — параметры верны; drop-ghost → `el-drop` через
+  `paintElDrop` (контур 1px белый 16%, без заливки, старый `opacity: 0.25` через
+  `_paintBlockSkin`/`saveLayer` убран целиком). `TntSkin`/`CreeperFacePainter`/
+  `game_engine`/`GhostTargetOverlay`/фон-сетка поля (T4)/карта `ShipMaterials`/логика
+  выбора скина в `BoardPainter` (`state.level.S.contains`) — не тронуты, сверено diff'ом.
+  `levelMaterial` в конструкторе `BoardPainter` остался как legacy-параметр (не влияет
+  на рендер с T5) — сохранение API, а не арх-решение: убирать параметр — вне ТЗ («меняется
+  отрисовка, не логика/интерфейс выбора»).
+  Довёл сам (что не было в унаследованном диффе): 1) стale-докстринг в
+  `block_material.dart` — ссылка на удалённый в диффе метод `ProceduralBlockSkin._colorAt`,
+  поправлена на актуальный `ProceduralBlockSkin.paint`; 2) паспорт
+  `lib/presentation/widgets/README.md` — не был обновлён унаследованной сессией: дополнил
+  описание `BoardPainter` явными якорями `el-piece`/`el-drop`/`el-block`/`el-scrap` и
+  зависимость от `BlockPaintUtils`; 3) статус задачи в стори и `docs/STATUS.md`.
+  `flutter analyze` — 0 ошибок/предупреждений. `flutter test` (полный набор) — 295/295
+  зелёных (существующие скин-тесты `scrap_block_skin_test.dart` не проверяли удалённые
+  поля `baseColor`/`spotColor` — обновлять под канон не пришлось, они уже были написаны
+  через публичное поведение `paint`/детерминизм шума). Визуальную проверку (соответствие
+  клеток каталогу `el-*` на глаз, `flutter run -d web-server`) НЕ делал — Гейт 2
+  оркестратора/PO (`system/AGENT.md` §3); стори в «на приёмке» не переводил — только
+  статус T5.

@@ -6,6 +6,7 @@ import '../../game_engine/game/game_state.dart';
 import '../../game_engine/models/board.dart';
 import '../../game_engine/models/falling_piece.dart';
 import '../theme/block_material.dart';
+import '../theme/block_paint_utils.dart';
 import '../theme/block_theme.dart';
 import '../theme/scrap_block_skin.dart';
 import '../theme/ship_materials.dart';
@@ -34,7 +35,10 @@ class BoardPainter extends CustomPainter {
   /// Block skin registry.
   final BlockTheme theme;
 
-  /// Material used for placed and falling normal pieces on this level.
+  /// Legacy per-level material parameter. Not used for rendering since
+  /// Стори 01 T5 (el-piece is fixed neutral graphite; placed blocks are
+  /// colored via `shipMaterials`) — kept in the constructor/`shouldRepaint`
+  /// for API compatibility with existing callers.
   final BlockMaterial levelMaterial;
 
   /// Skin used for armed explosive falling pieces.
@@ -79,29 +83,31 @@ class BoardPainter extends CustomPainter {
         .toList();
   }
 
-  void _paintBlockSkin(
+  /// Paints the falling piece — `el-piece` (neutral graphite, not colored by
+  /// material until locked in target) or the armed `TntSkin` for explosive
+  /// pieces (Стори 02, untouched here).
+  void _paintFallingPieceBlock(
     Canvas canvas,
     Rect rect,
     int boardX,
     int boardY, {
     required bool useTnt,
-    double opacity = 1.0,
   }) {
-    if (opacity < 1.0) {
-      canvas.saveLayer(rect, Paint()..color = Colors.white.withValues(alpha: opacity));
-    }
-
     if (useTnt) {
       tntSkin.paint(canvas, rect, boardX: boardX, boardY: boardY);
-    } else {
-      theme
-          .of(levelMaterial)
-          .paint(canvas, rect, boardX: boardX, boardY: boardY);
+      return;
     }
-
-    if (opacity < 1.0) {
-      canvas.restore();
-    }
+    // el-piece: graphite fill, brighter top bevel, soft outer glow, no
+    // side bevel (`docs/design/game-field.html` `.cell.piece .blk`).
+    BlockPaintUtils.paintElBlock(
+      canvas,
+      rect,
+      BlockMaterial.graphite.color,
+      topAlpha: 0.12,
+      leftAlpha: 0.0,
+      rightAlpha: 0.0,
+      glowAlpha: 0.06,
+    );
   }
 
   void _paintPlacedBlock(
@@ -178,24 +184,17 @@ class BoardPainter extends CustomPainter {
     }
 
     if (fp != null) {
-      // 5. Drop ghost (normal mode only)
+      // 5. Drop ghost (normal mode only) — el-drop: outline only, no fill.
       if (fp.mode == PieceMode.normal) {
         for (final cell in _ghostCells(fp, board)) {
-          _paintBlockSkin(
-            canvas,
-            _cellRect(cell.x, cell.y),
-            cell.x,
-            cell.y,
-            useTnt: false,
-            opacity: 0.25,
-          );
+          BlockPaintUtils.paintElDrop(canvas, _cellRect(cell.x, cell.y));
         }
       }
 
-      // 6. Falling piece
+      // 6. Falling piece — el-piece or TNT skin.
       final useTnt = fp.mode == PieceMode.explosive;
       for (final cell in fp.boardCells) {
-        _paintBlockSkin(
+        _paintFallingPieceBlock(
           canvas,
           _cellRect(cell.x, cell.y),
           cell.x,

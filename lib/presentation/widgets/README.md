@@ -13,9 +13,16 @@
 - `BoardPainter(state, cellSize, theme, levelMaterial, shipMaterials, {scrapSkin, tntSkin, animValue})` — `CustomPainter`
   поля: фон `boardBg` (токен DESIGN.md, `#16191D`) + тонкие линии сетки `gridLine`
   (`#9097A2` @ 6%, по границам клеток, Стори 01 T4), ghost-мишень (незаполненные `S`),
-  уложенные блоки, пульс dirty-halo, drop-ghost (normal), падающая фигура. Уложенные
-  блоки красятся материалом детали из `shipMaterials` если в мишени (`S`), иначе
-  `scrapSkin` («сырой» вид, Стори 01 T3).
+  уложенные блоки, пульс dirty-halo, drop-ghost, падающая фигура. Уложенные блоки
+  красятся материалом детали из `shipMaterials` если в мишени (`S`) — рендер `el-block`
+  (`ProceduralBlockSkin`, `theme`), иначе `scrapSkin` — рендер `el-scrap` («сырой» вид,
+  Стори 01 T3). Падающая фигура (normal mode) — канон `el-piece`
+  (`BlockPaintUtils.paintElBlock`, нейтральный `graphite`, не красится материалом до
+  лока, Стори 01 T5); drop-ghost (normal mode) — канон `el-drop`
+  (`BlockPaintUtils.paintElDrop`, только контур, без заливки, Стори 01 T5). Взведённая
+  (explosive) падающая фигура — `TntSkin`, вне скоупа T5 (Стори 02). `levelMaterial` —
+  legacy-параметр конструктора, оставлен для совместимости API, отрисовку не влияет
+  (Стори 01 T5).
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`. Под кнопкой arm —
   числовой индикатор `state.charges` (`Key('charges_indicator')`): белый при `charges > 0`,
@@ -37,8 +44,8 @@
 - `game_engine/game` — `GameState`, `GameController`.
 - `game_engine/models` — `Board`, `FallingPiece`.
 - `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
-- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `TntSkin`, `ScrapBlockSkin`,
-  `ShipMaterials`, оверлеи.
+- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`, `TntSkin`,
+  `ScrapBlockSkin`, `ShipMaterials`, оверлеи.
 
 ## От него зависят
 

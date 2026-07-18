@@ -16,9 +16,13 @@
 - `BlockSkin` (abstract): `paint(canvas, rect, {boardX, boardY})`.
 - `BlockTheme(map)` + `of(material)`, `copyWithMaterial`; статические `defaultTheme`
   (процедурная), `tnt`, `ghostTarget`, `haloHighlight`.
-- Скины: `ProceduralBlockSkin(material)` (текстуры в коде), `TntSkin` (взведённый заряд,
-  ⚠ ждёт Стори 02 «взрыв» — не трогать вне неё), `ScrapBlockSkin` («сырой» вид
-  клеток вне мишени, Стори 01 T3).
+- Скины (все — рендер по каталогу элементов `docs/design/game-field.html`,
+  утверждён PO 2026-07-18, Стори 01 T5): `ProceduralBlockSkin(material)` — канон
+  `el-block`, ОДИН рендер для любого `BlockMaterial` (заливка материалом + фаска
+  + риветы; прежние пер-материальные текстуры T1 отменены); `ScrapBlockSkin` —
+  канон `el-scrap` (заливка `graphiteDark`, слабая фаска без боковых граней, без
+  риветов, детерминированный питтинг rust-пятен от `(boardX,boardY)`); `TntSkin`
+  (взведённый заряд, ⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
 - `ImageBlockSkin` удалён в Стори 01 T1 (не был подключён, ассетов нет; добавление PNG-набора —
   отдельное продуктовое решение при появлении ассетов).
 - `LevelSkin.materialForLevelIndex/materialForLevel/materialForObjectFragment` — уровень → материал.
@@ -26,9 +30,15 @@
   по секциям корабля (нос/мостик/крылья/двигатель/хвост) из референса «Ронин» v4.
 - Оверлеи: `GhostTargetOverlay` (контур мишени — hazard-оранжевый пунктир по токену
   `ghostTarget`, inset+скругление по мокапу `game-field.html`, Стори 01 T4),
-  `HaloHighlightOverlay` (палитра выровнена под новый стиль в Стори 01 T1),
+  `HaloHighlightOverlay` — канон `el-halo` (рамка `ghostTarget`-тона @ 55% + лёгкое
+  свечение, без плоской заливки; пульс альфы — прежний период T1, Стори 01 T5),
   `CreeperFacePainter` (⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
-- `BlockPaintUtils` — общие хелперы: `noise/pick/drawTexturedRect/drawBevel/paintBlock`.
+- `BlockPaintUtils` — общие хелперы: `baseCellSize` (34px, база размеров каталога
+  элементов) + `paintElBlock`/`paintElDrop` (канон `el-block`/`el-piece`/`el-scrap`
+  и `el-drop`, размеры масштабируются от `baseCellSize` к фактическому `rect`,
+  Стори 01 T5), плюс низкоуровневые `noise/pick/drawTexturedRect/drawBevel/
+  drawBlockOutline/paintBlock` — только для `TntSkin`/`CreeperFacePainter`
+  (Стори 02, не трогать вне неё).
 
 ## Зависит от
 

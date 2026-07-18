@@ -31,8 +31,8 @@ enum BlockMaterial {
 }
 
 /// Цвет материала для рисования (например, в `ShipPainter`).
-/// Используется `ProceduralBlockSkin._colorAt` — тот же набор оттенков,
-/// что и для текстур полей.
+/// Используется `ProceduralBlockSkin.paint` (канон `el-block`, Стори 01 T5) —
+/// заливка блока цветом материала.
 extension BlockMaterialColor on BlockMaterial {
   Color get color {
     switch (this) {
