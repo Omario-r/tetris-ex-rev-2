@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<!--
+  Каркас мокапа экрана. Один файл = один экран; копия живёт в
+  docs/design/<экран>.html. Ведёт Дизайнер (system/DIZAINER.md), статус —
+  в индексе docs/DESIGN.md.
+
+  КАНОН — только блок «ТОКЕНЫ» в :root ниже: имена и значения зеркалят
+  docs/DESIGN.md (расхождение = баг). Вся остальная разметка и стили —
+  иллюстрация, из них значения не копировать.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап — [имя экрана]</title>
+<style>
+  /* ===== ТОКЕНЫ (канон; имена и значения = docs/DESIGN.md) ===== */
+  :root {
+    --color-bg:      hsl(220 15% 10%);  /* [имя токена в DESIGN.md] */
+    --color-surface: hsl(220 12% 16%);  /* [...] */
+    --color-accent:  hsl( 28 90% 55%);  /* [...] */
+    --color-text:    hsl(220 10% 88%);  /* [...] */
+    --space-unit:    8px;
+    --radius:        4px;
+  }
+
+  /* ===== Декорация мокапа (НЕ канон) ===== */
+  body { margin: 0; background: #202020; font-family: system-ui, sans-serif; }
+
+  /* Рамка целевого устройства — размеры из PROJECT.md («Дизайн»). */
+  .device {
+    width: 390px; height: 844px;           /* пример: iPhone-класс, портрет */
+    margin: 24px auto; position: relative; overflow: hidden;
+    background: var(--color-bg); outline: 2px solid #555; border-radius: 12px;
+  }
+
+  /* Аннотация: поведение, состояния, жесты — то, чего не видно на статике. */
+  .note {
+    position: absolute; max-width: 160px; padding: 4px 6px;
+    background: #402; color: #f9a; font-size: 11px; line-height: 1.3;
+    border: 1px dashed #f9a; border-radius: 4px; z-index: 10;
+  }
+</style>
+</head>
+<body>
+
+  <div class="device">
+    <!-- Разметка экрана. Цвета/размеры — через var(--токен), не литералами. -->
+
+    <div class="note" style="top: 8px; left: 8px;">
+      [аннотация: что происходит при тапе/скролле; какие есть состояния —
+      пустое / загрузка / ошибка — и где их смотреть]
+    </div>
+  </div>
+
+  <!-- Дополнительные состояния экрана — вторая/третья .device-рамка ниже,
+       с подписью, какое это состояние. -->
+
+</body>
+</html>
