@@ -7,6 +7,7 @@ import '../../game_engine/models/board.dart';
 import '../../game_engine/rules/randomizer.dart';
 import '../../game_engine/data/level_map.dart';
 import '../../application/progress_service.dart';
+import '../theme/block_material.dart';
 import '../theme/block_theme.dart';
 import '../theme/level_skin.dart';
 import '../theme/ship_materials.dart';
@@ -202,7 +203,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final boardPixelHeight = boardHeight * _cellSize;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      // spaceBg token: hsl(220 14% 7%) = #0F1114 — "космос"-фон экрана.
+      backgroundColor: const Color(0xFF0F1114),
       // SafeArea: у экрана нет AppBar — без него шапка (в т.ч. кнопка «Корабль»)
       // уходит под системный статус-бар/вырез и не нажимается.
       body: SafeArea(
@@ -252,10 +254,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            // Game board with overlay
-            SizedBox(
+            // Game board with overlay, framed as mokap `.board`: 1px gunmetal
+            // border, radius 6.
+            Container(
               width: boardPixelWidth,
               height: boardPixelHeight,
+              clipBehavior: Clip.antiAlias,
+              decoration: BoxDecoration(
+                border: Border.all(color: BlockMaterial.gunmetal.color),
+                borderRadius: BorderRadius.circular(6),
+              ),
               child: Stack(
                 children: [
                   // Board painter

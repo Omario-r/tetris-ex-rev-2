@@ -11,9 +11,11 @@
 ## Публичный интерфейс
 
 - `BoardPainter(state, cellSize, theme, levelMaterial, shipMaterials, {scrapSkin, tntSkin, animValue})` — `CustomPainter`
-  поля: фон, ghost-мишень (незаполненные `S`), уложенные блоки, пульс dirty-halo,
-  drop-ghost (normal), падающая фигура. Уложенные блоки красятся материалом детали из
-  `shipMaterials` если в мишени (`S`), иначе `scrapSkin` («сырой» вид, Стори 01 T3).
+  поля: фон `boardBg` (токен DESIGN.md, `#16191D`) + тонкие линии сетки `gridLine`
+  (`#9097A2` @ 6%, по границам клеток, Стори 01 T4), ghost-мишень (незаполненные `S`),
+  уложенные блоки, пульс dirty-halo, drop-ghost (normal), падающая фигура. Уложенные
+  блоки красятся материалом детали из `shipMaterials` если в мишени (`S`), иначе
+  `scrapSkin` («сырой» вид, Стори 01 T3).
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`. Под кнопкой arm —
   числовой индикатор `state.charges` (`Key('charges_indicator')`): белый при `charges > 0`,

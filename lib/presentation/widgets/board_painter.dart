@@ -11,7 +11,7 @@ import '../theme/scrap_block_skin.dart';
 import '../theme/ship_materials.dart';
 import '../theme/tnt_skin.dart';
 
-/// Custom painter for the game board with Minecraft-style block skins.
+/// Custom painter for the game board with the game's own voxel block skins.
 class BoardPainter extends CustomPainter {
   /// Creates a board painter for the given [state] and visual theme.
   const BoardPainter({
@@ -129,12 +129,25 @@ class BoardPainter extends CustomPainter {
     final board = state.board;
     final fp = state.fallingPiece;
 
-    // 1. Background
-    final bgPaint = Paint()..color = const Color(0xFF2A2A2A);
-    canvas.drawRect(
-      Rect.fromLTWH(0, 0, board.width * cellSize, board.height * cellSize),
-      bgPaint,
-    );
+    // 1. Background — boardBg token: hsl(219 13% 10%) = #16191D.
+    final bgPaint = Paint()..color = const Color(0xFF16191D);
+    final boardRect =
+        Rect.fromLTWH(0, 0, board.width * cellSize, board.height * cellSize);
+    canvas.drawRect(boardRect, bgPaint);
+
+    // 1b. Grid lines — gridLine token: hsl(215 9% 60% / 6%) = #9097A2 @ 6%.
+    final gridPaint = Paint()
+      ..color = const Color.fromRGBO(144, 151, 162, 0.06)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.0;
+    for (var x = 1; x < board.width; x++) {
+      final dx = x * cellSize;
+      canvas.drawLine(Offset(dx, 0), Offset(dx, boardRect.height), gridPaint);
+    }
+    for (var y = 1; y < board.height; y++) {
+      final dy = y * cellSize;
+      canvas.drawLine(Offset(0, dy), Offset(boardRect.width, dy), gridPaint);
+    }
 
     // 2. Ghost target — unfilled S cells
     for (final cell in state.level.S) {

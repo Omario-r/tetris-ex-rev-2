@@ -24,8 +24,10 @@
 - `LevelSkin.materialForLevelIndex/materialForLevel/materialForObjectFragment` — уровень → материал.
 - `ShipMaterials` — карта деталь→материал для корабля (новый модуль в T2). Дефолт: 7 материалов
   по секциям корабля (нос/мостик/крылья/двигатель/хвост) из референса «Ронин» v4.
-- Оверлеи: `GhostTargetOverlay`, `HaloHighlightOverlay` (палитра выровнена под новый стиль
-  в Стори 01 T1), `CreeperFacePainter` (⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
+- Оверлеи: `GhostTargetOverlay` (контур мишени — hazard-оранжевый пунктир по токену
+  `ghostTarget`, inset+скругление по мокапу `game-field.html`, Стори 01 T4),
+  `HaloHighlightOverlay` (палитра выровнена под новый стиль в Стори 01 T1),
+  `CreeperFacePainter` (⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
 - `BlockPaintUtils` — общие хелперы: `noise/pick/drawTexturedRect/drawBevel/paintBlock`.
 
 ## Зависит от
@@ -52,6 +54,9 @@
   Стори 02 эпика «Готовность» (взрыв), не трогать раньше.
 - `ShipMaterials` — единый источник цвета для `ShipPainter` и (T3) перекраски клетки. Не хардкодит
   единственный корабль (адресуемость под #6).
+- `GhostTargetOverlay` — цвета строго из токенов DESIGN.md `ghostTarget` (пунктир,
+  `hsl(23 62% 55% / 55%)` = `#D37C45`) и `hazardOrange` (лёгкая заливка 5%,
+  `#BE642D`) — не своя палитра, Стори 01 T4.
 
 ## Как проверить
 

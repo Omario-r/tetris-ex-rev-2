@@ -31,11 +31,11 @@
 | `rust` (RUST) | `hsl(19 58% 38%)` = `#994C29` | там же | окисленная ржавчина |
 | `gunmetal` (GUN) | `hsl(220 10% 22%)` = `#32363E` | там же | механизмы, gun-metal |
 | `matteBlack` (BLACKM) | `hsl(220 12% 13%)` = `#1D2025` | там же | матовый чёрный |
-| `spaceBg` | `hsl(220 14% 7%)` | — (реализация в #4) | фон экрана-«космоса», глубже BLACKM |
-| `boardBg` | `hsl(219 13% 10%)` | — (реализация в #4) | фон игрового поля |
-| `gridLine` | `hsl(215 9% 60% / 6%)` | — (реализация в #4) | линии сетки поля |
-| `ghostTarget` | `hsl(23 62% 55% / 55%)` | — (реализация в #4) | пунктирный контур мишени |
-| `hudIcon` | `hsl(215 9% 72%)` | — (реализация в #4) | глифы кнопок HUD |
+| `spaceBg` | `hsl(220 14% 7%)` | `lib/presentation/screens/game_screen.dart` | фон экрана-«космоса», глубже BLACKM |
+| `boardBg` | `hsl(219 13% 10%)` | `lib/presentation/widgets/board_painter.dart` | фон игрового поля |
+| `gridLine` | `hsl(215 9% 60% / 6%)` | `lib/presentation/widgets/board_painter.dart` | линии сетки поля |
+| `ghostTarget` | `hsl(23 62% 55% / 55%)` | `lib/presentation/theme/overlays.dart` (`GhostTargetOverlay`) | пунктирный контур мишени |
+| `hudIcon` | `hsl(215 9% 72%)` | — (реализация в #4, Стори 02) | глифы кнопок HUD |
 
 Карта «деталь корабля → материал» (7 деталей, по секциям «Ронина»):
 `lib/presentation/theme/ship_materials.dart` (`ShipMaterials.defaultMaterials`,
