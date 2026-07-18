@@ -45,11 +45,11 @@
     --grid-line:     hsla(215, 9%, 60%, .06); /* линии сетки поля */
     --ghost-target:  hsla( 23,62%, 55%, .55); /* контур мишени (hazard, приглушён) */
     --hud-icon:      hsl(215, 9%, 72%);  /* глифы кнопок HUD */
-    /* взведённая фигура (el-piece-armed) — кандидаты в DESIGN.md при утверждении: */
-    --armed-hatch:   hsla( 23,62%, 46%, .55); /* диагональный hazard-хэтч поверх графита */
-    --armed-glow:    hsla( 23,62%, 55%, .5);  /* горячее внешнее свечение (пульс) */
-    /* ембер-ядро (только вариант B) — те же значения, что ядро взведённой кнопки:
-       #ffd9b8 заливка + #ffb87a свечение (канон кнопки утв. PO 2026-07-18). */
+    /* взведённая фигура (el-piece-armed) / drop-ghost взведённой (el-drop-armed) — канон: */
+    --armed-hatch:      hsla( 23, 62%, 46%, .55); /* диагональный hazard-хэтч поверх графита */
+    --armed-glow:       hsla( 23, 62%, 55%, .5);  /* горячее внешнее свечение фигуры (пульс) */
+    --armed-ember:      hsl(  28,100%, 86%);      /* #FFD9B8 горячее ядро (заливка) = ядро взведённой кнопки */
+    --armed-ember-glow: hsl(  28,100%, 74%);      /* #FFB87A свечение ядра / контур+свечение el-drop-armed */
   }
 
   /* ===== Декорация мокапа (НЕ канон) ===== */
@@ -198,11 +198,12 @@
      background:hsla(23,62%,46%,.05); }
   .bigcell.dropg::after { content:""; position:absolute; inset:4px;
      border:2px solid rgba(255,255,255,.16); border-radius:6px; }
-  /* drop-ghost взведённой фигуры: тот же контур, но hazard (сплошной, не пунктир —
-     чтобы не путать с пунктиром мишени) + слабая hazard-заливка + мягкое свечение */
-  .bigcell.dropg.armed::after { border-color:hsla(23,62%,55%,.7);
-     background:hsla(23,62%,46%,.08);
-     box-shadow: inset 0 0 10px hsla(23,62%,55%,.3); }
+  /* drop-ghost взведённой фигуры: тот же контур, но цвета ембер-ядра (это взрыв),
+     сплошной (не пунктир — чтобы не путать с пунктиром мишени) + слабая тёплая
+     заливка + мягкое свечение ембера снаружи и внутри */
+  .bigcell.dropg.armed::after { border-color:var(--armed-ember-glow);
+     background:hsla(28,100%,74%,.10);
+     box-shadow: inset 0 0 12px hsla(28,100%,74%,.35), 0 0 9px hsla(28,100%,74%,.3); }
   .bblk { position:absolute; inset:2px; border-radius:6px;
      box-shadow: inset 0 6px 0 rgba(255,255,255,.09), inset 0 -6px 0 rgba(0,0,0,.35),
                  inset 6px 0 0 rgba(255,255,255,.04), inset -6px 0 0 rgba(0,0,0,.18); }
@@ -232,8 +233,8 @@
      box-shadow: inset 0 6px 0 hsla(23,62%,70%,.20), inset 0 -6px 0 rgba(0,0,0,.35),
                  0 0 20px hsla(23,62%,55%,.6), 0 0 7px hsla(23,62%,55%,.55); }
   .bblk .ember { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-  .bblk .ember i { width:13px; height:13px; border-radius:4px; background:#ffd9b8;
-     box-shadow:0 0 9px #ffb87a; }
+  .bblk .ember i { width:13px; height:13px; border-radius:4px; background:var(--armed-ember);
+     box-shadow:0 0 9px var(--armed-ember-glow); }
   /* мини-превью тетромино из взведённых клеток (как читается группой) */
   .piecemini { position:relative; display:grid; grid-template-columns:repeat(2,34px);
      grid-auto-rows:34px; }
@@ -247,8 +248,8 @@
   .piecemini.hot .mblk { box-shadow: inset 0 3px 0 hsla(23,62%,70%,.20), inset 0 -3px 0 rgba(0,0,0,.35),
                  0 0 12px hsla(23,62%,55%,.6); }
   .piecemini.hot .mblk .em { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-  .piecemini.hot .mblk .em i { width:9px; height:9px; border-radius:3px; background:#ffd9b8;
-     box-shadow:0 0 7px #ffb87a; }
+  .piecemini.hot .mblk .em i { width:9px; height:9px; border-radius:3px; background:var(--armed-ember);
+     box-shadow:0 0 7px var(--armed-ember-glow); }
   .bigcell.halo::after { content:""; position:absolute; inset:5px; border-radius:6px;
      border:3px solid hsla(23,62%,55%,.45); box-shadow:0 0 10px hsla(23,62%,55%,.35); }
   .matchips { display:flex; gap:4px; margin-top:5px; }
@@ -437,7 +438,8 @@
           = hazardOrange 55%) — ДНК канистры-заряда.<br>
           + горячее внешнее свечение <b style="color:#e6ebf0;">armedGlow</b> (hazardOrange 55%, 20 px)
           + hazard-подкрас верхней фаски (hsla 23,62%,70%, 20%).<br>
-          + ембер-ядро в центре клетки (13 px, #ffd9b8, свечение #ffb87a) — те же значения, что ядро
+          + ембер-ядро в центре клетки (13 px, <b style="color:#e6ebf0;">armedEmber</b> заливка,
+          свечение <b style="color:#e6ebf0;">armedEmberGlow</b>) — те же значения, что ядро
           взведённой кнопки.<br>
           Пульс альфы свечения — как у el-halo / взведённой кнопки (период не меняем).</div>
       </div>
@@ -453,10 +455,11 @@
         <div class="bigcell dropg armed"></div>
         <div class="name">el-drop-armed — drop-ghost взведённой <span style="color:#8b949e; font-weight:400;">(утв. PO 2026-07-19)</span></div>
         <div class="an">точка падения, пока фигура взведена. Тот же контур, что
-          el-drop, но <b style="color:#e6ebf0;">сплошной hazard</b> (hazardOrange 70%,
-          1 px, инсет 2 px) — сплошной, а не пунктир, чтобы не путать с мишенью
-          (el-target). + слабая hazard-заливка 8% + мягкое внутреннее свечение
-          armedGlow. Показывает, куда рухнет бомба.</div>
+          el-drop, но в цвете <b style="color:#e6ebf0;">ембер-ядра</b> (это взрыв):
+          сплошной контур <b style="color:#e6ebf0;">armedEmberGlow</b> (1 px, инсет 2 px) —
+          сплошной, а не пунктир, чтобы не путать с мишенью (el-target). + слабая
+          тёплая заливка (armedEmberGlow 10%) + мягкое свечение ембера внутри и
+          снаружи. Показывает, куда рухнет бомба.</div>
       </div>
 
       <div class="el" id="el-halo">
