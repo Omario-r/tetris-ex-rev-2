@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<!--
+  Мокап экрана: ИГРОВОЕ ПОЛЕ (game_screen). Один файл = один экран.
+  Эпик #4 «Готовность к плейтесту»: стори 01 (стиль поля/перекраска) +
+  стори 02 (объединённая кнопка взрыва).
+
+  КАНОН — только блок «ТОКЕНЫ» в :root (зеркало docs/DESIGN.md).
+  Секция «ПРЕДЛАГАЕМЫЕ НОВЫЕ ТОКЕНЫ» — кандидаты: при утверждении мокапа
+  внести в docs/DESIGN.md. Остальная разметка — иллюстрация.
+  Статус — в индексе docs/DESIGN.md. Без JS (статическая разметка).
+
+  Раскладка поля 10×15 (иллюстрация):
+    . пусто | g мишень-ghost | F уложено в мишени | s scrap вне мишени
+    p падающая фигура | d drop-ghost
+    r0  ..........
+    r1  .....p....
+    r2  ....ppp...
+    r3..r8  пусто
+    r9  .....d....
+    r10 ....ddd...
+    r11 ...gggg...
+    r12 ...gggg...
+    r13 ..FFgggg.s
+    r14 ..FFFFggs.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап — Игровое поле</title>
+<style>
+  /* ===== ТОКЕНЫ (канон = docs/DESIGN.md, палитра «Ронин» M) ===== */
+  :root {
+    --graphite:      hsl(215, 9%, 31%);  /* GRAF   #484E56 */
+    --graphite-dark: hsl(215, 9%, 26%);  /* GRAF2  #3C4148 */
+    --dark-niche:    hsl(216,11%, 17%);  /* DARK   #272A30 */
+    --hazard-orange: hsl( 23,62%, 46%);  /* ORAN   #BE642D */
+    --rust:          hsl( 19,58%, 38%);  /* RUST   #994C29 */
+    --gunmetal:      hsl(220,10%, 22%);  /* GUN    #32363E */
+    --matte-black:   hsl(220,12%, 13%);  /* BLACKM #1D2025 */
+
+    /* ===== ПРЕДЛАГАЕМЫЕ НОВЫЕ ТОКЕНЫ (внести в DESIGN.md при утверждении) ===== */
+    --space-bg:      hsl(220,14%,  7%);  /* фон экрана-«космоса», глубже BLACKM */
+    --board-bg:      hsl(219,13%, 10%);  /* фон поля */
+    --grid-line:     hsla(215, 9%, 60%, .06); /* линии сетки поля */
+    --ghost-target:  hsla( 23,62%, 55%, .55); /* контур мишени (hazard, приглушён) */
+    --hud-icon:      hsl(215, 9%, 72%);  /* глифы кнопок HUD */
+  }
+
+  /* ===== Декорация мокапа (НЕ канон) ===== */
+  * { box-sizing: border-box; }
+  body { margin:0; background:#101216; font-family:system-ui,sans-serif; color:#cfd4da; padding:20px; }
+  .head { max-width:900px; margin:0 auto 18px; }
+  .head h1 { font-size:17px; margin:0 0 6px; color:#e6ebf0; }
+  .head p { font-size:13px; margin:0; color:#8b949e; max-width:640px; line-height:1.5; }
+  .wrap { display:flex; gap:28px; justify-content:center; align-items:flex-start; flex-wrap:wrap; }
+
+  .device {
+    width:390px; height:844px; position:relative; overflow:hidden; flex:none;
+    background:var(--space-bg); outline:2px solid #3a4047; border-radius:28px;
+  }
+  .safe { position:absolute; left:0; right:0; top:0; height:50px; border-bottom:1px dashed rgba(255,255,255,.07); }
+  .safe.bottom { bottom:0; top:auto; height:30px; border-bottom:none; border-top:1px dashed rgba(255,255,255,.07); }
+
+  /* --- верхняя панель --- */
+  .topbar { position:absolute; top:56px; left:14px; right:14px; height:44px;
+            display:flex; align-items:center; justify-content:space-between; }
+  .chip { display:flex; align-items:center; gap:8px; background:var(--matte-black);
+          border:1px solid var(--gunmetal); border-radius:8px; padding:7px 11px;
+          font-size:12px; letter-spacing:.06em; color:#aeb6bf; }
+  .chip .sw { width:14px; height:14px; border-radius:3px; background:var(--gunmetal);
+              box-shadow:inset 0 2px 0 rgba(255,255,255,.10), inset 0 -2px 0 rgba(0,0,0,.35); }
+  .pausebtn { width:40px; height:40px; border-radius:10px; background:var(--matte-black);
+              border:1px solid var(--gunmetal); color:var(--hud-icon);
+              display:flex; align-items:center; justify-content:center; font-size:14px; }
+
+  /* --- поле --- */
+  .board { position:absolute; top:112px; left:25px; width:340px; height:510px;
+           background:var(--board-bg);
+           border:1px solid var(--gunmetal); border-radius:6px;
+           display:grid; grid-template-columns:repeat(10,34px); grid-auto-rows:34px; }
+  .cell { position:relative; border-right:1px solid var(--grid-line); border-bottom:1px solid var(--grid-line); }
+
+  .cell.ghost::after { content:""; position:absolute; inset:3px;
+     border:1.5px dashed var(--ghost-target); border-radius:3px;
+     background:hsla(23,62%,46%,.05); }
+  .cell.dropghost::after { content:""; position:absolute; inset:2px;
+     border:1px solid rgba(255,255,255,.16); border-radius:3px; }
+
+  .blk { position:absolute; inset:1px; border-radius:3px;
+     box-shadow: inset 0 3px 0 rgba(255,255,255,.09), inset 0 -3px 0 rgba(0,0,0,.35),
+                 inset 3px 0 0 rgba(255,255,255,.04), inset -3px 0 0 rgba(0,0,0,.18); }
+  /* риветы: 4 точки одним ::before (углы блока) */
+  .blk::before { content:""; position:absolute; top:4px; left:4px; width:3px; height:3px;
+     border-radius:50%; background:rgba(0,0,0,.45);
+     box-shadow: 21px 0 0 rgba(0,0,0,.45), 0 21px 0 rgba(0,0,0,.45), 21px 21px 0 rgba(0,0,0,.45); }
+
+  .cell.filled .blk { background:var(--gunmetal); }             /* в мишени = материал детали */
+  .cell.piece  .blk { background:var(--graphite);
+     box-shadow: inset 0 3px 0 rgba(255,255,255,.12), inset 0 -3px 0 rgba(0,0,0,.35),
+                 0 0 8px rgba(255,255,255,.06); }
+  .cell.scrap  .blk { background:var(--graphite-dark);          /* вне мишени = «сырой» scrap */
+     box-shadow: inset 0 2px 0 rgba(255,255,255,.05), inset 0 -2px 0 rgba(0,0,0,.30); }
+  .cell.scrap  .blk::before { /* вместо риветов — питтинг ржавчины */
+     top:0; left:0; width:100%; height:100%; border-radius:3px; box-shadow:none;
+     background: radial-gradient(circle at 26% 38%, hsla(19,58%,30%,.55) 0 2px, transparent 3px),
+                 radial-gradient(circle at 68% 70%, hsla(19,58%,26%,.5)  0 2px, transparent 3px),
+                 radial-gradient(circle at 55% 25%, rgba(0,0,0,.4)       0 1.5px, transparent 2.5px); }
+
+  /* --- HUD --- */
+  .hud { position:absolute; left:14px; right:14px; bottom:44px; height:150px; }
+  .ctl { position:absolute; width:58px; height:58px; border-radius:50%;
+     background:var(--matte-black); border:1px solid var(--gunmetal);
+     color:var(--hud-icon); font-size:20px;
+     display:flex; align-items:center; justify-content:center;
+     box-shadow: inset 0 2px 0 rgba(255,255,255,.06), inset 0 -3px 0 rgba(0,0,0,.35); }
+  /* классическая крестовина слева: ⟳ сверху, ◀ ▶ снизу */
+  .ctl.rot{left:68px; bottom:70px}
+  .ctl.left{left:6px; bottom:14px} .ctl.right{left:130px; bottom:14px}
+  /* softDrop сгруппирован с кнопкой взрыва справа */
+  .ctl.drop{right:96px; bottom:35px}
+
+  /* объединённая кнопка взрыва — «канистра-заряд» (референс PO, 2026-07-18) */
+  .boom { position:absolute; right:8px; bottom:26px; width:76px; height:76px; border-radius:18px;
+     background:var(--dark-niche); border:1px solid var(--hazard-orange);
+     display:flex; align-items:center; justify-content:center;
+     box-shadow: inset 0 3px 0 rgba(255,255,255,.06), inset 0 -4px 0 rgba(0,0,0,.4); }
+  .boom .cnt { position:absolute; top:-9px; right:-9px; background:var(--hazard-orange);
+     color:#1a130c; font-size:12px; font-weight:700; padding:2px 7px; border-radius:9px; z-index:2; }
+  /* канистра: корпус-графит, колпак с индикатором, шов, hazard-полоса */
+  .can { position:relative; width:34px; height:46px; margin-top:6px; background:var(--graphite);
+     border-radius:7px;
+     box-shadow: inset 0 2px 0 rgba(255,255,255,.10), inset 0 -3px 0 rgba(0,0,0,.35); }
+  .can::before { content:""; position:absolute; top:-8px; left:50%; margin-left:-6px;
+     width:12px; height:8px; background:var(--graphite-dark); border-radius:3px 3px 0 0; }
+  .can::after { content:""; position:absolute; top:-6px; left:50%; margin-left:-2px;
+     width:4px; height:4px; border-radius:50%; background:#cfd6dd; }
+  .can .seam { position:absolute; top:4px; bottom:4px; left:50%; width:1px; background:rgba(0,0,0,.25); }
+  .can .stripe { position:absolute; left:-3px; right:-3px; top:17px; height:10px; border-radius:2px;
+     background: repeating-linear-gradient(45deg, var(--hazard-orange) 0 7px, #17191d 7px 14px);
+     box-shadow:0 1px 2px rgba(0,0,0,.5); }
+  .can.dead .stripe { background: repeating-linear-gradient(45deg, #3a3f46 0 7px, #17191d 7px 14px); }
+  /* взведённое состояние: горячее ядро + кольца + искры по углам */
+  .armedcore { position:relative; width:36px; height:36px; border-radius:10px; background:hsl(23,45%,34%);
+     display:flex; align-items:center; justify-content:center;
+     box-shadow: 0 0 0 9px hsla(23,62%,50%,.16), 0 0 0 18px hsla(23,62%,50%,.08),
+                 0 0 18px hsla(23,62%,55%,.55); }
+  .armedcore::before { content:""; width:15px; height:15px; border-radius:4px; background:#ffd9b8;
+     box-shadow:0 0 8px #ffb87a; }
+  .spark { position:absolute; width:7px; height:7px; border-radius:2px;
+     background:var(--hazard-orange); transform:rotate(12deg); }
+
+  /* --- легенда состояний кнопки --- */
+  .panel { width:320px; background:#161b22; border:1px solid #2d333b; border-radius:12px; padding:16px; }
+  .panel h2 { font-size:13px; margin:0 0 12px; color:var(--hazard-orange); letter-spacing:.05em; }
+  .strow { display:flex; align-items:center; gap:14px; margin-bottom:14px; }
+  .strow .boom2 { position:relative; width:56px; height:56px; border-radius:14px; flex:none;
+     background:var(--dark-niche); border:1px solid var(--hazard-orange);
+     display:flex; align-items:center; justify-content:center; }
+  .strow .cnt { position:absolute; top:-7px; right:-7px; background:var(--hazard-orange);
+     color:#1a130c; font-size:10px; font-weight:700; padding:1px 5px; border-radius:8px; z-index:2; }
+  .boom2 .can { width:26px; height:36px; margin-top:5px; }
+  .boom2 .can .stripe { top:13px; height:8px; }
+  .boom2 .armedcore { width:28px; height:28px;
+     box-shadow: 0 0 0 7px hsla(23,62%,50%,.16), 0 0 0 14px hsla(23,62%,50%,.08),
+                 0 0 14px hsla(23,62%,55%,.5); }
+  .boom2 .armedcore::before { width:12px; height:12px; }
+  .boom2 .spark { width:6px; height:6px; }
+  .strow.armed .boom2 { box-shadow:0 0 14px hsla(23,62%,50%,.55); background:hsl(23,40%,16%); }
+  .strow.empty .boom2 { border-color:var(--gunmetal); opacity:.55; }
+  .strow.empty .cnt { background:var(--gunmetal); color:#9aa2ab; }
+  .strow p { font-size:12px; margin:0; color:#aeb6bf; line-height:1.45; }
+  .strow b { color:#e6ebf0; }
+  .panel .foot { font-size:11.5px; color:#8b949e; line-height:1.5; border-top:1px solid #2d333b; padding-top:10px; }
+
+  .note { position:absolute; max-width:150px; padding:4px 7px;
+     background:#2a1520; color:#f8a; font-size:10.5px; line-height:1.35;
+     border:1px dashed #f8a; border-radius:5px; z-index:10; }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Игровое поле — мокап (эпик #4, стори 01+02)</h1>
+  <p>Палитра — токены «Ронина» из docs/DESIGN.md. Кнопка взрыва — объединённая,
+     дизайн «канистра-заряд» по референсу PO (сессия 2026-07-18): Готов / Взведён /
+     Пусто, счётчик на кнопке. Клетка в мишени красится материалом детали при локе,
+     вне мишени — scrap. Раскладка: классическая крестовина слева (⟳ сверху, ◀ ▶
+     снизу), softDrop ⤓ сгруппирован со взрывом справа.</p>
+</div>
+
+<div class="wrap">
+
+  <div class="device">
+    <div class="safe"></div>
+    <div class="safe bottom"></div>
+
+    <div class="topbar">
+      <div class="chip"><span class="sw"></span> ДЕТАЛЬ 4/7 · ДВИГАТЕЛЬ</div>
+      <div class="pausebtn">❚❚</div>
+    </div>
+
+    <div class="board">
+      <!-- r0 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r1 .....p.... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell piece"><div class="blk"></div></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r2 ....ppp... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell piece"><div class="blk"></div></div><div class="cell piece"><div class="blk"></div></div><div class="cell piece"><div class="blk"></div></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r3 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r4 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r5 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r6 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r7 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r8 .......... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r9 .....d.... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell dropghost"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r10 ....ddd... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell dropghost"></div><div class="cell dropghost"></div><div class="cell dropghost"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r11 ...gggg... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r12 ...gggg... -->
+      <div class="cell"></div><div class="cell"></div><div class="cell"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell"></div><div class="cell"></div><div class="cell"></div>
+      <!-- r13 ..FFgggg.s -->
+      <div class="cell"></div><div class="cell"></div><div class="cell filled"><div class="blk"></div></div><div class="cell filled"><div class="blk"></div></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell"></div><div class="cell scrap"><div class="blk"></div></div>
+      <!-- r14 ..FFFFggs. -->
+      <div class="cell"></div><div class="cell"></div><div class="cell filled"><div class="blk"></div></div><div class="cell filled"><div class="blk"></div></div><div class="cell filled"><div class="blk"></div></div><div class="cell filled"><div class="blk"></div></div><div class="cell ghost"></div><div class="cell ghost"></div><div class="cell scrap"><div class="blk"></div></div><div class="cell"></div>
+    </div>
+
+    <div class="hud">
+      <div class="ctl left">◀</div>
+      <div class="ctl right">▶</div>
+      <div class="ctl rot">⟳</div>
+      <div class="ctl drop">⤓</div>
+      <div class="boom">
+        <span class="cnt">×3</span>
+        <div class="can"><span class="seam"></span><span class="stripe"></span></div>
+      </div>
+    </div>
+
+    <div class="note" style="top:118px; right:10px;">мишень: пунктир hazard-оранжевым, читается как цель</div>
+    <div class="note" style="top:588px; left:10px;">в мишени: материал детали (GUN)</div>
+    <div class="note" style="top:492px; right:6px;">вне мишени: scrap — подсказка «расчисти взрывом»</div>
+    <div class="note" style="bottom:196px; right:8px;">одна кнопка: Готов→тап=взвести; Взведён→тап=взрыв; счётчик на кнопке</div>
+  </div>
+
+  <div class="panel">
+    <h2>КНОПКА ВЗРЫВА — СОСТОЯНИЯ</h2>
+    <div class="strow">
+      <div class="boom2"><span class="cnt">×3</span>
+        <div class="can"><span class="seam"></span><span class="stripe"></span></div>
+      </div>
+      <p><b>Готов</b> — есть заряды. Тап — взвести. Канистра спокойная,
+         hazard-полоса горит оранжевым.</p>
+    </div>
+    <div class="strow armed">
+      <div class="boom2"><span class="cnt">×3</span>
+        <i class="spark" style="top:6px; left:8px;"></i><i class="spark" style="top:8px; right:6px;"></i>
+        <i class="spark" style="bottom:6px; left:6px;"></i><i class="spark" style="bottom:8px; right:8px;"></i>
+        <div class="armedcore"></div>
+      </div>
+      <p><b>Взведён</b> — жми — рванёт. Кнопка горит: ядро, кольца, искры,
+         свечение/пульс. Тап — детонация.</p>
+    </div>
+    <div class="strow empty">
+      <div class="boom2"><span class="cnt">×0</span>
+        <div class="can dead"><span class="seam"></span><span class="stripe"></span></div>
+      </div>
+      <p><b>Пусто</b> — 0 зарядов, неактивна. Полосы гаснут в серый,
+         счётчик серый, кнопка задимлена.</p>
+    </div>
+    <div class="foot">
+      Системная зона (конвенции игры на мобилке): верхний/нижний safe-area
+      соблюдены (пунктир на рамке); все контролы ≥ 56 px; портрет; back-жест
+      Android = пауза, не выход. Механика взрыва (#3) не меняется — только
+      UI-триггер.
+    </div>
+  </div>
+
+</div>
+
+</body>
+</html>
