@@ -22,7 +22,8 @@
   + риветы; прежние пер-материальные текстуры T1 отменены); `ScrapBlockSkin` —
   канон `el-scrap` (заливка `graphiteDark`, слабая фаска без боковых граней, без
   риветов, детерминированный питтинг rust-пятен от `(boardX,boardY)`); `TntSkin`
-  (взведённый заряд, ⚠ ждёт Стори 02 «взрыв» — не трогать вне неё).
+  (⚠ ждёт Стори 02 «взрыв» — не трогать вне неё; больше НЕ используется для
+  падающей взведённой фигуры, T6 заменил её на `el-piece-armed`).
 - `ImageBlockSkin` удалён в Стори 01 T1 (не был подключён, ассетов нет; добавление PNG-набора —
   отдельное продуктовое решение при появлении ассетов).
 - `LevelSkin.materialForLevelIndex/materialForLevel/materialForObjectFragment` — уровень → материал.
@@ -36,7 +37,15 @@
 - `BlockPaintUtils` — общие хелперы: `baseCellSize` (34px, база размеров каталога
   элементов) + `paintElBlock`/`paintElDrop` (канон `el-block`/`el-piece`/`el-scrap`
   и `el-drop`, размеры масштабируются от `baseCellSize` к фактическому `rect`,
-  Стори 01 T5), плюс низкоуровневые `noise/pick/drawTexturedRect/drawBevel/
+  Стори 01 T5); `paintElPieceArmed(canvas, rect, {required pulse})` — канон
+  `el-piece-armed` (Стори 01 T6): реиспользует `paintElBlock` (через новые опц.
+  хуки `onFillPainted`/`topBandOverlayColor`, поведение существующих вызовов не
+  изменилось) для базы el-piece + диагональный hazard-хэтч 45° (`armedHatch`) +
+  hazard-подкрас верхней фаски + горячее свечение `armedGlow` (пульс от [pulse] —
+  тот же источник/период, что `el-halo`) + ембер-ядро (`armedEmber`/
+  `armedEmberGlow`); `paintElDropArmed(canvas, rect)` — канон `el-drop-armed`:
+  геометрия `paintElDrop`, но сплошной контур + 10% заливка + свечение
+  `armedEmberGlow`. Плюс низкоуровневые `noise/pick/drawTexturedRect/drawBevel/
   drawBlockOutline/paintBlock` — только для `TntSkin`/`CreeperFacePainter`
   (Стори 02, не трогать вне неё).
 

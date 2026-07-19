@@ -396,7 +396,7 @@ _нет_
   статус T5.
 
 ### T6 — Взведённая фигура по канону: `el-piece-armed` + `el-drop-armed` (возврат Гейта 2 №2)
-- **Статус:** не начата
+- **Статус:** готова
 - **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`) —
   отрисовка по готовой поэлементной спеке поверх готового канон-рендера T5,
   не «тяжёлая».
@@ -481,4 +481,73 @@ _нет_
   статус задачи в стори; `docs/STATUS.md`; один коммит
   `gotovnost/01-svoy-stil-i-perekraska T6: <суть> (возврат)`. Общий чек-лист —
   `system/AGENT.md` §5.
-- **Заметки по выполнению:** —
+- **Заметки по выполнению:** `BlockPaintUtils.paintElBlock` получил два опц.
+  хука для реиспользования (`onFillPainted` — колбэк сразу после заливки,
+  внутри клипа, до фаски/риветов; `topBandOverlayColor` — доп. рект поверх
+  верхней световой полосы): существующие вызовы (`el-block`/`el-scrap`/
+  `el-piece`, T1/T5) их не передают → поведение не изменилось (сверил
+  `flutter test` — не потребовалось менять ни одного T5-теста).
+  `paintElPieceArmed(canvas, rect, {required pulse})`: база через
+  `paintElBlock(graphite, topAlpha:0.12, glowAlpha:0.06, ...)` (то же, что
+  и обычный `el-piece`) + `onFillPainted` рисует диагональный hazard-хэтч
+  45° (полоса 6/34, период 14/34 = зазор 8/34, `armedHatch` `#BE642D`@55%) —
+  реализован как `canvas.rotate(pi/4)` вокруг центра `blockRect`, фаза
+  считается от `rect`/`blockRect` клетки (сигнатура функции не берёт
+  `boardX/boardY` вовсе — фаза физически не может зависеть от board-коорд.,
+  условие ТЗ выполняется тривиально) + `topBandOverlayColor` даёт
+  hazard-подкрас верхней фаски (`hsl(23 62% 70% / 20%)` = `#E2A783`@20%)
+  поверх штатной белой полосы 12%. После вызова `paintElBlock` — горячее
+  внешнее свечение `armedGlow` (RGB `#D37C45` = тот же тон, что `ghostTarget`/
+  `el-halo`, alpha `0.55 + pulse*0.04` — тот же паттерн буста, что
+  `HaloHighlightOverlay.paint`, blur 20/34) и ембер-ядро (круг Ø 13/34,
+  `armedEmber` `#FFD9B8` заливка + `armedEmberGlow` `#FFB87A` blur-свечение
+  9/34, по мокапу `.bblk .ember i`). HSL→RGB токенов пересчитаны детерминированно
+  (`colorsys`, тем же способом, что в T4/T5) и сверены с hex, указанными в
+  DESIGN.md напрямую (`armedEmber`=`#FFD9B8`, `armedEmberGlow`=`#FFB87A` — совпало).
+  `paintElDropArmed(canvas, rect)`: геометрия 1:1 с `paintElDrop` (инсет 2/34,
+  скругление 3/34), но контур сплошной `armedEmberGlow` 100% + заливка
+  `armedEmberGlow`@10% + мягкое blur-свечение (паттерн — как у
+  `HaloHighlightOverlay`: сначала блюр-обводка, потом чёткий контур).
+  `board_painter.dart`: `tntSkin`/`TntSkin` полностью убраны из конструктора/
+  полей/`shouldRepaint`/импортов (файл `tnt_skin.dart` не тронут — Стори 02,
+  `BlockTheme.tnt` тоже цел). `_paintFallingPieceBlock` переписан без
+  `boardX/boardY` (были нужны только для `tntSkin.paint`, теперь не нужны) —
+  ветвится по `armed` (`fp.mode == PieceMode.explosive`) на `paintElPieceArmed`
+  с тем же `pulse`, что уже вычислен для halo (`math.sin(animValue*2*pi).abs()*0.5`,
+  переиспользован, свой таймер не заводил). Новый метод `armedGhostCells(fp, board)` —
+  формула из ТЗ буквально (`ghostY = fp.y + (board.height-1-maxY)`), но с
+  важным уточнением: `maxY` — board-абсолютный y нижней клетки фигуры
+  (`fp.boardCells`, т.е. `fp.y + локальный cell.y`), не локальный matrix-y.
+  С локальным `maxY` формула зависела бы от `fp.y` и уводила бы отпечаток за
+  пределы поля по мере падения фигуры (проверил на бумаге: `fp.y=15` дало бы
+  `y=34` при высоте поля 20) — с board-абсолютным `maxY` слагаемое `fp.y`
+  сокращается и отпечаток константен независимо от текущей высоты падения
+  (физически верно: `canMoveDownExplosive` видит только дно, финальная позиция
+  не зависит от старта). Метод сделан публичным (без `_`) и помечен
+  `@visibleForTesting` (`package:flutter/material.dart` уже реэкспортирует
+  аннотацию — `package:flutter/foundation.dart` явно импортировать не
+  пришлось, `flutter analyze` подтвердил `unnecessary_import` при попытке) —
+  расчёт остаётся в пейнтере (ТЗ: «движок НЕ трогать»), но формула
+  тестируется без канваса. `paint()`: ветка drop-ghost/falling piece
+  объединена на одном булевом `armed`, слои остались в том же порядке
+  (drop-ghost → фигура), explosive-ветка рисует `armedGhostCells`/
+  `paintElDropArmed` вместо пустого блока (сейчас в T5 explosive drop-ghost
+  не рисовался вовсе — это и есть основная новая видимая часть).
+  Тесты `test/presentation/board_painter_test.dart`: убран `_TntCountingSkin`
+  и импорт `tnt_skin.dart`, тест `explosive_piece_uses_tnt_skin` удалён
+  (поведение больше не существует); добавлены 2 теста на
+  `armedGhostCells` — (1) отпечаток I-фигуры прижат к последней строке поля,
+  занятые клетки в её пути/отпечатке не влияют на расчёт; (2) T-фигура даёт
+  идентичный отпечаток при `fp.y=0` и `fp.y=5` (независимость от текущей
+  высоты падения — это и есть регресс-защита от бага с локальным `maxY`,
+  который я сначала чуть не оставил, тест бы его поймал). НЕ трогал: `game_engine`,
+  рендеры T5 (`el-block`/`el-scrap`/`el-piece`/`el-drop`/`el-halo` — их
+  тесты прошли без изменений), `GhostTargetOverlay`/фон/сетку (T4),
+  `tnt_skin.dart`/`CreeperFacePainter`/`BlockTheme.tnt`/HUD/топбар/кнопку
+  взрыва, карту `ShipMaterials`/логику выбора скина в `_paintPlacedBlock`.
+  `flutter analyze` — 0 ошибок/предупреждений. `flutter test` (полный набор) —
+  296/296 зелёных (было 295; -1 удалённый tnt-тест, +2 новых armed-теста).
+  Визуальную проверку (`el-piece-armed`: хэтч/свечение-пульс/ембер-ядро;
+  `el-drop-armed`: сплошной ембер-контур у дна, `flutter run -d web-server`)
+  НЕ делал — Гейт 2 оркестратора/PO (`system/AGENT.md` §3); статус стори
+  «на приёмке» не менял, только статус T6.

@@ -10,7 +10,6 @@ import '../theme/block_paint_utils.dart';
 import '../theme/block_theme.dart';
 import '../theme/scrap_block_skin.dart';
 import '../theme/ship_materials.dart';
-import '../theme/tnt_skin.dart';
 
 /// Custom painter for the game board with the game's own voxel block skins.
 class BoardPainter extends CustomPainter {
@@ -22,7 +21,6 @@ class BoardPainter extends CustomPainter {
     required this.levelMaterial,
     required this.shipMaterials,
     this.scrapSkin = const ScrapBlockSkin(),
-    this.tntSkin = BlockTheme.tnt,
     this.animValue = 0.0,
   });
 
@@ -40,9 +38,6 @@ class BoardPainter extends CustomPainter {
   /// colored via `shipMaterials`) — kept in the constructor/`shouldRepaint`
   /// for API compatibility with existing callers.
   final BlockMaterial levelMaterial;
-
-  /// Skin used for armed explosive falling pieces.
-  final TntSkin tntSkin;
 
   /// Animation value for halo pulse (0..1).
   final double animValue;
@@ -83,18 +78,41 @@ class BoardPainter extends CustomPainter {
         .toList();
   }
 
-  /// Paints the falling piece — `el-piece` (neutral graphite, not colored by
-  /// material until locked in target) or the armed `TntSkin` for explosive
-  /// pieces (Стори 02, untouched here).
+  /// Landing footprint of an armed (explosive) falling piece. Explosive
+  /// down-collision only checks the floor (`CollisionDetector.
+  /// canMoveDownExplosive`, `rules/collision.dart`) — it ignores placed
+  /// blocks — so the normal `_ghostCells` (which stops on occupied cells)
+  /// does not apply. The footprint is simply the piece's own cells shifted
+  /// down so its lowest cell touches the last board row; placed blocks may
+  /// end up under the footprint — that's expected (the bomb passes through).
+  ///
+  /// Public (not `_`-prefixed) and `@visibleForTesting` so the formula can
+  /// be unit-tested directly (Стори 01 T6 "Как проверить") without a canvas.
+  @visibleForTesting
+  List<({int x, int y})> armedGhostCells(FallingPiece fp, Board board) {
+    // maxY — board-absolute y of the piece's lowest cell in the current
+    // position (`fp.boardCells`, already `fp.y + local cell.y`). `fp.y +
+    // (board.height - 1 - maxY)` cancels `fp.y` out, so the footprint is a
+    // fixed row (independent of how far the piece has already fallen) —
+    // exactly "нижняя клетка фигуры встаёт в нижний ряд поля".
+    final maxY = fp.boardCells.map((cell) => cell.y).reduce(math.max);
+    final ghostY = fp.y + (board.height - 1 - maxY);
+    return fp.piece.cells
+        .map((cell) => (x: fp.x + cell.x, y: ghostY + cell.y))
+        .toList();
+  }
+
+  /// Paints one cell of the falling piece — `el-piece` (neutral graphite,
+  /// not colored by material until locked in target) or `el-piece-armed`
+  /// while the explosive is armed (Стори 01 T6).
   void _paintFallingPieceBlock(
     Canvas canvas,
-    Rect rect,
-    int boardX,
-    int boardY, {
-    required bool useTnt,
+    Rect rect, {
+    required bool armed,
+    required double pulse,
   }) {
-    if (useTnt) {
-      tntSkin.paint(canvas, rect, boardX: boardX, boardY: boardY);
+    if (armed) {
+      BlockPaintUtils.paintElPieceArmed(canvas, rect, pulse: pulse);
       return;
     }
     // el-piece: graphite fill, brighter top bevel, soft outer glow, no
@@ -184,22 +202,26 @@ class BoardPainter extends CustomPainter {
     }
 
     if (fp != null) {
-      // 5. Drop ghost (normal mode only) — el-drop: outline only, no fill.
-      if (fp.mode == PieceMode.normal) {
+      final armed = fp.mode == PieceMode.explosive;
+
+      // 5. Drop ghost — el-drop (normal) or el-drop-armed (explosive).
+      if (armed) {
+        for (final cell in armedGhostCells(fp, board)) {
+          BlockPaintUtils.paintElDropArmed(canvas, _cellRect(cell.x, cell.y));
+        }
+      } else {
         for (final cell in _ghostCells(fp, board)) {
           BlockPaintUtils.paintElDrop(canvas, _cellRect(cell.x, cell.y));
         }
       }
 
-      // 6. Falling piece — el-piece or TNT skin.
-      final useTnt = fp.mode == PieceMode.explosive;
+      // 6. Falling piece — el-piece or el-piece-armed.
       for (final cell in fp.boardCells) {
         _paintFallingPieceBlock(
           canvas,
           _cellRect(cell.x, cell.y),
-          cell.x,
-          cell.y,
-          useTnt: useTnt,
+          armed: armed,
+          pulse: pulse,
         );
       }
     }
@@ -213,7 +235,6 @@ class BoardPainter extends CustomPainter {
         levelMaterial != oldDelegate.levelMaterial ||
         shipMaterials != oldDelegate.shipMaterials ||
         scrapSkin != oldDelegate.scrapSkin ||
-        animValue != oldDelegate.animValue ||
-        tntSkin != oldDelegate.tntSkin;
+        animValue != oldDelegate.animValue;
   }
 }

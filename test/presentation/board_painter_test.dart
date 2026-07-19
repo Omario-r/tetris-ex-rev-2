@@ -14,7 +14,6 @@ import 'package:explosive_tetris/presentation/theme/block_skin.dart';
 import 'package:explosive_tetris/presentation/theme/block_theme.dart';
 import 'package:explosive_tetris/presentation/theme/scrap_block_skin.dart';
 import 'package:explosive_tetris/presentation/theme/ship_materials.dart';
-import 'package:explosive_tetris/presentation/theme/tnt_skin.dart';
 import 'package:explosive_tetris/presentation/widgets/board_painter.dart';
 
 class CountingSkin implements BlockSkin {
@@ -244,24 +243,81 @@ void main() {
       expect(levelSkin.calls, greaterThan(0));
     });
 
-    test('explosive_piece_uses_tnt_skin', () {
-      final levelSkin = CountingSkin('level');
-      final tntSkin = _TntCountingSkin();
-      final state = createStateWithExplosivePiece(3, 0);
-      final painter = BoardPainter(
-        state: state,
-        cellSize: 30.0,
-        theme: TestBlockTheme(levelSkin: levelSkin),
-        levelMaterial: BlockMaterial.graphite,
-        shipMaterials: ShipMaterials.defaultMaterials,
-        tntSkin: tntSkin,
-      );
+    test(
+      'armed_ghost_cells_pinned_to_bottom_row_ignoring_occupied_cells',
+      () {
+        final board = Board(defaultLevel.boardWidth, defaultLevel.boardHeight);
+        // Occupied cells in and around the footprint must not affect the
+        // computed landing row — explosive collision only checks the floor
+        // (`CollisionDetector.canMoveDownExplosive`), the bomb passes
+        // through placed blocks.
+        board.setCell(3, 10, const Cell.occupied());
+        board.setCell(4, 19, const Cell.occupied());
 
-      final recorder = ui.PictureRecorder();
-      painter.paint(Canvas(recorder), const Size(300, 600));
+        // I-piece: local cells at (0,1)..(3,1) — a single row.
+        final piece = PieceFactory.create(PieceType.I);
+        final fallingPiece = FallingPiece(
+          piece: piece,
+          x: 3,
+          y: 0,
+          mode: PieceMode.explosive,
+        );
+        final state = GameState(
+          board: board,
+          fallingPiece: fallingPiece,
+          phase: GamePhase.falling,
+          generator: SevenBagGenerator(seed: 42),
+          level: defaultLevel,
+        );
+        final painter = createPainter(state);
 
-      expect(tntSkin.calls, greaterThan(0));
-    });
+        final cells = painter.armedGhostCells(fallingPiece, board);
+
+        // Lowest local cell y=1 → footprint row = board.height - 1 = 19,
+        // regardless of the occupied cells placed above/within it.
+        expect(
+          cells.toSet(),
+          equals({(x: 3, y: 19), (x: 4, y: 19), (x: 5, y: 19), (x: 6, y: 19)}),
+        );
+      },
+    );
+
+    test(
+      'armed_ghost_cells_footprint_independent_of_current_fall_progress',
+      () {
+        final board = Board(defaultLevel.boardWidth, defaultLevel.boardHeight);
+        // T-piece: local cells (0,0),(1,0),(2,0),(1,1) — two rows, lowest
+        // local y = 1.
+        final piece = PieceFactory.create(PieceType.T);
+
+        final atSpawn = FallingPiece(
+          piece: piece,
+          x: 0,
+          y: 0,
+          mode: PieceMode.explosive,
+        );
+        final midFall = FallingPiece(
+          piece: piece,
+          x: 0,
+          y: 5,
+          mode: PieceMode.explosive,
+        );
+
+        final painter = createPainter(createStateWithExplosivePiece(0, 0));
+
+        final spawnCells = painter.armedGhostCells(atSpawn, board);
+        final midFallCells = painter.armedGhostCells(midFall, board);
+
+        // Same footprint whether the piece just spawned or already fell
+        // partway — it's the resting position, not the current position.
+        expect(spawnCells, equals(midFallCells));
+        // The lowest local cell (1,1) of the T-piece touches the bottom row.
+        expect(
+          spawnCells.map((c) => c.y).reduce((a, b) => a > b ? a : b),
+          equals(board.height - 1),
+        );
+      },
+    );
 
     test('placed_cells_outside_target_use_scrap_skin', () {
       final scrapSkin = ScrapCountingSkin();
@@ -281,13 +337,4 @@ void main() {
       expect(scrapSkin.coords, equals([(0, 0)]));
     });
   });
-}
-
-class _TntCountingSkin extends TntSkin {
-  int calls = 0;
-
-  @override
-  void paint(Canvas canvas, Rect rect, {int? boardX, int? boardY}) {
-    calls++;
-  }
 }

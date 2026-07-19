@@ -10,8 +10,8 @@
 
 ## Публичный интерфейс
 
-- `BoardPainter(state, cellSize, theme, levelMaterial, shipMaterials, {scrapSkin, tntSkin, animValue})` — `CustomPainter`
-  поля: фон `boardBg` (токен DESIGN.md, `#16191D`) + тонкие линии сетки `gridLine`
+- `BoardPainter(state, cellSize, theme, levelMaterial, shipMaterials, {scrapSkin, animValue})` —
+  `CustomPainter` поля: фон `boardBg` (токен DESIGN.md, `#16191D`) + тонкие линии сетки `gridLine`
   (`#9097A2` @ 6%, по границам клеток, Стори 01 T4), ghost-мишень (незаполненные `S`),
   уложенные блоки, пульс dirty-halo, drop-ghost, падающая фигура. Уложенные блоки
   красятся материалом детали из `shipMaterials` если в мишени (`S`) — рендер `el-block`
@@ -20,9 +20,15 @@
   (`BlockPaintUtils.paintElBlock`, нейтральный `graphite`, не красится материалом до
   лока, Стори 01 T5); drop-ghost (normal mode) — канон `el-drop`
   (`BlockPaintUtils.paintElDrop`, только контур, без заливки, Стори 01 T5). Взведённая
-  (explosive) падающая фигура — `TntSkin`, вне скоупа T5 (Стори 02). `levelMaterial` —
-  legacy-параметр конструктора, оставлен для совместимости API, отрисовку не влияет
-  (Стори 01 T5).
+  (`PieceMode.explosive`) падающая фигура — канон `el-piece-armed`
+  (`BlockPaintUtils.paintElPieceArmed`, `pulse` — тот же, что у `HaloHighlightOverlay`);
+  её drop-ghost — канон `el-drop-armed` (`BlockPaintUtils.paintElDropArmed`), клетки —
+  `armedGhostCells(fp, board)` (публичный, `@visibleForTesting`: отпечаток = клетки
+  фигуры, сдвинутые так, что нижняя клетка встаёт в последний ряд поля; занятые клетки
+  игнорируются — `CollisionDetector.canMoveDownExplosive` видит только дно, Стори 01 T6).
+  `tntSkin`/`TntSkin` для падающей фигуры **больше не используется** (сам `TntSkin` — файл
+  остаётся, Стори 02). `levelMaterial` — legacy-параметр конструктора, оставлен для
+  совместимости API, отрисовку не влияет (Стори 01 T5).
 - `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
   arm (крипер) + detonate; активность через `state.canArm/canDetonate`. Под кнопкой arm —
   числовой индикатор `state.charges` (`Key('charges_indicator')`): белый при `charges > 0`,
@@ -44,8 +50,10 @@
 - `game_engine/game` — `GameState`, `GameController`.
 - `game_engine/models` — `Board`, `FallingPiece`.
 - `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
-- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`, `TntSkin`,
-  `ScrapBlockSkin`, `ShipMaterials`, оверлеи.
+- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`,
+  `ScrapBlockSkin`, `ShipMaterials`, оверлеи (`GhostTargetOverlay`,
+  `HaloHighlightOverlay`, `CreeperFacePainter`). `TntSkin` — больше не
+  зависимость `widgets` (Стори 01 T6 заменила её `el-piece-armed`).
 
 ## От него зависят
 
