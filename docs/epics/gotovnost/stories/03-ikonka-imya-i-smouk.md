@@ -116,7 +116,7 @@ _нет_
   имени под иконкой на устройстве — T3/Гейт 2 (PO).
 
 ### T2 — Своя иконка (iOS + Android) из канона канистры-заряда
-- **Статус:** не начата
+- **Статус:** выполнено (2026-07-19)
 - **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`). ТЗ
   детальное; домен хрупкий (платформенная упаковка, первый заход). **Критик
   (режим «ТЗ») отработал 2026-07-19** — критические пробелы закрыты в разделе
@@ -212,7 +212,51 @@ _нет_
   T2: <суть>`, включающий: исходники `assets/icon/*`, генератор
   `tool/generate_app_icon.dart`, сгенерированные ассеты (`android/`, `ios/`),
   `pubspec.yaml`.
-- **Заметки по выполнению:** —
+- **Заметки по выполнению:** Генератор `tool/generate_app_icon.dart`
+  (Flutter-тест-файл, не в `test/` — не попадает в дефолтный `flutter test`)
+  рендерит `CanisterChargePainter(state: ChargeIconState.ready)` через
+  `PictureRecorder`→`Canvas`→`toImage(1024,1024)`→`toByteData(png)` в
+  `assets/icon/app_icon.png` (matteBlack `#1D2025` фон, `canW=421`,
+  `translate(301.5, 276.5)`, `paint(Size(421,421))`) и
+  `assets/icon/app_icon_foreground.png` (прозрачный фон, `canW=360`,
+  `translate(332, 310.7)`, `paint(Size(360,360))`) — числа по уточнению ТЗ,
+  визуально сверено (иконка = канистра-заряд, канон мокапа). Запуск разово:
+  `flutter test tool/generate_app_icon.dart` — прошёл. Пакет добавлен
+  `flutter pub add dev:flutter_launcher_icons` → `flutter_launcher_icons: ^0.14.4`
+  (без хардкода версии). Конфиг в `pubspec.yaml` (`flutter_launcher_icons:`
+  верхнего уровня): `android: true`, `ios: true`, `remove_alpha_ios: true`,
+  `image_path`, `adaptive_icon_background: "#1D2025"`,
+  `adaptive_icon_foreground`. `assets/icon/` НЕ зарегистрирован в
+  `flutter: assets:` (вход генератора, не ресурс приложения). Генерация:
+  `dart run flutter_launcher_icons` → `AppIcon.appiconset` перезаписан (25
+  файлов, PNG 402Б–14002Б, включая 1024×1024), новые idiom-размеры (50/57/72)
+  добавлены пакетом (стандартное поведение); Android получил
+  `mipmap-anydpi-v26/ic_launcher.xml` (adaptive, background=`@color/
+  ic_launcher_background` из нового `values/colors.xml` `#1D2025`,
+  foreground=`drawable-*/ic_launcher_foreground.png` с inset 16%) + легаси
+  `mipmap-*/ic_launcher.png` перезаписаны. `ios/Runner.xcodeproj/project.pbxproj`
+  получил 2-строчную правку `ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS`
+  `YES`→`AppIcon` — штатный побочный эффект генератора пакета, не трогал руками.
+  minSdk не менялся (`android/app/build.gradle.kts` — `minSdk = flutter.minSdkVersion`,
+  без диффа). `flutter analyze` = 0 ошибок/предупреждений. Дефолтный `flutter
+  test` (БЕЗ `tool/`) — 301/301 зелёных (не изменилось, как и ожидалось —
+  генератор вне суита). Паспорт `theme/README.md` не тронут — публичный хелпер
+  рендера НЕ добавлялся, `CanisterChargePainter` переиспользован как есть
+  (уже публичный конструктор), новый интерфейс модуля не появился. Визуал
+  иконки на домашнем экране — T3/Гейт 2 (PO).
+  **Побочная находка/фикс:** `.gitignore` строка `Icon` (правило для macOS
+  custom-folder-icon, литерального файла, оканчивающегося двумя CR-байтами)
+  без anchoring совпадала регистронезависимо (macOS `core.ignorecase`) с ЛЮБЫМ
+  путём, содержащим компонент `icon`/`Icon` — включая новый каталог
+  `assets/icon/`, из-за чего исходники не попадали под git-трекинг
+  (`git status` их не видел, `git check-ignore` подтвердил совпадение с
+  правилом `Icon`). Минимальный фикс: заменил `Icon` на `Icon\r\r`
+  (два литеральных CR-байта — канонический macOS-gitignore идиом из
+  github/gitignore), теперь совпадает только с настоящим артефактом Finder, не
+  с нашим каталогом. Проверено: `git check-ignore assets/icon
+  assets/icon/app_icon.png assets/icon/app_icon_foreground.png` → exit 1
+  (не игнорируется); `git status --short assets/` → `?? assets/icon/`. Диф
+  `.gitignore` — только эта строка (комментарий + замена).
 
 ### T3 — Ранбук установки на устройства + локальный смоук
 - **Статус:** не начата

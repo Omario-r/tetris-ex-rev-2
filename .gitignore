@@ -5,9 +5,9 @@
 # Thumbnails
 ._*
 
-# Custom folder icons
-Icon
-
+# Custom folder icons (literal file ending in two CR bytes; must not
+# match plain "icon"/"Icon" path components like assets/icon/)
+Icon
 
 # Volume root files
 .DocumentRevisions-V100
