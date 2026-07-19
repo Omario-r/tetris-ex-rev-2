@@ -9,7 +9,7 @@ import 'package:explosive_tetris/game_engine/data/level_map.dart';
 import 'package:explosive_tetris/presentation/widgets/hud.dart';
 
 void main() {
-  group('GameHud', () {
+  group('GameHud — boom_button (Стори 02 T1)', () {
     late GameController controller;
 
     setUp(() {
@@ -25,149 +25,130 @@ void main() {
       );
     });
 
-    testWidgets('arm_button_disabled_when_cannot_arm', (
+    Future<void> pumpHud(WidgetTester tester) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GameHud(
+              controller: controller,
+              state: controller.state,
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('boom_button всегда виден — одна кнопка вместо двух', (
       WidgetTester tester,
     ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: GameHud(
-              controller: controller,
-              state: controller.state,
-            ),
-          ),
-        ),
-      );
-
-      final armButton = tester.widget<IconButton>(
-        find.byKey(const Key('arm_button')),
-      );
-      expect(armButton.onPressed, isNull);
-
-      final opacityWidget = tester.widget<Opacity>(
-        find.ancestor(
-          of: find.byKey(const Key('arm_button')),
-          matching: find.byType(Opacity),
-        ),
-      );
-      expect(opacityWidget.opacity, equals(0.3));
+      await pumpHud(tester);
+      expect(find.byKey(const Key('boom_button')), findsOneWidget);
     });
 
-    testWidgets('arm_button_enabled_when_can_arm', (
+    testWidgets(
+      'Пусто: 0 зарядов → кнопка неактивна, задымлена (opacity ~0.55)',
+      (WidgetTester tester) async {
+        controller.setCharges(0);
+        await pumpHud(tester);
+
+        final gesture = tester.widget<GestureDetector>(
+          find.byKey(const Key('boom_button')),
+        );
+        expect(gesture.onTap, isNull);
+
+        final opacityWidget = tester.widget<Opacity>(
+          find.ancestor(
+            of: find.byKey(const Key('boom_button')),
+            matching: find.byType(Opacity),
+          ),
+        );
+        expect(opacityWidget.opacity, equals(0.55));
+      },
+    );
+
+    testWidgets(
+      'Готов: заряды есть, canArm false (нет падающей фигуры) → неактивна',
+      (WidgetTester tester) async {
+        // spawning phase, до первого тика: fallingPiece == null → canArm false.
+        expect(controller.state.canArm, isFalse);
+        expect(controller.state.charges, greaterThan(0));
+        await pumpHud(tester);
+
+        final gesture = tester.widget<GestureDetector>(
+          find.byKey(const Key('boom_button')),
+        );
+        expect(gesture.onTap, isNull);
+      },
+    );
+
+    testWidgets(
+      'Готов: canArm true → тап взводит (controller.armExplosive)',
+      (WidgetTester tester) async {
+        controller.tick(0);
+        controller.tick(1);
+        if (!controller.state.canArm) return;
+
+        await pumpHud(tester);
+
+        final gesture = tester.widget<GestureDetector>(
+          find.byKey(const Key('boom_button')),
+        );
+        expect(gesture.onTap, isNotNull);
+
+        await tester.tap(find.byKey(const Key('boom_button')));
+        await tester.pump();
+
+        expect(controller.state.canDetonate, isTrue);
+      },
+    );
+
+    testWidgets(
+      'Взведён: canDetonate true → тап детонирует (controller.detonate)',
+      (WidgetTester tester) async {
+        controller.tick(0);
+        controller.tick(1);
+        if (!controller.state.canArm) return;
+        controller.armExplosive();
+        expect(controller.state.canDetonate, isTrue);
+
+        await pumpHud(tester);
+
+        final opacityWidget = tester.widget<Opacity>(
+          find.ancestor(
+            of: find.byKey(const Key('boom_button')),
+            matching: find.byType(Opacity),
+          ),
+        );
+        expect(opacityWidget.opacity, equals(1.0));
+
+        await tester.tap(find.byKey(const Key('boom_button')));
+        await tester.pump();
+
+        expect(controller.state.canDetonate, isFalse);
+      },
+    );
+
+    testWidgets('charges_indicator показывает бейдж ×N (state.charges)', (
       WidgetTester tester,
     ) async {
-      controller.tick(0);
-      controller.tick(1);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: GameHud(
-              controller: controller,
-              state: controller.state,
-            ),
-          ),
-        ),
-      );
-
-      if (!controller.state.canArm) {
-        return;
-      }
-
-      final armButton = tester.widget<IconButton>(
-        find.byKey(const Key('arm_button')),
-      );
-      expect(armButton.onPressed, isNotNull);
-
-      final opacityWidget = tester.widget<Opacity>(
-        find.ancestor(
-          of: find.byKey(const Key('arm_button')),
-          matching: find.byType(Opacity),
-        ),
-      );
-      expect(opacityWidget.opacity, equals(1.0));
-    });
-
-    testWidgets('arm_button_always_visible', (WidgetTester tester) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: GameHud(
-              controller: controller,
-              state: controller.state,
-            ),
-          ),
-        ),
-      );
-
-      expect(find.byKey(const Key('arm_button')), findsOneWidget);
-    });
-
-    testWidgets('charges_indicator показывает текущий остаток зарядов', (
-      WidgetTester tester,
-    ) async {
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: GameHud(
-              controller: controller,
-              state: controller.state,
-            ),
-          ),
-        ),
-      );
+      await pumpHud(tester);
 
       final text = tester.widget<Text>(
         find.byKey(const Key('charges_indicator')),
       );
-      expect(text.data, '${controller.state.charges}');
+      expect(text.data, '×${controller.state.charges}');
     });
 
-    testWidgets(
-      'charges_indicator читается без слов: цвет меняется на 0 зарядов',
-      (WidgetTester tester) async {
-        controller.setCharges(0);
+    testWidgets('charges_indicator обновляется при setCharges', (
+      WidgetTester tester,
+    ) async {
+      controller.setCharges(0);
+      await pumpHud(tester);
 
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: GameHud(
-                controller: controller,
-                state: controller.state,
-              ),
-            ),
-          ),
-        );
-
-        final text = tester.widget<Text>(
-          find.byKey(const Key('charges_indicator')),
-        );
-        expect(text.data, '0');
-        expect(text.style?.color, equals(Colors.redAccent));
-      },
-    );
-
-    testWidgets(
-      'charges_indicator обычный цвет, когда заряды есть',
-      (WidgetTester tester) async {
-        controller.setCharges(3);
-
-        await tester.pumpWidget(
-          MaterialApp(
-            home: Scaffold(
-              body: GameHud(
-                controller: controller,
-                state: controller.state,
-              ),
-            ),
-          ),
-        );
-
-        final text = tester.widget<Text>(
-          find.byKey(const Key('charges_indicator')),
-        );
-        expect(text.style?.color, equals(Colors.white));
-      },
-    );
+      final text = tester.widget<Text>(
+        find.byKey(const Key('charges_indicator')),
+      );
+      expect(text.data, '×0');
+    });
   });
 }

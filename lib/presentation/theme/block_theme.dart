@@ -1,7 +1,6 @@
 import 'block_material.dart';
 import 'block_skin.dart';
 import 'procedural_block_skin.dart';
-import 'tnt_skin.dart';
 import 'overlays.dart';
 
 /// Single wiring point mapping block materials to their skins.
@@ -25,9 +24,6 @@ class BlockTheme {
     BlockMaterial.matteBlack:
         const ProceduralBlockSkin(BlockMaterial.matteBlack),
   });
-
-  /// TNT skin for armed explosive pieces.
-  static const TntSkin tnt = TntSkin();
 
   /// Ghost overlay for unfilled target cells.
   static const GhostTargetOverlay ghostTarget = GhostTargetOverlay();

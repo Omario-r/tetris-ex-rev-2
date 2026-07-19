@@ -26,14 +26,20 @@
   `armedGhostCells(fp, board)` (публичный, `@visibleForTesting`: отпечаток = клетки
   фигуры, сдвинутые так, что нижняя клетка встаёт в последний ряд поля; занятые клетки
   игнорируются — `CollisionDetector.canMoveDownExplosive` видит только дно, Стори 01 T6).
-  `tntSkin`/`TntSkin` для падающей фигуры **больше не используется** (сам `TntSkin` — файл
-  остаётся, Стори 02). `levelMaterial` — legacy-параметр конструктора, оставлен для
-  совместимости API, отрисовку не влияет (Стори 01 T5).
-- `GameHud(controller, state)` — `StatelessWidget`: кнопки движения/поворота/softDrop +
-  arm (крипер) + detonate; активность через `state.canArm/canDetonate`. Под кнопкой arm —
-  числовой индикатор `state.charges` (`Key('charges_indicator')`): белый при `charges > 0`,
-  `Colors.redAccent` на 0 (эпик «Взрыв», Стори 01). `canArm` уже учитывает `charges > 0` —
-  кнопка arm сама димится на 0 (см. `game_engine/game` README).
+  `TntSkin` удалён (Стори 02 T1) — уже не использовался для падающей фигуры с Стори 01 T6.
+  `levelMaterial` — legacy-параметр конструктора, оставлен для совместимости API,
+  отрисовку не влияет (Стори 01 T5).
+- `GameHud(controller, state, {animValue})` — `StatelessWidget`: кнопки движения/поворота/
+  softDrop (раскладка — T2, не тронута этой задачей) + одна объединённая кнопка взрыва
+  `Key('boom_button')` — «канистра-заряд» (Стори 02 T1, канон `docs/design/game-field.html`
+  `.boom`/`.can`/`.armedcore`/`.cnt`), заменившая прежние отдельные arm/detonate. State-машина
+  (UI-триггер, своей логики нет): **Взведён** (`state.canDetonate`) → тап `controller.detonate`;
+  иначе **Готов** (`state.charges > 0`) → тап `controller.armExplosive` (активность —
+  `state.canArm`, `canArm` уже учитывает `charges > 0`); иначе **Пусто** — неактивна, opacity
+  ~0.55. Иконка — `CanisterChargePainter` (`presentation/theme`); `animValue` (0..1,
+  по умолчанию 0.0) прокидывается насквозь как `pulse` — тот же тикер, что `BoardPainter`,
+  свой таймер `GameHud` не заводит. Бейдж `×N` — `Key('charges_indicator')` (`state.charges`),
+  фон `hazardOrange`/текст тёмный (обычно), `gunmetal`/серый текст (Пусто).
 - `ShipPainter({collectedCount, revealPartIndex, revealProgress, materials})` — единый корабль из
   `kShipPartCount` деталей: первые `collectedCount` установлены (залиты материалом из `materials`),
   остальные — контуром; `collectedCount` клампится 0..`kShipPartCount`. Каждая деталь — маска
@@ -51,9 +57,10 @@
 - `game_engine/models` — `Board`, `FallingPiece`.
 - `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
 - `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`,
-  `ScrapBlockSkin`, `ShipMaterials`, оверлеи (`GhostTargetOverlay`,
-  `HaloHighlightOverlay`, `CreeperFacePainter`). `TntSkin` — больше не
-  зависимость `widgets` (Стори 01 T6 заменила её `el-piece-armed`).
+  `ScrapBlockSkin`, `ShipMaterials`, `CanisterChargePainter`/`ChargeIconState`
+  (Стори 02 T1, кнопка взрыва), оверлеи (`GhostTargetOverlay`,
+  `HaloHighlightOverlay`). `TntSkin`/`CreeperFacePainter` удалены (Стори 02 T1,
+  Minecraft-остатки) — не зависимость `widgets`.
 
 ## От него зависят
 

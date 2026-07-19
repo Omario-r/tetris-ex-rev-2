@@ -44,7 +44,7 @@ void main() {
       tester.view.resetPhysicalSize();
     });
 
-    testWidgets('arm_button_disabled_when_cannot_arm', (
+    testWidgets('boom_button_disabled_when_cannot_arm_or_detonate', (
       WidgetTester tester,
     ) async {
       // Set larger viewport to avoid overflow
@@ -57,46 +57,16 @@ void main() {
         ),
       );
 
-      // Find ARM button by key
-      final armButtonFinder = find.byKey(const Key('arm_button'));
-      expect(armButtonFinder, findsOneWidget);
+      // Find the combined boom (arm+detonate) button by key.
+      final boomButtonFinder = find.byKey(const Key('boom_button'));
+      expect(boomButtonFinder, findsOneWidget);
 
-      // Get the Opacity widget wrapping the ARM button
-      final opacityWidget = tester.widget<Opacity>(
-        find.ancestor(of: armButtonFinder, matching: find.byType(Opacity)),
-      );
+      // Get the GestureDetector wrapping the boom button.
+      final gesture = tester.widget<GestureDetector>(boomButtonFinder);
 
-      // Verify opacity is 0.3 when canArm is false (initial state)
-      expect(opacityWidget.opacity, equals(0.3));
-
-      // Reset viewport
-      tester.view.resetPhysicalSize();
-    });
-
-    testWidgets('detonate_button_disabled_when_cannot_detonate', (
-      WidgetTester tester,
-    ) async {
-      // Set larger viewport to avoid overflow
-      tester.view.physicalSize = const Size(1200, 800);
-      tester.view.devicePixelRatio = 1.0;
-
-      await tester.pumpWidget(
-        const MaterialApp(
-          home: GameScreen(levelIndex: 0),
-        ),
-      );
-
-      // Find DETONATE button by emoji
-      final detonateButtonFinder = find.text('💥');
-      expect(detonateButtonFinder, findsOneWidget);
-
-      // Get the Opacity widget wrapping the DETONATE button
-      final opacityWidget = tester.widget<Opacity>(
-        find.ancestor(of: detonateButtonFinder, matching: find.byType(Opacity)),
-      );
-
-      // Verify opacity is 0.3 when canDetonate is false (initial state)
-      expect(opacityWidget.opacity, equals(0.3));
+      // Verify it's not tappable when canArm/canDetonate are both false
+      // (initial state, before the first tick spawns a falling piece).
+      expect(gesture.onTap, isNull);
 
       // Reset viewport
       tester.view.resetPhysicalSize();

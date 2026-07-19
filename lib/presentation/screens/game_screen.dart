@@ -302,7 +302,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
             // Control panel
             Expanded(
-              child: GameHud(controller: _controller, state: state),
+              child: GameHud(
+                controller: _controller,
+                state: state,
+                animValue: _animController.value,
+              ),
             ),
           ],
         ),
