@@ -29,8 +29,14 @@
   `TntSkin` удалён (Стори 02 T1) — уже не использовался для падающей фигуры с Стори 01 T6.
   `levelMaterial` — legacy-параметр конструктора, оставлен для совместимости API,
   отрисовку не влияет (Стори 01 T5).
-- `GameHud(controller, state, {animValue})` — `StatelessWidget`: кнопки движения/поворота/
-  softDrop (раскладка — T2, не тронута этой задачей) + одна объединённая кнопка взрыва
+- `GameHud(controller, state, {animValue})` — `StatelessWidget`, фиксированная зона 150 высотой
+  (Стори 02 T2, канон `docs/design/game-field.html` `.hud`/`.ctl`), 14px side padding, дети —
+  `Stack`+`Positioned` 1:1 с мокапом: слева классическая крестовина (`Key('ctl_rot')` `⟳` сверху
+  над парой `Key('ctl_left')`/`Key('ctl_right')` `◀`/`▶`), справа `Key('ctl_drop')` `⤓` softDrop
+  сгруппирован с кнопкой взрыва. Кнопки движения — `_CtlButton` (58×58 круг, `matteBlack`
+  `#1D2025`, рамка 1px `gunmetal` `#32363E`, глиф `hudIcon` `#B1B7BE` — иконки Material
+  `refresh`/`chevron_left`/`chevron_right`/`south`; инсет-бевел приближён теми же двумя
+  полупрозрачными полосами, что `_BoomButton`). Плюс одна объединённая кнопка взрыва
   `Key('boom_button')` — «канистра-заряд» (Стори 02 T1, канон `docs/design/game-field.html`
   `.boom`/`.can`/`.armedcore`/`.cnt`), заменившая прежние отдельные arm/detonate. State-машина
   (UI-триггер, своей логики нет): **Взведён** (`state.canDetonate`) → тап `controller.detonate`;

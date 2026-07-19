@@ -5,6 +5,13 @@ import '../../game_engine/game/game_state.dart';
 import '../theme/canister_charge_painter.dart';
 
 /// On-screen control panel for movement and the boom (arm/detonate) button.
+///
+/// Layout (Стори 02 T2, канон `docs/design/game-field.html` `.hud`/`.ctl`):
+/// HUD zone 150 tall, 14px side padding. Classic cross-layout on the left
+/// (`rot` above the `left`/`right` pair), `drop` grouped with the boom button
+/// on the right. Positions below are copied 1:1 from the mockup CSS
+/// (`.ctl.rot/.left/.right/.drop`, `.boom`), all relative to the padded HUD
+/// box (matches the mockup's `.hud` positioning context).
 class GameHud extends StatelessWidget {
   /// Creates a HUD bound to the game [controller] and [state].
   const GameHud({
@@ -25,36 +32,125 @@ class GameHud extends StatelessWidget {
   /// `el-halo`/`armedGlow`); the HUD does not run its own timer.
   final double animValue;
 
+  // Mockup `.hud`: left:14; right:14; height:150.
+  static const double _hudHeight = 150.0;
+  static const double _hudSidePadding = 14.0;
+
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          IconButton(
-            icon: const Icon(Icons.arrow_left, color: Colors.white),
-            onPressed: () => controller.moveLeft(),
+    return SizedBox(
+      width: double.infinity,
+      height: _hudHeight,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: _hudSidePadding),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // `.ctl.rot`: left:68; bottom:70 — вершина крестовины.
+            Positioned(
+              left: 68,
+              bottom: 70,
+              child: _CtlButton(
+                key: const Key('ctl_rot'),
+                icon: Icons.refresh,
+                onTap: () => controller.rotateCW(),
+              ),
+            ),
+            // `.ctl.left`: left:6; bottom:14.
+            Positioned(
+              left: 6,
+              bottom: 14,
+              child: _CtlButton(
+                key: const Key('ctl_left'),
+                icon: Icons.chevron_left,
+                onTap: () => controller.moveLeft(),
+              ),
+            ),
+            // `.ctl.right`: left:130; bottom:14.
+            Positioned(
+              left: 130,
+              bottom: 14,
+              child: _CtlButton(
+                key: const Key('ctl_right'),
+                icon: Icons.chevron_right,
+                onTap: () => controller.moveRight(),
+              ),
+            ),
+            // `.ctl.drop`: right:96; bottom:35 — сгруппирована с `.boom`.
+            Positioned(
+              right: 96,
+              bottom: 35,
+              child: _CtlButton(
+                key: const Key('ctl_drop'),
+                icon: Icons.south,
+                onTap: () => controller.softDrop(),
+              ),
+            ),
+            // `.boom`: right:8; bottom:26 (Стори 02 T1, не тронута).
+            Positioned(
+              right: 8,
+              bottom: 26,
+              child: _BoomButton(
+                controller: controller,
+                state: state,
+                animValue: animValue,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Круглая кнопка управления — канон `.ctl` (Стори 02 T2): 58×58, фон
+/// `matteBlack`, рамка 1px `gunmetal`, глиф — токен `hudIcon`.
+class _CtlButton extends StatelessWidget {
+  const _CtlButton({
+    super.key,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final VoidCallback onTap;
+
+  // Mockup `.ctl`: 58×58 circle, matteBlack fill, gunmetal 1px border,
+  // hudIcon glyph, font-size 20 (glyph size).
+  static const double _size = 58.0;
+  static const Color _matteBlack = Color(0xFF1D2025); // matteBlack token
+  static const Color _gunmetal = Color(0xFF32363E); // gunmetal token
+  // hudIcon hsl(215 9% 72%) → hex, детерминированный пересчёт
+  // (colorsys.hls_to_rgb), как в Стори 01 T4.
+  static const Color _hudIcon = Color(0xFFB1B7BE);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: ClipOval(
+        child: Container(
+          width: _size,
+          height: _size,
+          decoration: const BoxDecoration(
+            color: _matteBlack,
+            shape: BoxShape.circle,
+            border: Border.fromBorderSide(
+              BorderSide(color: _gunmetal, width: 1.0),
+            ),
           ),
-          IconButton(
-            icon: const Icon(Icons.arrow_downward, color: Colors.white),
-            onPressed: () => controller.softDrop(),
+          // Approximates mockup's inset box-shadow (top-light/bottom-dark
+          // bevel bands) — same technique as `_BoomButton._boomChrome`.
+          child: Column(
+            children: [
+              Container(height: 2, color: Colors.white.withValues(alpha: 0.06)),
+              Expanded(
+                child: Center(child: Icon(icon, color: _hudIcon, size: 20)),
+              ),
+              Container(height: 3, color: Colors.black.withValues(alpha: 0.35)),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: () => controller.rotateCW(),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_right, color: Colors.white),
-            onPressed: () => controller.moveRight(),
-          ),
-          const SizedBox(width: 24),
-          _BoomButton(
-            controller: controller,
-            state: state,
-            animValue: animValue,
-          ),
-        ],
+        ),
       ),
     );
   }

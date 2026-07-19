@@ -300,13 +300,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 ],
               ),
             ),
-            // Control panel
-            Expanded(
-              child: GameHud(
-                controller: _controller,
-                state: state,
-                animValue: _animController.value,
-              ),
+            // Control panel — фиксированная зона HUD (Стори 02 T2, канон
+            // `.hud` height:150; `GameHud` уже сама несёт эту высоту).
+            GameHud(
+              controller: _controller,
+              state: state,
+              animValue: _animController.value,
             ),
           ],
         ),

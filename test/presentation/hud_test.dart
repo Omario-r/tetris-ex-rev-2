@@ -151,4 +151,97 @@ void main() {
       expect(text.data, '×0');
     });
   });
+
+  group('GameHud — крестовина/softDrop (Стори 02 T2)', () {
+    late GameController controller;
+
+    setUp(() {
+      final level = LevelMap.levelAt(0);
+      controller = GameController(
+        initialState: GameState(
+          board: Board(level.boardWidth, level.boardHeight),
+          fallingPiece: null,
+          phase: GamePhase.spawning,
+          generator: SevenBagGenerator(seed: 42),
+          level: level,
+        ),
+      );
+    });
+
+    Future<void> pumpHud(WidgetTester tester) {
+      return tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: GameHud(
+              controller: controller,
+              state: controller.state,
+            ),
+          ),
+        ),
+      );
+    }
+
+    testWidgets('крестовина и softDrop видны (ctl_rot/left/right/drop)', (
+      WidgetTester tester,
+    ) async {
+      await pumpHud(tester);
+      expect(find.byKey(const Key('ctl_rot')), findsOneWidget);
+      expect(find.byKey(const Key('ctl_left')), findsOneWidget);
+      expect(find.byKey(const Key('ctl_right')), findsOneWidget);
+      expect(find.byKey(const Key('ctl_drop')), findsOneWidget);
+    });
+
+    testWidgets('тап ctl_left/ctl_right двигает фигуру (moveLeft/moveRight)', (
+      WidgetTester tester,
+    ) async {
+      controller.tick(0);
+      controller.tick(1);
+      await pumpHud(tester);
+
+      final startX = controller.state.fallingPiece?.x;
+      expect(startX, isNotNull);
+
+      await tester.tap(find.byKey(const Key('ctl_right')));
+      await tester.pump();
+      expect(controller.state.fallingPiece?.x, equals(startX! + 1));
+
+      await tester.tap(find.byKey(const Key('ctl_left')));
+      await tester.pump();
+      expect(controller.state.fallingPiece?.x, equals(startX));
+    });
+
+    testWidgets('тап ctl_rot поворачивает фигуру (rotateCW)', (
+      WidgetTester tester,
+    ) async {
+      controller.tick(0);
+      controller.tick(1);
+      await pumpHud(tester);
+
+      final startPiece = controller.state.fallingPiece?.piece;
+      expect(startPiece, isNotNull);
+      final expectedMatrix = startPiece!.rotateCW().matrix;
+
+      await tester.tap(find.byKey(const Key('ctl_rot')));
+      await tester.pump();
+
+      expect(controller.state.fallingPiece?.piece.matrix, equals(expectedMatrix));
+    });
+
+    testWidgets('тап ctl_drop зовёт softDrop', (WidgetTester tester) async {
+      controller.tick(0);
+      controller.tick(1);
+      await pumpHud(tester);
+
+      final startY = controller.state.fallingPiece?.y;
+      expect(startY, isNotNull);
+
+      await tester.tap(find.byKey(const Key('ctl_drop')));
+      await tester.pump();
+
+      expect(
+        controller.state.fallingPiece!.y,
+        greaterThanOrEqualTo(startY!),
+      );
+    });
+  });
 }
