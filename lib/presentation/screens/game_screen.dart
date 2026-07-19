@@ -17,6 +17,10 @@ import '../widgets/ship.dart';
 import 'cheat_menu.dart';
 import 'ship_screen.dart';
 
+/// Токен `hudIcon` `hsl(215 9% 72%)`, пересчитан детерминированно
+/// (`colorsys.hls_to_rgb`), как в Стори 02 T2 (`hud.dart` `_CtlButton`).
+const Color _hudIconColor = Color(0xFFB1B7BE);
+
 /// The main game screen widget that displays the Tetris game.
 ///
 /// Uses [TickerProviderStateMixin] to drive the game loop via an
@@ -210,48 +214,49 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       body: SafeArea(
         child: Column(
           children: [
-            // HUD: уровень + вход на экран корабля
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Level ${widget.levelIndex + 1}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+            // Топбар (Стори 02 T3, канон `docs/design/game-field.html`
+            // `.topbar`/`.chip`/`.chip .sw`/`.pausebtn`): чип «ДЕТАЛЬ N/7» со
+            // свотчем материала слева, dev-входы (читы + корабль) справа.
+            SizedBox(
+              height: 44.0,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _PartChip(
+                      fragmentIndex: state.level.fragmentIndex,
+                      material: ShipMaterials.defaultMaterials
+                          .materialForPart(state.level.fragmentIndex),
                     ),
-                  ),
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // Вход в чит-меню — только в дев-сборке.
-                      if (kDebugMode)
-                        IconButton(
-                          key: const Key('cheat_button'),
-                          tooltip: 'Читы',
-                          icon: const Icon(
-                            Icons.bug_report,
-                            color: Colors.white,
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Вход в чит-меню — только в дев-сборке.
+                        if (kDebugMode)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: _DevButton(
+                              key: const Key('cheat_button'),
+                              icon: Icons.bug_report,
+                              tooltip: 'Читы',
+                              onTap: _openCheatMenu,
+                            ),
                           ),
-                          onPressed: _openCheatMenu,
+                        _DevButton(
+                          key: const Key('ship_button'),
+                          icon: Icons.rocket_launch,
+                          tooltip: 'Корабль',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => const ShipScreen(),
+                            ),
+                          ),
                         ),
-                      IconButton(
-                        key: const Key('ship_button'),
-                        tooltip: 'Корабль',
-                        icon: const Icon(
-                          Icons.rocket_launch,
-                          color: Colors.white,
-                        ),
-                        onPressed: () => Navigator.of(context).push(
-                          MaterialPageRoute(builder: (_) => const ShipScreen()),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
             // Game board with overlay, framed as mokap `.board`: 1px gunmetal
@@ -308,6 +313,127 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               animValue: _animController.value,
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Чип детали в топбаре — канон `.chip`/`.chip .sw` (Стори 02 T3):
+/// matteBlack fill, gunmetal 1px border, radius 8, свотч материала +
+/// текст «ДЕТАЛЬ N/7» разрядкой.
+class _PartChip extends StatelessWidget {
+  const _PartChip({required this.fragmentIndex, required this.material});
+
+  /// Индекс текущей детали (0-based); в тексте отображается `fragmentIndex+1`.
+  final int fragmentIndex;
+
+  /// Материал текущей детали (заливка свотча).
+  final BlockMaterial material;
+
+  static const Color _matteBlack = Color(0xFF1D2025); // matteBlack token
+  static const Color _gunmetal = Color(0xFF32363E); // gunmetal token
+  static const Color _textColor = Color(0xFFAEB6BF); // chip text color
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 7.0, horizontal: 11.0),
+      decoration: BoxDecoration(
+        color: _matteBlack,
+        border: Border.all(color: _gunmetal, width: 1.0),
+        borderRadius: BorderRadius.circular(8.0),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _Swatch(color: material.color),
+          const SizedBox(width: 8.0),
+          Text(
+            'ДЕТАЛЬ ${fragmentIndex + 1}/$kShipPartCount',
+            style: const TextStyle(
+              color: _textColor,
+              fontSize: 12.0,
+              letterSpacing: 0.72, // .06em @ 12px
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Свотч материала детали — канон `.chip .sw` (Стори 02 T3): 14×14, radius 3,
+/// лёгкий bevel (inset top-light/bottom-dark, приближено полосами — та же
+/// техника, что `_CtlButton`/`_BoomButton` в `hud.dart`).
+class _Swatch extends StatelessWidget {
+  const _Swatch({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(3.0),
+      child: SizedBox(
+        width: 14.0,
+        height: 14.0,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Container(color: color),
+            Column(
+              children: [
+                Container(
+                  height: 1,
+                  color: Colors.white.withValues(alpha: 0.10),
+                ),
+                const Expanded(child: SizedBox.shrink()),
+                Container(
+                  height: 1,
+                  color: Colors.black.withValues(alpha: 0.35),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Dev-кнопка топбара (читы/корабль) — канон `.pausebtn` (Стори 02 T3):
+/// 40×40, radius 10, matteBlack fill, gunmetal 1px border, глиф `hudIcon`.
+class _DevButton extends StatelessWidget {
+  const _DevButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  static const Color _matteBlack = Color(0xFF1D2025); // matteBlack token
+  static const Color _gunmetal = Color(0xFF32363E); // gunmetal token
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          width: 40.0,
+          height: 40.0,
+          decoration: BoxDecoration(
+            color: _matteBlack,
+            border: Border.all(color: _gunmetal, width: 1.0),
+            borderRadius: BorderRadius.circular(10.0),
+          ),
+          child: Icon(icon, color: _hudIconColor, size: 20.0),
         ),
       ),
     );

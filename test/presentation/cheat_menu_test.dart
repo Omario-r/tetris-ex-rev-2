@@ -97,7 +97,7 @@ void main() {
 
     final game = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(game.levelIndex, 2);
-    expect(find.text('Level 3'), findsOneWidget);
+    expect(find.text('ДЕТАЛЬ 3/7'), findsOneWidget);
   });
 
   testWidgets('Чит «заряды взрыва»: N=5 → заряды в HUD == 5',

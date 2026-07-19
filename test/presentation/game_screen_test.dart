@@ -72,7 +72,7 @@ void main() {
       tester.view.resetPhysicalSize();
     });
 
-    testWidgets('renders_level_text', (WidgetTester tester) async {
+    testWidgets('renders_part_chip_text', (WidgetTester tester) async {
       // Set larger viewport to avoid overflow
       tester.view.physicalSize = const Size(1200, 800);
       tester.view.devicePixelRatio = 1.0;
@@ -83,8 +83,8 @@ void main() {
         ),
       );
 
-      // Verify level text is shown
-      expect(find.text('Level 1'), findsOneWidget);
+      // Топбар (Стори 02 T3): чип «ДЕТАЛЬ N/7» вместо старого «Level N».
+      expect(find.text('ДЕТАЛЬ 1/7'), findsOneWidget);
 
       // Reset viewport
       tester.view.resetPhysicalSize();

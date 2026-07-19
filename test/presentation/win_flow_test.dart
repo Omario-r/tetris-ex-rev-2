@@ -53,7 +53,7 @@ void main() {
       await _pump(t);
       final game = t.widget<GameScreen>(find.byType(GameScreen));
       expect(game.levelIndex, 1);
-      expect(find.text('Level 2'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 2/7'), findsOneWidget);
     },
   );
 
@@ -72,7 +72,7 @@ void main() {
 
       final game = t.widget<GameScreen>(find.byType(GameScreen));
       expect(game.levelIndex, 0);
-      expect(find.text('Level 1'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1/7'), findsOneWidget);
       expect(await ProgressService().getCurrentLevel(), 0);
     },
   );
@@ -102,7 +102,7 @@ void main() {
 
       // Полный круг завершён: прогресс сброшен, снова уровень 0.
       expect(await ProgressService().getCurrentLevel(), 0);
-      expect(find.text('Level 1'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1/7'), findsOneWidget);
     },
   );
 }

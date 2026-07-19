@@ -12,8 +12,14 @@
 ## Публичный интерфейс
 
 - `GameScreen({levelIndex=0})` — `StatefulWidget`. Держит `AnimationController` (цикл ~60fps →
-  `controller.tick(dt)`), `GameController`; рисует `BoardPainter` + `GameHud`; на победе
+  `controller.tick(dt)`), `GameController`; рисует топбар + `BoardPainter` + `GameHud`; на победе
   зовёт `ProgressService.advanceOnWin` и открывает авто-показ корабля.
+- Топбар (Стори 02 T3, канон `.topbar`/`.chip`/`.chip .sw`/`.pausebtn`, высота 44) заменил
+  старый «Level N + иконки»: слева чип «ДЕТАЛЬ N/7» (N = `fragmentIndex+1`, 7 = `kShipPartCount`,
+  без имени секции — решение PO) со свотчем материала текущей детали
+  (`ShipMaterials.defaultMaterials.materialForPart(level.fragmentIndex)`), справа dev-кнопки в
+  стиле `.pausebtn` (40×40, `matteBlack`/`gunmetal`, глиф `hudIcon` `#B1B7BE`) — те же ключи и
+  поведение читов/корабля, что раньше. Кнопки паузы нет (решение PO 2026-07-18).
 - `ShipScreen()` — ручной статичный экран корабля: `ShipPainter` по `min(current_level,
   kShipPartCount)`; читает `ProgressService`. Вход — `Key('ship_button')` на `GameScreen`.
 - `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
