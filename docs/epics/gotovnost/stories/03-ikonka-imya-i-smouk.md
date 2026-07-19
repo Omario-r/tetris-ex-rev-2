@@ -118,9 +118,10 @@ _нет_
 ### T2 — Своя иконка (iOS + Android) из канона канистры-заряда
 - **Статус:** не начата
 - **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`). ТЗ
-  детальное; домен хрупкий (платформенная упаковка, первый заход) — перед
-  запуском Исполнителя прогнать **Критика** в режиме «ТЗ» (`system/CRITIC.md`
-  § 3): свежие глаза на пайплайн генерации иконки.
+  детальное; домен хрупкий (платформенная упаковка, первый заход). **Критик
+  (режим «ТЗ») отработал 2026-07-19** — критические пробелы закрыты в разделе
+  «Уточнения» ниже (алгоритм вписания, структура генератора, версия/команда
+  пакета, safe-zone, регистрация исходников). ТЗ готово к запуску.
 - **Цель:** на iOS и Android — своя иконка «канистра-заряд» (не дефолтная
   Flutter-заглушка, не Minecraft), в каноне мокапа `docs/design/app-icon.html`.
 - **Модули (≤3):** `pubspec.yaml` (dev-dep + конфиг `flutter_launcher_icons`);
@@ -159,21 +160,58 @@ _нет_
      flutter_launcher_icons`) — сгенерит `ios/Runner/Assets.xcassets/AppIcon.appiconset`
      и `android/app/src/main/res/mipmap-*` + adaptive XML в `mipmap-anydpi-v26`.
      Убедиться, что дефолтная Flutter-иконка заменена (файлы перезаписаны).
+- **Уточнения (по холодной вычитке Критиком 2026-07-19 — закрыть до кода):**
+  1. **Вписание канистры (колпак в −y) — точные числа.** Полные габариты
+     `_paintCanister` в локали пейнтера (до масштаба): x∈[0,34], y∈[−8,46]
+     (колпак сверху −8, корпус до 46, индикатор ≈−6 внутри) → ширина 34, высота
+     54. Пейнтер масштабирует по `size.width/34` (height параметра не использует).
+     - `app_icon.png` (1024²): ширина канистры `canW=421` (≈0.411·1024 из мокапа
+       `.can` 74/180). `s=421/34≈12.38`, полная высота `54·s≈669`. Отрисовка:
+       `canvas.drawRect(0,0,1024,1024, matteBlack #1D2025)`; затем
+       `canvas.translate(301.5, 276.5)` (dx=(1024−421)/2; ty так, что полный верх
+       на (1024−669)/2≈177.5, т.е. ty=177.5+8·s); затем
+       `CanisterChargePainter(state: ChargeIconState.ready).paint(canvas, Size(421,421))`.
+     - `app_icon_foreground.png` (1024², ПРОЗРАЧНЫЙ фон — фон НЕ заливать):
+       `canW=360` (запас под adaptive-маску), `s≈10.59`, полная высота ≈572;
+       `canvas.translate(332, 310.7)` (dx=(1024−360)/2; ty=(1024−572)/2+8·s);
+       `paint(canvas, Size(360,360))`. Канистра ложится в центральные ~66%
+       (safe-zone adaptive), маска её не режет.
+  2. **Пайплайн — где код.** Генератор — Flutter-**тест-файл** `tool/generate_app_icon.dart`
+     (НЕ в `test/`, чтобы не попал в дефолтный `flutter test`, который берёт
+     `test/**_test.dart`). Внутри: `TestWidgetsFlutterBinding.ensureInitialized()`,
+     `PictureRecorder`→`Canvas`→заливка/трансформ/`painter.paint`→
+     `final img = await recorder.endRecording().toImage(1024,1024)`→
+     `final png = await img.toByteData(format: ui.ImageByteFormat.png)`→
+     `File('assets/icon/app_icon.png').writeAsBytesSync(png!.buffer.asUint8List())`
+     (и второй файл). Запуск разово: `flutter test tool/generate_app_icon.dart`.
+     Идемпотентен (детерминированный рендер), в обычный прогон тестов не входит.
+  3. **Пакет — версия/команда.** Добавить через `flutter pub add dev:flutter_launcher_icons`
+     (подберёт совместимую версию — не хардкодить constraint). Генерация:
+     `dart run flutter_launcher_icons`. Если README установленной версии диктует
+     иную команду — следовать ей.
+  4. **`assets/icon/` создать в корне, НЕ регистрировать в `flutter: assets:`** —
+     исходники PNG это вход генератора, не ресурсы приложения (иначе зря
+     раздуют APK/IPA).
+  5. **minSdk не менять**, `monochrome`/доп-теги не нужны — стандартный конфиг.
+     Web-таргет `flutter_launcher_icons` не трогает (это норма, вне скоупа).
 - **Границы (строго):** только иконка. Игровую логику, `lib/` вне
   `canister_charge_painter.dart`, имя (T1) — не трогать. Новую платформу не
   заводить. Единственная новая зависимость — `flutter_launcher_icons` (одобрена
   PO); других не добавлять.
 - **Арх-дельта:** нет (если публичный хелпер рендера иконки добавляется в
   `theme` — отметить в паспорте `theme/README.md`, связи модулей не меняются).
-- **Результат (как проверить):** `flutter analyze` = 0; `flutter test` зелёные
-  (+ тест-рендер иконки, если оформлен тестом, детерминирован). Иконки
-  сгенерированы: `ls ios/Runner/Assets.xcassets/AppIcon.appiconset` (не пусто/не
-  дефолт), `android/.../mipmap-anydpi-v26/ic_launcher.xml` (adaptive) есть.
-  Визуал иконки на домашнем экране — Гейт 2 (PO на устройстве, T3); агент
-  проверяет сам факт генерации и вид исходника.
+- **Результат (как проверить):** `flutter analyze` = 0; `flutter test` (дефолтный
+  набор, БЕЗ `tool/`) зелёные — число тестов не растёт (генератор вне суита).
+  Иконки сгенерированы: `ls ios/Runner/Assets.xcassets/AppIcon.appiconset` — PNG
+  перезаписаны (>1KB, не дефолт-Flutter); `android/app/src/main/res/mipmap-anydpi-v26/`
+  содержит `ic_launcher.xml` (adaptive) + foreground/background drawables.
+  Исходники `assets/icon/app_icon.png` и `app_icon_foreground.png` существуют.
+  Визуал иконки на домашнем экране — Гейт 2 (PO на устройстве, T3).
 - **DoD задачи:** паспорт `theme` (если добавлен хелпер рендера иконки); статус
-  задачи в стори; `docs/STATUS.md`; один коммит
-  `gotovnost/03-ikonka-imya-i-smouk T2: <суть>` (включая сгенерированные ассеты).
+  задачи в стори; `docs/STATUS.md`; ОДИН коммит `gotovnost/03-ikonka-imya-i-smouk
+  T2: <суть>`, включающий: исходники `assets/icon/*`, генератор
+  `tool/generate_app_icon.dart`, сгенерированные ассеты (`android/`, `ios/`),
+  `pubspec.yaml`.
 - **Заметки по выполнению:** —
 
 ### T3 — Ранбук установки на устройства + локальный смоук
