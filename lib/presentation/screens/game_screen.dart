@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
@@ -40,8 +42,31 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late final AnimationController _animController;
   late final GameController _controller;
   late double _lastTime;
-  static const double _cellSize = 28.0;
   bool _winHandled = false;
+
+  // Стори 02 T4: канонный размер клетки (мокап при 812-высоте) — потолок,
+  // ниже которого клетка не сжимается на высоких экранах. Зона топбара и HUD
+  // фиксированы (T2/T3) — используются как константы при расчёте доступного
+  // места под поле.
+  static const double _canonicalCellSize = 28.0;
+  static const double _topbarHeight = 44.0;
+  static const double _hudZoneHeight = 150.0;
+
+  /// Адаптивный размер клетки (Стори 02 T4): не больше [_canonicalCellSize],
+  /// сжимается только когда топбар(44) + поле + HUD(150) не влезают в
+  /// доступную высоту колонки (`constraints`, уже внутри `SafeArea` — системные
+  /// отступы исключены), либо когда поле шире доступной ширины.
+  double _computeCellSize(
+    BoxConstraints constraints,
+    int boardWidth,
+    int boardHeight,
+  ) {
+    final availableHeight =
+        constraints.maxHeight - _topbarHeight - _hudZoneHeight;
+    final fitByHeight = availableHeight / boardHeight;
+    final fitByWidth = constraints.maxWidth / boardWidth;
+    return math.min(_canonicalCellSize, math.min(fitByHeight, fitByWidth));
+  }
 
   @override
   void initState() {
@@ -203,8 +228,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final state = _controller.state;
     final boardWidth = state.level.boardWidth;
     final boardHeight = state.level.boardHeight;
-    final boardPixelWidth = boardWidth * _cellSize;
-    final boardPixelHeight = boardHeight * _cellSize;
 
     return Scaffold(
       // spaceBg token: hsl(220 14% 7%) = #0F1114 — "космос"-фон экрана.
@@ -212,107 +235,123 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       // SafeArea: у экрана нет AppBar — без него шапка (в т.ч. кнопка «Корабль»)
       // уходит под системный статус-бар/вырез и не нажимается.
       body: SafeArea(
-        child: Column(
-          children: [
-            // Топбар (Стори 02 T3, канон `docs/design/game-field.html`
-            // `.topbar`/`.chip`/`.chip .sw`/`.pausebtn`): чип «ДЕТАЛЬ N/7» со
-            // свотчем материала слева, dev-входы (читы + корабль) справа.
-            SizedBox(
-              height: 44.0,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    _PartChip(
-                      fragmentIndex: state.level.fragmentIndex,
-                      material: ShipMaterials.defaultMaterials
-                          .materialForPart(state.level.fragmentIndex),
-                    ),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+        // Стори 02 T4: LayoutBuilder внутри SafeArea — constraints уже без
+        // системных отступов, поэтому формула размера клетки использует их
+        // напрямую (топбар 44 + зона HUD 150 — константы выше).
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final cellSize = _computeCellSize(
+              constraints,
+              boardWidth,
+              boardHeight,
+            );
+            final boardPixelWidth = boardWidth * cellSize;
+            final boardPixelHeight = boardHeight * cellSize;
+
+            return Column(
+              children: [
+                // Топбар (Стори 02 T3, канон `docs/design/game-field.html`
+                // `.topbar`/`.chip`/`.chip .sw`/`.pausebtn`): чип «ДЕТАЛЬ N/7»
+                // со свотчем материала слева, dev-входы (читы + корабль)
+                // справа.
+                SizedBox(
+                  height: _topbarHeight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // Вход в чит-меню — только в дев-сборке.
-                        if (kDebugMode)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: _DevButton(
-                              key: const Key('cheat_button'),
-                              icon: Icons.bug_report,
-                              tooltip: 'Читы',
-                              onTap: _openCheatMenu,
+                        _PartChip(
+                          fragmentIndex: state.level.fragmentIndex,
+                          material: ShipMaterials.defaultMaterials
+                              .materialForPart(state.level.fragmentIndex),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Вход в чит-меню — только в дев-сборке.
+                            if (kDebugMode)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: _DevButton(
+                                  key: const Key('cheat_button'),
+                                  icon: Icons.bug_report,
+                                  tooltip: 'Читы',
+                                  onTap: _openCheatMenu,
+                                ),
+                              ),
+                            _DevButton(
+                              key: const Key('ship_button'),
+                              icon: Icons.rocket_launch,
+                              tooltip: 'Корабль',
+                              onTap: () => Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const ShipScreen(),
+                                ),
+                              ),
                             ),
-                          ),
-                        _DevButton(
-                          key: const Key('ship_button'),
-                          icon: Icons.rocket_launch,
-                          tooltip: 'Корабль',
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => const ShipScreen(),
-                            ),
-                          ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-            ),
-            // Game board with overlay, framed as mokap `.board`: 1px gunmetal
-            // border, radius 6.
-            Container(
-              width: boardPixelWidth,
-              height: boardPixelHeight,
-              clipBehavior: Clip.antiAlias,
-              decoration: BoxDecoration(
-                border: Border.all(color: BlockMaterial.gunmetal.color),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Stack(
-                children: [
-                  // Board painter
-                  CustomPaint(
-                    size: Size(boardPixelWidth, boardPixelHeight),
-                    painter: BoardPainter(
-                      state: state,
-                      cellSize: _cellSize,
-                      theme: BlockTheme.defaultTheme,
-                      levelMaterial: LevelSkin.materialForLevelIndex(
-                        widget.levelIndex,
-                      ),
-                      shipMaterials: ShipMaterials.defaultMaterials,
-                      animValue: _animController.value,
-                    ),
                   ),
-                  // Win/Lose overlay
-                  if (state.isWin || state.isLost)
-                    Container(
-                      width: boardPixelWidth,
-                      height: boardPixelHeight,
-                      color: Colors.black54,
-                      child: Center(
-                        child: Text(
-                          state.isWin ? 'YOU WIN 🎉' : 'GAME OVER',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
+                ),
+                // Game board with overlay, framed as mokap `.board`: 1px
+                // gunmetal border, radius 6.
+                Container(
+                  width: boardPixelWidth,
+                  height: boardPixelHeight,
+                  clipBehavior: Clip.antiAlias,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: BlockMaterial.gunmetal.color),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Stack(
+                    children: [
+                      // Board painter
+                      CustomPaint(
+                        size: Size(boardPixelWidth, boardPixelHeight),
+                        painter: BoardPainter(
+                          state: state,
+                          cellSize: cellSize,
+                          theme: BlockTheme.defaultTheme,
+                          levelMaterial: LevelSkin.materialForLevelIndex(
+                            widget.levelIndex,
                           ),
+                          shipMaterials: ShipMaterials.defaultMaterials,
+                          animValue: _animController.value,
                         ),
                       ),
-                    ),
-                ],
-              ),
-            ),
-            // Control panel — фиксированная зона HUD (Стори 02 T2, канон
-            // `.hud` height:150; `GameHud` уже сама несёт эту высоту).
-            GameHud(
-              controller: _controller,
-              state: state,
-              animValue: _animController.value,
-            ),
-          ],
+                      // Win/Lose overlay
+                      if (state.isWin || state.isLost)
+                        Container(
+                          width: boardPixelWidth,
+                          height: boardPixelHeight,
+                          color: Colors.black54,
+                          child: Center(
+                            child: Text(
+                              state.isWin ? 'YOU WIN 🎉' : 'GAME OVER',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+                // Control panel — фиксированная зона HUD (Стори 02 T2, канон
+                // `.hud` height:150; `GameHud` уже сама несёт эту высоту).
+                GameHud(
+                  controller: _controller,
+                  state: state,
+                  animValue: _animController.value,
+                ),
+              ],
+            );
+          },
         ),
       ),
     );

@@ -14,6 +14,14 @@
 - `GameScreen({levelIndex=0})` — `StatefulWidget`. Держит `AnimationController` (цикл ~60fps →
   `controller.tick(dt)`), `GameController`; рисует топбар + `BoardPainter` + `GameHud`; на победе
   зовёт `ProgressService.advanceOnWin` и открывает авто-показ корабля.
+- Размер клетки поля (Стори 02 T4) — **адаптивный**, не константа: колонка
+  (топбар + поле + `GameHud`) обёрнута в `LayoutBuilder` внутри `SafeArea`;
+  `_computeCellSize(constraints, boardWidth, boardHeight)` = `min(28.0 канон,
+  (constraints.maxHeight - 44 топбар - 150 HUD) / boardHeight, constraints.maxWidth
+  / boardWidth)` — на высоких экранах (≥812 логич.) даёт канонные 28px как раньше,
+  на коротких (вплоть до 640 логич.) сжимается ровно настолько, чтобы топбар+поле+HUD
+  влезли без `RenderFlex overflow`, скроллов нет. Топбар (44) и зона HUD (150) — те же
+  константы, что несут T2/T3 (`GameHud._hudHeight`), НЕ пересчитываются.
 - Топбар (Стори 02 T3, канон `.topbar`/`.chip`/`.chip .sw`/`.pausebtn`, высота 44) заменил
   старый «Level N + иконки»: слева чип «ДЕТАЛЬ N/7» (N = `fragmentIndex+1`, 7 = `kShipPartCount`,
   без имени секции — решение PO) со свотчем материала текущей детали

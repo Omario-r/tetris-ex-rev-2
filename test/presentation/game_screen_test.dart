@@ -89,5 +89,29 @@ void main() {
       // Reset viewport
       tester.view.resetPhysicalSize();
     });
+
+    testWidgets(
+      'renders_without_overflow_on_short_screen',
+      (WidgetTester tester) async {
+        // Стори 02 T4: короткий телефон (например iPhone SE) — 360×640
+        // логических px. Топбар(44) + поле(boardHeight*_cellSize) + HUD(150)
+        // раньше не влезали (RenderFlex overflow); адаптивный размер клетки
+        // должен вписать колонку без переполнения и без падения.
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+
+        await tester.pumpWidget(
+          const MaterialApp(
+            home: GameScreen(levelIndex: 0),
+          ),
+        );
+
+        // Никакого FlutterError (в т.ч. "A RenderFlex overflowed").
+        expect(tester.takeException(), isNull);
+        expect(find.byType(GameScreen), findsOneWidget);
+      },
+    );
   });
 }
