@@ -80,7 +80,7 @@ _нет_
 > своих iOS+Android; агент устройства не трогает.
 
 ### T1 — Отображаемое имя приложения «Voxel Voyager»
-- **Статус:** не начата
+- **Статус:** выполнено (2026-07-19)
 - **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`) — правка
   двух платформенных конфигов, не «тяжёлая».
 - **Цель:** на домашнем экране обеих ОС приложение подписано «Voxel Voyager»
@@ -106,7 +106,14 @@ _нет_
   показывает обе правки.
 - **DoD задачи:** статус задачи в стори; `docs/STATUS.md`; один коммит
   `gotovnost/03-ikonka-imya-i-smouk T1: <суть>`.
-- **Заметки по выполнению:** —
+- **Заметки по выполнению:** правка ровно двух строк: `android/app/src/main/AndroidManifest.xml:3`
+  `android:label="explosive_tetris"` → `"Voxel Voyager"`; `ios/Runner/Info.plist`
+  `CFBundleDisplayName` `Explosive Tetris` → `Voxel Voyager`. `CFBundleName`,
+  `applicationId`/`PRODUCT_BUNDLE_IDENTIFIER`, `pubspec.yaml` `name:` — не тронуты.
+  `flutter analyze` = 0 ошибок/предупреждений. `flutter test` — 301/301 зелёных
+  (не изменилось, как и ожидалось — конфиг вне тестового покрытия). `grep -rn
+  "Voxel Voyager" android/ ios/` подтверждает обе правки. Визуальная проверка
+  имени под иконкой на устройстве — T3/Гейт 2 (PO).
 
 ### T2 — Своя иконка (iOS + Android) из канона канистры-заряда
 - **Статус:** не начата
