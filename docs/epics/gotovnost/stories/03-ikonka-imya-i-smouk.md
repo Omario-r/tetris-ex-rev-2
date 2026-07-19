@@ -4,7 +4,9 @@
 > на Гейте 2.
 
 **Эпик:** Готовность к плейтесту
-**Статус:** не начата
+**Статус:** нарезана на задачи 2026-07-19 (T1 имя → T2 иконка → T3 ранбук/смоук).
+Зависимость `flutter_launcher_icons` для T2 одобрена PO 2026-07-19 (dev-dep).
+Приёмка (Гейт 2) — с участием PO: прогон ранбука на его iOS+Android.
 
 ## Ценность
 
@@ -71,6 +73,136 @@ _нет_
 
 ## Задачи
 
-> Нарезаются командой «нарежь стори 03 на задачи» (Постановщик).
+> Нарезал Постановщик 2026-07-19. Порядок = зависимости: имя → иконка → ранбук.
+> T1 и T2 обе трогают платформенные каталоги, но разные файлы (T1 — label/
+> DisplayName, T2 — иконки/pubspec) — конфликтов нет, порядок для чистоты.
+> Приёмка стори (Гейт 2) — device-gated: закрывает PO прогоном ранбука (T3) на
+> своих iOS+Android; агент устройства не трогает.
 
-_не нарезана_
+### T1 — Отображаемое имя приложения «Voxel Voyager»
+- **Статус:** не начата
+- **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`) — правка
+  двух платформенных конфигов, не «тяжёлая».
+- **Цель:** на домашнем экране обеих ОС приложение подписано «Voxel Voyager»
+  (не «Explosive Tetris», не Minecraft-отсылки).
+- **Модули (≤3):** `android/` (`app/src/main/AndroidManifest.xml`), `ios/`
+  (`Runner/Info.plist`). Не `lib/`-модули — паспорт не требуется. `test/` — нет
+  (платформенный конфиг тестами не покрывается).
+- **Что сделать:**
+  1. `android/app/src/main/AndroidManifest.xml:3` — `android:label="explosive_tetris"`
+     → `android:label="Voxel Voyager"`.
+  2. `ios/Runner/Info.plist` — `CFBundleDisplayName` (сейчас `Explosive Tetris`) →
+     `Voxel Voyager`. `CFBundleName` (`explosive_tetris`) НЕ трогать — это короткое
+     служебное имя; `applicationId`/`PRODUCT_BUNDLE_IDENTIFIER`
+     (`com.example.explosive_tetris`) НЕ трогать (смена ломает подпись/установку).
+  3. Пакетное имя в `pubspec.yaml` (`name: explosive_tetris`) НЕ трогать — это
+     Dart-пакет, смена ломает все импорты `package:explosive_tetris/...`.
+- **Границы (строго):** только `android:label` и `CFBundleDisplayName`. Bundle id,
+  applicationId, Dart-имя пакета, версии — не трогать.
+- **Арх-дельта:** нет.
+- **Результат (как проверить):** `flutter analyze` = 0; `flutter test` зелёные
+  (ничего не должно измениться — конфиг не в тестовом покрытии). Визуально имя
+  под иконкой — на устройстве (T3, PO). `grep -rn "Voxel Voyager" android/ ios/`
+  показывает обе правки.
+- **DoD задачи:** статус задачи в стори; `docs/STATUS.md`; один коммит
+  `gotovnost/03-ikonka-imya-i-smouk T1: <суть>`.
+- **Заметки по выполнению:** —
+
+### T2 — Своя иконка (iOS + Android) из канона канистры-заряда
+- **Статус:** не начата
+- **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`). ТЗ
+  детальное; домен хрупкий (платформенная упаковка, первый заход) — перед
+  запуском Исполнителя прогнать **Критика** в режиме «ТЗ» (`system/CRITIC.md`
+  § 3): свежие глаза на пайплайн генерации иконки.
+- **Цель:** на iOS и Android — своя иконка «канистра-заряд» (не дефолтная
+  Flutter-заглушка, не Minecraft), в каноне мокапа `docs/design/app-icon.html`.
+- **Модули (≤3):** `pubspec.yaml` (dev-dep + конфиг `flutter_launcher_icons`);
+  `theme` (переиспользование `CanisterChargePainter` для рендера исходника — файл
+  `lib/presentation/theme/canister_charge_painter.dart`, паспорт
+  `lib/presentation/theme/README.md` если добавляется публичный хелпер);
+  генератор пишет в `android/`/`ios/` (артефакты, не модуль). + инструмент
+  рендера исходника в `test/` или `tool/`.
+- **Дизайн-референс:** мокап `docs/design/app-icon.html` (вариант «Заряд»,
+  утверждён PO 2026-07-18). Пропорции с эталона `.appicon.l` = 180×180:
+  канистра `.can` 74×100 (≈0.411×0.556 от стороны иконки), `margin-top` 14
+  (≈0.078), центрирована по горизонтали, колпак/индикатор над корпусом. Фон —
+  `matteBlack` `#1D2025`. Токены канистры уже в `CanisterChargePainter`
+  (`_graphite #484E56`, `_graphiteDark #3C4148`, `_hazardOrange #BE642D` и т.д.).
+  **Исходник — квадрат БЕЗ запечённых скруглённых углов** (обе ОС маскируют
+  сами); Android — **слоями**: foreground = канистра (прозрачный фон),
+  background = сплошной `matteBlack`.
+- **Что сделать:**
+  1. Сгенерировать исходники PNG из канона (переиспользовать
+     `CanisterChargePainter(state: ChargeIconState.ready)` — тот же объект, что
+     кнопка взрыва, единый источник правды). Инструмент: Flutter-тест или
+     `tool/`-скрипт, который через `PictureRecorder`→`picture.toImage`→
+     `toByteData(png)` рисует на 1024×1024:
+     - `assets/icon/app_icon.png` — matteBlack-квадрат + канистра по центру
+       (масштаб/сдвиг по пропорциям выше; учесть, что painter рисует колпак в
+       отрицательном `y` относительно корпуса — вписать полные габариты
+       канистры с полем-отступом);
+     - `assets/icon/app_icon_foreground.png` — та же канистра на ПРОЗРАЧНОМ фоне
+       (для Android adaptive foreground), с safe-zone запасом (adaptive-иконка
+       обрезается маской — канистра в центральных ~66%).
+  2. `pubspec.yaml`: добавить `flutter_launcher_icons` в `dev_dependencies` +
+     блок конфига (`android: true`, `ios: true`, `image_path: assets/icon/app_icon.png`,
+     `adaptive_icon_foreground: assets/icon/app_icon_foreground.png`,
+     `adaptive_icon_background: "#1D2025"`, `remove_alpha_ios: true`). `flutter pub get`.
+  3. Запустить `dart run flutter_launcher_icons` (или `flutter pub run
+     flutter_launcher_icons`) — сгенерит `ios/Runner/Assets.xcassets/AppIcon.appiconset`
+     и `android/app/src/main/res/mipmap-*` + adaptive XML в `mipmap-anydpi-v26`.
+     Убедиться, что дефолтная Flutter-иконка заменена (файлы перезаписаны).
+- **Границы (строго):** только иконка. Игровую логику, `lib/` вне
+  `canister_charge_painter.dart`, имя (T1) — не трогать. Новую платформу не
+  заводить. Единственная новая зависимость — `flutter_launcher_icons` (одобрена
+  PO); других не добавлять.
+- **Арх-дельта:** нет (если публичный хелпер рендера иконки добавляется в
+  `theme` — отметить в паспорте `theme/README.md`, связи модулей не меняются).
+- **Результат (как проверить):** `flutter analyze` = 0; `flutter test` зелёные
+  (+ тест-рендер иконки, если оформлен тестом, детерминирован). Иконки
+  сгенерированы: `ls ios/Runner/Assets.xcassets/AppIcon.appiconset` (не пусто/не
+  дефолт), `android/.../mipmap-anydpi-v26/ic_launcher.xml` (adaptive) есть.
+  Визуал иконки на домашнем экране — Гейт 2 (PO на устройстве, T3); агент
+  проверяет сам факт генерации и вид исходника.
+- **DoD задачи:** паспорт `theme` (если добавлен хелпер рендера иконки); статус
+  задачи в стори; `docs/STATUS.md`; один коммит
+  `gotovnost/03-ikonka-imya-i-smouk T2: <суть>` (включая сгенерированные ассеты).
+- **Заметки по выполнению:** —
+
+### T3 — Ранбук установки на устройства + локальный смоук
+- **Статус:** не начата
+- **Рекомендованный агент:** Исполнитель · Claude/Sonnet (`ispolnitel`) —
+  техпис + прогон существующих смоук-тестов, не «тяжёлая».
+- **Цель:** у PO есть пошаговый ранбук, по которому он ставит игру на свои
+  iOS + Android и прогоняет весь контент от старта до собранного корабля;
+  локальный смоук зелёный перед сборкой под устройства.
+- **Модули (≤3):** `docs/` (новый ранбук, напр. `docs/RUNBOOK-devices.md`);
+  `test/` (прогон существующих смоук-тестов, без новых). Не `lib/`-модуль.
+- **Что сделать:**
+  1. Написать ранбук `docs/RUNBOOK-devices.md`:
+     - **iOS (free-signing):** открыть `ios/Runner.xcworkspace` в Xcode, выбрать
+       свою личную Team в Signing & Capabilities (бесплатная учётка Apple ID),
+       поменять bundle id на уникальный при конфликте, подключить iPhone,
+       Trust, `flutter run --release -d <device>` или Run из Xcode; типовые
+       грабли (untrusted developer → Settings→General→VPN & Device Management).
+     - **Android:** включить USB-debugging, `flutter run --release -d <device>`
+       (или `flutter build apk --release` + установка `app-release.apk`);
+       типовые грабли (драйвер/автоподтверждение).
+     - **Чек-лист смоука:** пройти весь контент от старта до собранного корабля
+       (все `kShipPartCount` деталей), проверить: запуск без падения, кнопка
+       взрыва (Готов/Взведён/детонация), сборка N/N → «Начать заново», нет
+       overflow HUD на своём экране, имя/иконка на домашнем экране.
+     - Место для отметки PO по устройствам (модель iOS/Android → «без падений»).
+  2. Прогнать локальный смоук: `flutter test test/presentation/win_flow_test.dart
+     test/integration/golden_scenario_test.dart test/widget_test.dart` (сквозной
+     смоук из PROJECT.md) — зелёный. Полный `flutter test` — тоже зелёный.
+- **Границы (строго):** только документ + прогон существующих тестов. Код игры,
+  конфиги, иконку/имя — не трогать (сделаны в T1/T2).
+- **Арх-дельта:** нет.
+- **Результат (как проверить):** `flutter analyze` = 0; сквозной смоук-набор и
+  полный `flutter test` зелёные (числа в заметках); `docs/RUNBOOK-devices.md`
+  существует и покрывает обе ОС + чек-лист. Прогон на физических устройствах —
+  **PO** (критерий приёмки стори, не агент).
+- **DoD задачи:** статус задачи в стори; `docs/STATUS.md`; один коммит
+  `gotovnost/03-ikonka-imya-i-smouk T3: <суть>`.
+- **Заметки по выполнению:** —
