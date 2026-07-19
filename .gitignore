@@ -79,3 +79,6 @@ devtools_options.yaml
 /packages/build/
 /build/
 build
+
+# Claude Code: машинно-локальные разрешения — не коммитятся
+.claude/settings.local.json
