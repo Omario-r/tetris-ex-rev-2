@@ -463,46 +463,73 @@ class _Toolbar extends StatelessWidget {
 
   static const Color _iconColor = Color(0xFFB1B7BE); // hudIcon token
 
+  /// Компактная иконочная кнопка тулбара: телефонная ширина (375, целевая
+  /// форма из `PROJECT.md`) не даёт места дефолтным 48×48 `IconButton` на
+  /// пять кнопок в ряд — сжимаем до 32×32 (hotfix RenderFlex overflow,
+  /// Гейт 2 возврат по T3).
+  static Widget _compactIconButton({
+    required Key key,
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback? onPressed,
+  }) {
+    return IconButton(
+      key: key,
+      tooltip: tooltip,
+      onPressed: onPressed,
+      icon: Icon(icon, color: _iconColor, size: 18.0),
+      iconSize: 18.0,
+      padding: EdgeInsets.zero,
+      constraints: const BoxConstraints(minWidth: 32.0, minHeight: 32.0),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14.0, vertical: 4.0),
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          IconButton(
+          _compactIconButton(
             key: const Key('packing_close_button'),
+            icon: Icons.close,
+            tooltip: 'Закрыть',
             onPressed: onClose,
-            icon: const Icon(Icons.close, color: _iconColor),
           ),
-          const Text(
-            'Прототип укладки',
-            style: TextStyle(color: Color(0xFFAEB6BF), fontSize: 16),
+          const SizedBox(width: 4.0),
+          const Expanded(
+            child: Text(
+              'Прототип укладки',
+              style: TextStyle(color: Color(0xFFAEB6BF), fontSize: 14.0),
+              overflow: TextOverflow.ellipsis,
+              maxLines: 1,
+              textAlign: TextAlign.center,
+            ),
           ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextButton(
-                key: const Key('packing_reshuffle'),
-                onPressed: onReshuffle,
-                child: const Text('Пересобрать'),
-              ),
-              if (onSolve != null)
-                IconButton(
-                  key: const Key('packing_debug_solve'),
-                  tooltip: 'Решить (dev)',
-                  onPressed: onSolve,
-                  icon: const Icon(Icons.check_circle_outline, color: _iconColor),
-                ),
-              if (onOpenCheat != null)
-                IconButton(
-                  key: const Key('packing_cheat_button'),
-                  tooltip: 'Читы прототипа',
-                  onPressed: onOpenCheat,
-                  icon: const Icon(Icons.bug_report, color: _iconColor),
-                ),
-            ],
+          const SizedBox(width: 4.0),
+          // Иконка вместо текста «Пересобрать» — экономит место (ужато под
+          // 375-ширину, тот же ключ/действие).
+          _compactIconButton(
+            key: const Key('packing_reshuffle'),
+            icon: Icons.shuffle,
+            tooltip: 'Пересобрать нарезку',
+            onPressed: onReshuffle,
           ),
+          if (onSolve != null)
+            _compactIconButton(
+              key: const Key('packing_debug_solve'),
+              icon: Icons.check_circle_outline,
+              tooltip: 'Решить (dev)',
+              onPressed: onSolve,
+            ),
+          if (onOpenCheat != null)
+            _compactIconButton(
+              key: const Key('packing_cheat_button'),
+              icon: Icons.bug_report,
+              tooltip: 'Читы прототипа',
+              onPressed: onOpenCheat,
+            ),
         ],
       ),
     );

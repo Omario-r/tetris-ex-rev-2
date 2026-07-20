@@ -149,6 +149,92 @@ void main() {
     });
   });
 
+  group('Регрессия: нет RenderFlex overflow на телефонной ширине (Гейт 2 '
+      'возврат по T3, 375×812 не settle-ился на дефолтном тестовом вьюпорте '
+      '800×600, где overflow не проявлялся)', () {
+    /// Пампит экран на геометрии телефона и убеждается, что раскладка не даёт
+    /// overflow (в debug-режиме overflow бросает `FlutterError`, тест ловит
+    /// его через `tester.takeException()`). Целевая форма — `PROJECT.md`
+    /// (телефон, портрет); ширины подобраны от iPhone SE (320) до iPhone
+    /// 12/13 (390) — самый узкий реалистичный случай.
+    Future<void> pumpOnPhone(
+      WidgetTester tester, {
+      double width = 375.0,
+      double height = 812.0,
+      double dpr = 3.0,
+    }) async {
+      tester.view.physicalSize = Size(width * dpr, height * dpr);
+      tester.view.devicePixelRatio = dpr;
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(const MaterialApp(home: PackingPrototypeScreen()));
+      await tester.pump();
+    }
+
+    testWidgets('320×568 (iPhone SE, самый узкий случай) — стартовая нарезка '
+        'без overflow', (tester) async {
+      await pumpOnPhone(tester, width: 320.0, height: 568.0);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('375×812 — стартовая нарезка + лоток без overflow',
+        (tester) async {
+      await pumpOnPhone(tester);
+      expect(tester.takeException(), isNull);
+      // Тулбар (закрыть/заголовок/пересобрать/dev-кнопки) и лоток кусочков —
+      // оба Row из отчёта Гейта 2 — построены без overflow.
+      expect(find.byKey(const Key('packing_close_button')), findsOneWidget);
+      expect(find.byKey(const Key('packing_reshuffle')), findsOneWidget);
+      expect(find.byKey(const Key('packing_cheat_button')), findsOneWidget);
+    });
+
+    testWidgets('375×812 — dev-чит-меню (тумблер подачи) открывается без '
+        'overflow, packing_cheat_button нажимаема', (tester) async {
+      await pumpOnPhone(tester);
+
+      // Критично: если бы dev-кнопка уезжала за край (регрессия отчёта Гейта
+      // 2), `tester.tap` всё равно нашёл бы виджет по ключу и «нажал» — но
+      // overflow-исключение должно было бы уже случиться на этапе layout,
+      // до тапа.
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.byKey(const Key('packing_cheat_button')));
+      await _pumpFrames(tester);
+
+      expect(tester.takeException(), isNull);
+      expect(find.byKey(const Key('feed_full')), findsOneWidget);
+      expect(find.byKey(const Key('feed_tray3')), findsOneWidget);
+    });
+
+    testWidgets('375×812 — переключение feed_tray3, «Решить», «Заново», '
+        '«Пересобрать» без overflow ни на одном состоянии', (tester) async {
+      await pumpOnPhone(tester);
+      expect(tester.takeException(), isNull);
+
+      await tester.tap(find.byKey(const Key('packing_cheat_button')));
+      await _pumpFrames(tester);
+      await tester.tap(find.byKey(const Key('feed_tray3')));
+      await _pumpFrames(tester);
+      expect(tester.takeException(), isNull, reason: 'feed_tray3');
+
+      // Закрыть sheet.
+      await tester.tapAt(const Offset(20, 20));
+      await _pumpFrames(tester);
+      expect(tester.takeException(), isNull, reason: 'закрытие sheet');
+
+      await tester.tap(find.byKey(const Key('packing_debug_solve')));
+      await _pumpFrames(tester);
+      expect(tester.takeException(), isNull, reason: 'после «Решить»');
+      expect(find.byKey(const Key('packing_complete')), findsOneWidget);
+
+      await tester.tap(find.byKey(const Key('packing_restart_button')));
+      await _pumpFrames(tester);
+      expect(tester.takeException(), isNull, reason: 'после «Заново»');
+
+      await tester.tap(find.byKey(const Key('packing_reshuffle')));
+      await _pumpFrames(tester);
+      expect(tester.takeException(), isNull, reason: 'после «Пересобрать»');
+    });
+  });
+
   group('Вход из основного чит-меню', () {
     Future<void> pumpGame(WidgetTester tester) async {
       tester.view.physicalSize = const Size(1200, 1600);
