@@ -14,6 +14,7 @@
 |--------|------|----------------------|------------|
 | models | `lib/game_engine/models/` | Структуры данных ядра (поле, фигура, маска, шаблоны уровня/объекта) | rules ¹ |
 | rules | `lib/game_engine/rules/` | Чистые правила: коллизии, halo/победа, взрыв, генерация фигур | models ¹ |
+| packing | `lib/game_engine/packing/` | Ядро укладки (новое): полиомино-кусок, состояние (силуэт+размещённые+лоток), валидация/завершение; нарезка силуэта (T2) | models |
 | game | `lib/game_engine/game/` | Состояние партии + оркестрация (`tick`, команды игрока) | models, rules |
 | data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (`ShipParts.parts.length` уровней, v1=7) | models |
 | application | `lib/application/` | Персист прогресса (`ProgressService`) | data ² |
@@ -48,6 +49,9 @@ lib/main.dart (вход)
                   │                    ▲
                   └──► data ◄──────────┴─── application
 ```
+
+- packing ──► models (TargetMask как силуэт); новое ядро укладки, параллельно
+  game/rules (старое тетрис-ядро выпиливается в Стори 02 эпика «Укладка»).
 
 - `screens` — единственный композиционный корень: тянет ядро, данные и виджеты.
 - `application` тонкий: игровой цикл фактически в `screens/game_screen`, не в `application/game_loop` (стуб).
