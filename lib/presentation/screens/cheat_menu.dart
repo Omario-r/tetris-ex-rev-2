@@ -24,6 +24,9 @@ class CheatMenu extends StatelessWidget {
   /// Задать число зарядов взрыва в текущей партии (эпик «Взрыв»).
   final void Function(int charges) onSetCharges;
 
+  /// Открыть прототип-экран укладки (эпик «Укладка», Стори 01).
+  final VoidCallback onOpenPrototype;
+
   /// Сколько дев-уровней предлагать в «выборе уровня». `null` (по умолчанию) —
   /// все детали корабля [kShipPartCount] (не можем задать дефолтом: `kShipPartCount`
   /// не `const`). Единый источник истины «N уровней ↔ N деталей».
@@ -35,6 +38,7 @@ class CheatMenu extends StatelessWidget {
     required this.onInstantWin,
     required this.onSetShipParts,
     required this.onSetCharges,
+    required this.onOpenPrototype,
     this.levelCount,
   });
 
@@ -84,6 +88,13 @@ class CheatMenu extends StatelessWidget {
                     child: Text('$n'),
                   ),
               ]),
+              _section(context, 'Прототип укладки', [
+                ElevatedButton(
+                  key: const Key('cheat_open_prototype'),
+                  onPressed: onOpenPrototype,
+                  child: const Text('Прототип укладки'),
+                ),
+              ]),
             ],
           ),
         ),
@@ -113,6 +124,7 @@ Future<void> showCheatMenu(
   required VoidCallback onInstantWin,
   required void Function(int parts) onSetShipParts,
   required void Function(int charges) onSetCharges,
+  required VoidCallback onOpenPrototype,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -122,6 +134,7 @@ Future<void> showCheatMenu(
       onInstantWin: onInstantWin,
       onSetShipParts: onSetShipParts,
       onSetCharges: onSetCharges,
+      onOpenPrototype: onOpenPrototype,
     ),
   );
 }

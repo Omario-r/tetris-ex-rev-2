@@ -34,7 +34,8 @@
 
 ## От него зависят
 
-- (пока никто; T3 подключит `presentation/screens`+`widgets`).
+- `presentation/screens` (`packing_prototype_screen`) и `presentation/widgets`
+  (`packing_painter`) — прототип-экран укладки, Стори 01 T3.
 
 ## Инварианты
 

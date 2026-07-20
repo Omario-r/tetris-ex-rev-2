@@ -6,7 +6,8 @@
 ## Назначение
 
 Переиспользуемые виджеты/пейнтеры: отрисовка поля, панель управления (HUD) и
-единый корабль мета-каркаса. Экраны (`screens`) собирают их вместе.
+единый корабль мета-каркаса. Экраны (`screens`) собирают их вместе. Плюс (эпик
+«Укладка», Стори 01 T3) пейнтер прототипа нового ядра укладки.
 
 ## Публичный интерфейс
 
@@ -56,12 +57,25 @@
 - `kShipPartCount` (`ship.dart`) — **`final`, выводится из `ShipParts.parts.length`** (v1 = 7).
   Единый источник «N деталей ↔ N уровней». Не `const` — только рантайм. Форма деталей живёт в
   `game_engine/data/ship_parts`.
+- `PackingPainter({state, cellSize, shipMaterials, excludePieceId})` — `CustomPainter` прототипа
+  укладки (эпик «Укладка», Стори 01 T3): фон `boardBg` (`#16191D`) + ghost незаполненных клеток
+  силуэта (`BlockTheme.ghostTarget`, канон `GhostTargetOverlay`/токен `ghostTarget`) + уложенные
+  кусочки (`BlockPaintUtils.paintElBlock`, канон `el-block`). Материал кусочка — циклический
+  выбор из `ShipMaterials.defaultMaterials` по `pieceId % kShipPartCount`
+  (`PackingPainter.materialForPiece`, публичный статик) — различает соседние кусочки на
+  существующей палитре, новых цветов не заводит. `excludePieceId` — пропустить отрисовку
+  уложенного кусочка (экран рисует его отдельно как floating drag-фидбэк, чтобы не дублировать).
+  `PackingPainter.paintPiece` (публичный статик) — единая точка правды «как выглядит кусочек»,
+  переиспользуется экраном для лотка/drag-фидбэка. Только вид — не знает про drag-жесты
+  (логика в `presentation/screens/packing_prototype_screen`).
 
 ## Зависит от
 
 - `game_engine/game` — `GameState`, `GameController`.
 - `game_engine/models` — `Board`, `FallingPiece`.
 - `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
+- `game_engine/packing` (`PackPiece`, `PackState`) — только `packing_painter` (эпик «Укладка»,
+  Стори 01 T3); `board_painter`/`hud`/`ship_painter` эту зависимость не тянут.
 - `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`,
   `ScrapBlockSkin`, `ShipMaterials`, `CanisterChargePainter`/`ChargeIconState`
   (Стори 02 T1, кнопка взрыва), оверлеи (`GhostTargetOverlay`,
@@ -70,7 +84,8 @@
 
 ## От него зависят
 
-- `presentation/screens` — `game_screen` (board_painter + hud), `ship_screen` (ship_painter).
+- `presentation/screens` — `game_screen` (board_painter + hud), `ship_screen` (ship_painter),
+  `packing_prototype_screen` (packing_painter, Стори 01 T3).
 
 ## Инварианты
 
@@ -84,4 +99,5 @@
 ## Как проверить
 
 `flutter test test/presentation/board_painter_test.dart test/presentation/hud_test.dart
-test/presentation/ship_screen_test.dart test/game_engine/data/ship_parts_test.dart`.
+test/presentation/ship_screen_test.dart test/game_engine/data/ship_parts_test.dart
+test/presentation/packing_prototype_screen_test.dart`.

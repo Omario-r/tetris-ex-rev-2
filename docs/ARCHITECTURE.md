@@ -52,6 +52,10 @@ lib/main.dart (вход)
 
 - packing ──► models (TargetMask как силуэт); новое ядро укладки, параллельно
   game/rules (старое тетрис-ядро выпиливается в Стори 02 эпика «Укладка»).
+- `presentation/screens` и `presentation/widgets` теперь читают также
+  `game_engine/packing` (прототип укладки, Стори 01 эпика «Укладка»). Новых
+  модулей нет; связь `presentation → game_engine` уже была, здесь уточняется
+  охват.
 
 - `screens` — единственный композиционный корень: тянет ядро, данные и виджеты.
 - `application` тонкий: игровой цикл фактически в `screens/game_screen`, не в `application/game_loop` (стуб).

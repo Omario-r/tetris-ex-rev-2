@@ -7,7 +7,8 @@
 
 Экраны и склейка партии: игровой экран (держит игровой цикл), экран сборки фрагмента,
 экран собранного объекта и экран корабля мета-каркаса. Композиционный корень: собирает
-ядро, данные и виджеты.
+ядро, данные и виджеты. Плюс (эпик «Укладка», Стори 01 T3) параллельный прототип-экран
+нового ядра укладки — доступен из чит-меню, старый игровой цикл/`GameScreen` не трогает.
 
 ## Публичный интерфейс
 
@@ -33,17 +34,41 @@
 - `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
   победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
   (или «Начать заново», если `isComplete`), без «Назад».
-- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, onSetCharges})` / `showCheatMenu(...)`
-  — дев-читы (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход —
+- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, onSetCharges, onOpenPrototype})` /
+  `showCheatMenu(...)` — дев-читы (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход —
   `Key('cheat_button')`, виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа,
   состояние корабля (N=0..`kShipPartCount`), заряды взрыва (N=0..5, эпик «Взрыв», Стори 01;
-  выставляет `GameController.setCharges` напрямую в активной партии). `levelCount` по умолчанию
-  `null` → `kShipPartCount` уровней.
+  выставляет `GameController.setCharges` напрямую в активной партии), «Прототип укладки»
+  (`Key('cheat_open_prototype')`, эпик «Укладка», Стори 01 T3 — `GameScreen` реализует колбэк
+  `Navigator.push(PackingPrototypeScreen())`, партия под стеком не трогается). `levelCount` по
+  умолчанию `null` → `kShipPartCount` уровней.
+- `PackingPrototypeScreen()` (эпик «Укладка», Стори 01 T3) — `StatefulWidget`, параллельный
+  прототип-экран нового ядра укладки (`game_engine/packing`), доступен из `CheatMenu` (см. выше).
+  Силуэт — крест `defaultTargetMask` (6×6, 20 клеток; режется на 5 кусков — больше
+  порционного лотка-3, тумблеру подачи есть что показать; выбор зафиксирован комментарием
+  в файле). При старте/«Пересобрать» (`Key('packing_reshuffle')`)
+  режет силуэт `slicePolyomino(silhouette, seed: _seed)`, кладёт кусочки в `PackController`
+  (весь набор в лотке). Drag-and-drop — ручной `GestureDetector` (не `Draggable`/`DragTarget`):
+  тащим кусочек из лотка/с поля, офсет `_dragLiftPx=56` px над пальцем (кусок рисуется выше
+  точки касания — риск drag-UX эпика), отпустили над силуэтом → `controller.place`/`move`,
+  невалидно → no-op (визуально возврат, т.к. painter не рисует «призрак» дважды), отпустили с
+  уже уложенного за пределами поля → `controller.remove` (в лоток). Сигнал завершения —
+  `Key('packing_complete')` при `state.isComplete` (баннер + `Key('packing_restart_button')`
+  «Заново» = пересборка). Тумблер подачи `FeedMode {fullSet, tray3}` — в дев-чите прототипа
+  (`Key('packing_cheat_button')`, только `kDebugMode`, bottom sheet с `Key('feed_full')`/
+  `Key('feed_tray3')`); режим хранится в module-level переменной файла (переживает
+  повторное открытие экрана в рамках сессии, персиста на диск нет). Дев-кнопка «Решить»
+  (`Key('packing_debug_solve')`, только `kDebugMode`) раскладывает все кусочки по эталонному
+  `PackSlice.solution` — и ручной dev-инструмент, и programmatic-хук для виджет-теста (без
+  симуляции drag-жестов).
 
 ## Зависит от
 
 - `game_engine/game`, `game_engine/models`, `game_engine/data`, `game_engine/rules` (`randomizer`),
   `application` (`ProgressService`), `presentation/theme`, `presentation/widgets`.
+- `game_engine/packing` (`PackController`/`PackState`/`slicePolyomino`) — только
+  `packing_prototype_screen` (эпик «Укладка», Стори 01 T3); `GameScreen` и старое ядро эту
+  зависимость не тянут.
 - Это композиционный корень — потому зависимостей больше «правила трёх модулей»; ожидаемо
   для верхнего экрана, глубже дробить незачем.
 
@@ -72,8 +97,16 @@
   2026-07-11). Новую секцию читов добавлять — не забывать, что скролл уже есть, отдельно
   оборачивать не нужно.
 
+## Инварианты (доп. к T3)
+
+- `PackingPrototypeScreen` — параллельный экран нового ядра укладки: не пересаживает и не
+  трогает `GameScreen`/старое тетрис-ядро (`game`/`rules`) — заморозка эпика «Укладка» до
+  вердикта PO (Стори 01, контрольная точка).
+- Экран сам несёт свой `SafeArea` (нет `AppBar`, как у `GameScreen`); фон — `boardBg`
+  (`#16191D`, тот же токен, что и у поля).
+
 ## Как проверить
 
 `flutter test test/presentation/game_screen_test.dart test/navigation_test.dart
 test/presentation/ship_screen_test.dart test/presentation/cheat_menu_test.dart
-test/presentation/win_flow_test.dart`.
+test/presentation/win_flow_test.dart test/presentation/packing_prototype_screen_test.dart`.

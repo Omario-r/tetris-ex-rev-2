@@ -17,6 +17,7 @@ import '../widgets/board_painter.dart';
 import '../widgets/hud.dart';
 import '../widgets/ship.dart';
 import 'cheat_menu.dart';
+import 'packing_prototype_screen.dart';
 import 'ship_screen.dart';
 
 /// Токен `hudIcon` `hsl(215 9% 72%)`, пересчитан детерминированно
@@ -185,6 +186,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       onInstantWin: _cheatInstantWin,
       onSetShipParts: _cheatSetShipParts,
       onSetCharges: _cheatSetCharges,
+      onOpenPrototype: _cheatOpenPrototype,
+    );
+  }
+
+  /// Чит «Прототип укладки» (эпик «Укладка», Стори 01): открыть параллельный
+  /// прототип-экран поверх текущей партии (`Navigator.push`, по образцу
+  /// открытия `ShipScreen`) — старое ядро/партию не трогаем.
+  void _cheatOpenPrototype() {
+    Navigator.of(context).pop(); // закрыть bottom sheet
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PackingPrototypeScreen()),
     );
   }
 
