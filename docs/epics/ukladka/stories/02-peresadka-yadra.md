@@ -196,6 +196,10 @@ _Закрыт._ Решение PO 2026-07-20: **(A) дизайн-сессия с
      : pieceId)`; собери абсолютные `cells` куска при этом якоре и передавай
      `PackingPainter(dragPreview: PackDragPreview(cells, valid))` (T1) — поле
      подсвечивает оранжевым/красным. Когда драга нет — `dragPreview: null`.
+     Точная сигнатура `PackDragPreview` уже реализована в T1 — сверься с
+     `packing_painter.dart` (`cells` — список record-клеток `({int x, int y})`,
+     тот же тип, что у `PackState.occupiedCells`; отдельного `PackCell` в проекте
+     нет).
   5. **Топбар.** Сохрани как есть уже существующие в текущем `game_screen.dart`
      виджеты `_PartChip` (чип «ДЕТАЛЬ N/7» со свотчем материала детали) и
      `_DevButton` (dev-кнопки): слева чип, справа кнопки — чит (`Key('cheat_button')`,
