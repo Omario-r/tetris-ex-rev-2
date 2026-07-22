@@ -67,7 +67,17 @@ class _PackingPrototypeScreenState extends State<PackingPrototypeScreen> {
   /// «Решить».
   late Map<int, ({int x, int y})> _solution;
 
-  // --- Drag state (ручной GestureDetector, на усмотрение Исполнителя ТЗ T3) ---
+  // --- Drag state ---
+  // Возврат Гейта 2 (2026-07-20): драг переведён с `GestureDetector.onPan*`
+  // на сырые pointer-события (`Listener.onPointerDown/Move/Up/Cancel`).
+  // `onPan*` — распознаватель жестов, участвующий в gesture arena; лоток —
+  // горизонтальный `SingleChildScrollView`, чей собственный pan-распознаватель
+  // выигрывал арену при движении пальца и ОТМЕНЯЛ pan дочернего
+  // `GestureDetector` (onPanUpdate переставал приходить — кусок не следовал
+  // за пальцем; onPanCancel не был обработан — состояние драга подвисало,
+  // клали только вторым тапом). Raw pointer-события в `Listener` не участвуют
+  // в арене — доставляются кусочку целиком независимо от конкурирующих
+  // скроллов/распознавателей.
   int? _dragPieceId;
   bool _dragFromTray = false;
   Offset? _dragGlobalPos;
@@ -162,20 +172,33 @@ class _PackingPrototypeScreenState extends State<PackingPrototypeScreen> {
     });
   }
 
-  void _onDragUpdate(DragUpdateDetails details) {
+  void _onDragUpdate(Offset globalPos) {
     if (_dragPieceId == null) return;
-    setState(() => _dragGlobalPos = details.globalPosition);
+    setState(() => _dragGlobalPos = globalPos);
   }
 
-  void _onBoardPanStart(DragStartDetails details) {
-    final local = _globalToLocal(_boardKey, details.globalPosition);
+  void _onBoardPointerDown(PointerDownEvent event) {
+    final local = _globalToLocal(_boardKey, event.position);
     if (local == null) return;
     final x = (local.dx / _cellSize).floor();
     final y = (local.dy / _cellSize).floor();
     final pieceId = _pieceAt(x, y);
     if (pieceId != null) {
-      _startDrag(pieceId, fromTray: false, globalPos: details.globalPosition);
+      _startDrag(pieceId, fromTray: false, globalPos: event.position);
     }
+  }
+
+  /// `onPointerCancel` (система забрала жест — напр. скролл/другой владелец
+  /// пришли раньше): сбрасываем драг БЕЗ попытки уложить — состояние `place`/
+  /// `move` не звалось, кусок остаётся, где был (не бьётся). Раньше (`onPan*`)
+  /// этот путь не был обработан вовсе — драг подвисал.
+  void _cancelDrag() {
+    if (_dragPieceId == null) return;
+    setState(() {
+      _dragPieceId = null;
+      _dragGlobalPos = null;
+      _dragFromTray = false;
+    });
   }
 
   void _endDrag() {
@@ -310,10 +333,11 @@ class _PackingPrototypeScreenState extends State<PackingPrototypeScreen> {
                 ),
                 const SizedBox(height: 12),
                 Center(
-                  child: GestureDetector(
-                    onPanStart: _onBoardPanStart,
-                    onPanUpdate: _onDragUpdate,
-                    onPanEnd: (_) => _endDrag(),
+                  child: Listener(
+                    onPointerDown: _onBoardPointerDown,
+                    onPointerMove: (event) => _onDragUpdate(event.position),
+                    onPointerUp: (_) => _endDrag(),
+                    onPointerCancel: (_) => _cancelDrag(),
                     child: Container(
                       width: boardWpx,
                       height: boardHpx,
@@ -360,15 +384,16 @@ class _PackingPrototypeScreenState extends State<PackingPrototypeScreen> {
               if (!(id == _dragPieceId && _dragFromTray))
                 Padding(
                   padding: const EdgeInsets.only(right: 12),
-                  child: GestureDetector(
+                  child: Listener(
                     key: Key('tray_piece_$id'),
-                    onPanStart: (details) => _startDrag(
+                    onPointerDown: (event) => _startDrag(
                       id,
                       fromTray: true,
-                      globalPos: details.globalPosition,
+                      globalPos: event.position,
                     ),
-                    onPanUpdate: _onDragUpdate,
-                    onPanEnd: (_) => _endDrag(),
+                    onPointerMove: (event) => _onDragUpdate(event.position),
+                    onPointerUp: (_) => _endDrag(),
+                    onPointerCancel: (_) => _cancelDrag(),
                     child: CustomPaint(
                       size: _pieceBoundsPx(_pieceById(id)),
                       painter: _PieceCellsPainter(
@@ -404,6 +429,10 @@ class _PackingPrototypeScreenState extends State<PackingPrototypeScreen> {
       top: local.dy,
       child: IgnorePointer(
         child: CustomPaint(
+          // Ключ — тестовый хук: виджет-тест сверяет позицию фидбэка на
+          // разных шагах непрерывного драга (drag-follow), не заглядывая в
+          // приватное состояние экрана.
+          key: const Key('packing_drag_feedback'),
           size: _pieceBoundsPx(piece),
           painter: _PieceCellsPainter(
             piece: piece,

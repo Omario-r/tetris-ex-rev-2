@@ -48,11 +48,16 @@
   порционного лотка-3, тумблеру подачи есть что показать; выбор зафиксирован комментарием
   в файле). При старте/«Пересобрать» (`Key('packing_reshuffle')`)
   режет силуэт `slicePolyomino(silhouette, seed: _seed)`, кладёт кусочки в `PackController`
-  (весь набор в лотке). Drag-and-drop — ручной `GestureDetector` (не `Draggable`/`DragTarget`):
-  тащим кусочек из лотка/с поля, офсет `_dragLiftPx=56` px над пальцем (кусок рисуется выше
-  точки касания — риск drag-UX эпика), отпустили над силуэтом → `controller.place`/`move`,
-  невалидно → no-op (визуально возврат, т.к. painter не рисует «призрак» дважды), отпустили с
-  уже уложенного за пределами поля → `controller.remove` (в лоток). Сигнал завершения —
+  (весь набор в лотке). Drag-and-drop — сырые pointer-события `Listener`
+  (`onPointerDown/Move/Up/Cancel`, НЕ `GestureDetector.onPan*`/`Draggable`/`DragTarget`:
+  возврат Гейта 2 2026-07-20 — лоток `SingleChildScrollView(Axis.horizontal)` выигрывал
+  `onPan*` в gesture arena при движении пальца, кусок не следовал за курсором, ложился
+  только вторым тапом; raw pointer в арене не участвует — фикс): тащим кусочек из
+  лотка/с поля, офсет `_dragLiftPx=56` px над пальцем (кусок рисуется выше точки касания
+  — риск drag-UX эпика), отпустили над силуэтом → `controller.place`/`move`, невалидно →
+  no-op (визуально возврат, т.к. painter не рисует «призрак» дважды), отпустили с уже
+  уложенного за пределами поля → `controller.remove` (в лоток); `onPointerCancel` сбрасывает
+  драг без попытки уложить (не подвисает). Сигнал завершения —
   `Key('packing_complete')` при `state.isComplete` (баннер + `Key('packing_restart_button')`
   «Заново» = пересборка). Тумблер подачи `FeedMode {fullSet, tray3}` — в дев-чите прототипа
   (`Key('packing_cheat_button')`, только `kDebugMode`, bottom sheet с `Key('feed_full')`/
