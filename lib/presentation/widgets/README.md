@@ -57,17 +57,34 @@
 - `kShipPartCount` (`ship.dart`) — **`final`, выводится из `ShipParts.parts.length`** (v1 = 7).
   Единый источник «N деталей ↔ N уровней». Не `const` — только рантайм. Форма деталей живёт в
   `game_engine/data/ship_parts`.
-- `PackingPainter({state, cellSize, shipMaterials, excludePieceId})` — `CustomPainter` прототипа
-  укладки (эпик «Укладка», Стори 01 T3): фон `boardBg` (`#16191D`) + ghost незаполненных клеток
-  силуэта (`BlockTheme.ghostTarget`, канон `GhostTargetOverlay`/токен `ghostTarget`) + уложенные
-  кусочки (`BlockPaintUtils.paintElBlock`, канон `el-block`). Материал кусочка — циклический
-  выбор из `ShipMaterials.defaultMaterials` по `pieceId % kShipPartCount`
-  (`PackingPainter.materialForPiece`, публичный статик) — различает соседние кусочки на
-  существующей палитре, новых цветов не заводит. `excludePieceId` — пропустить отрисовку
-  уложенного кусочка (экран рисует его отдельно как floating drag-фидбэк, чтобы не дублировать).
+- `PackingPainter({state, cellSize, shipMaterials, excludePieceId, partMaterial, dragPreview})` —
+  `CustomPainter` укладки (эпик «Укладка», Стори 01 T3, канон утверждён эпик «Укладка» Стори 02
+  T1): фон `boardBg` (`#16191D`) + ghost незаполненных клеток силуэта (`BlockTheme.ghostTarget`,
+  канон `GhostTargetOverlay`/токен `ghostTarget`) + уложенные кусочки
+  (`BlockPaintUtils.paintElBlock`, канон `el-block`) + живое снап-превью драга
+  (`el-drop-ok`/`el-drop-bad`, эпик «Укладка» Стори 02 T1). Материал уложенных клеток: если
+  `partMaterial` (`BlockMaterial?`) задан — ВСЕ уложенные клетки красятся ИМ (единый материал =
+  собранная деталь, канон `el-cell-filled`, эпик «Укладка» Стори 02 T1); если `null` — прежнее
+  поведение прототипа, циклический выбор из `ShipMaterials.defaultMaterials` по
+  `pieceId % kShipPartCount` (`PackingPainter.materialForPiece`, публичный статик). `excludePieceId` —
+  пропустить отрисовку уложенного кусочка (экран рисует его отдельно как floating drag-фидбэк,
+  чтобы не дублировать). `dragPreview` (`PackDragPreview?`, эпик «Укладка» Стори 02 T1) —
+  снап-превью текущего драга: если задан, поверх ghost/уложенных клеток рисуется по каждой клетке
+  `dragPreview.cells` (АБСОЛЮТНЫЕ клетки силуэта; клетки вне `[0..width)×[0..height)` молча
+  пропускаются) рамка 2px + заливка — `dropOk`/`dropOkFill` при `valid:true`, иначе
+  `dropBad`/`dropBadFill`; `null` — превью не рисуется. Новые цвет-токены `docs/DESIGN.md`,
+  размещены на классе как `static const Color` рядом с `boardBg`: `dropOk`/`dropOkFill` (снап
+  «ляжет»), `dropBad`/`dropBadFill` (снап «нельзя»), `trayBg` (фон лотка), `doneGlow`
+  (пульс-ободок собранной детали, канон `board.complete`; `trayBg`/`doneGlow` пока только
+  токены-константы, потребитель — `presentation/screens`, эпик «Укладка» Стори 02 T2).
   `PackingPainter.paintPiece` (публичный статик) — единая точка правды «как выглядит кусочек»,
-  переиспользуется экраном для лотка/drag-фидбэка. Только вид — не знает про drag-жесты
-  (логика в `presentation/screens/packing_prototype_screen`).
+  переиспользуется экраном для лотка/drag-фидбэка. Только вид — не знает про drag-жесты (логика в
+  `presentation/screens`).
+- `PackDragPreview({cells, valid})` (`packing_painter.dart`, эпик «Укладка» Стори 02 T1) —
+  маленький immutable DTO снап-превью: `cells` (`List<({int x, int y})>`, тот же тип клетки, что у
+  `PackState.occupiedCells`) — абсолютные клетки силуэта под текущим якорем драга; `valid` —
+  можно ли класть. Равенство по значению (`==`/`hashCode`) — на нём держится
+  `PackingPainter.shouldRepaint`.
 
 ## Зависит от
 
@@ -100,4 +117,4 @@
 
 `flutter test test/presentation/board_painter_test.dart test/presentation/hud_test.dart
 test/presentation/ship_screen_test.dart test/game_engine/data/ship_parts_test.dart
-test/presentation/packing_prototype_screen_test.dart`.
+test/presentation/packing_prototype_screen_test.dart test/presentation/packing_painter_test.dart`.
