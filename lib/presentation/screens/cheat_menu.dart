@@ -1,10 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/ship.dart';
-
-/// Верхняя граница кнопок чита «заряды взрыва» (0.._maxCheatCharges) — с запасом
-/// над плейсхолдер-бюджетом (эпик «Взрыв», Стори 01/02).
-const _maxCheatCharges = 5;
+import 'game_screen.dart' show FeedMode;
 
 /// Оверлей чит-меню для дев-сборки: минимальный список кнопок.
 ///
@@ -15,17 +12,23 @@ class CheatMenu extends StatelessWidget {
   /// Перезапустить игру на уровне с индексом `levelIndex` (0-based).
   final void Function(int levelIndex) onSelectLevel;
 
-  /// Мгновенная победа: засчитать текущий уровень пройденным.
+  /// Мгновенная победа: засчитать текущий уровень пройденным (мета-уровень).
   final VoidCallback onInstantWin;
 
   /// Задать «собрано N деталей» (N = 0..[kShipPartCount]).
   final void Function(int parts) onSetShipParts;
 
-  /// Задать число зарядов взрыва в текущей партии (эпик «Взрыв»).
-  final void Function(int charges) onSetCharges;
+  /// Текущий режим подачи лотка (для секции «Подача»).
+  final FeedMode feedMode;
 
-  /// Открыть прототип-экран укладки (эпик «Укладка», Стори 01).
-  final VoidCallback onOpenPrototype;
+  /// Переключить режим подачи лотка (`fullSet` / `tray3`).
+  final ValueChanged<FeedMode> onSetFeedMode;
+
+  /// Пересобрать нарезку текущего уровня (новый seed).
+  final VoidCallback onReshuffle;
+
+  /// Solve-хук: доложить деталь по эталонной раскладке (дев-инструмент).
+  final VoidCallback onSolve;
 
   /// Сколько дев-уровней предлагать в «выборе уровня». `null` (по умолчанию) —
   /// все детали корабля [kShipPartCount] (не можем задать дефолтом: `kShipPartCount`
@@ -37,8 +40,10 @@ class CheatMenu extends StatelessWidget {
     required this.onSelectLevel,
     required this.onInstantWin,
     required this.onSetShipParts,
-    required this.onSetCharges,
-    required this.onOpenPrototype,
+    required this.feedMode,
+    required this.onSetFeedMode,
+    required this.onReshuffle,
+    required this.onSolve,
     this.levelCount,
   });
 
@@ -80,19 +85,28 @@ class CheatMenu extends StatelessWidget {
                     child: Text('$n'),
                   ),
               ]),
-              _section(context, 'Заряды взрыва', [
-                for (int n = 0; n <= _maxCheatCharges; n++)
-                  ElevatedButton(
-                    key: Key('cheat_charges_$n'),
-                    onPressed: () => onSetCharges(n),
-                    child: Text('$n'),
-                  ),
-              ]),
-              _section(context, 'Прототип укладки', [
+              _section(context, 'Подача', [
                 ElevatedButton(
-                  key: const Key('cheat_open_prototype'),
-                  onPressed: onOpenPrototype,
-                  child: const Text('Прототип укладки'),
+                  key: const Key('feed_full'),
+                  onPressed: () => onSetFeedMode(FeedMode.fullSet),
+                  child: const Text('Полный набор'),
+                ),
+                ElevatedButton(
+                  key: const Key('feed_tray3'),
+                  onPressed: () => onSetFeedMode(FeedMode.tray3),
+                  child: const Text('Лоток-3'),
+                ),
+              ]),
+              _section(context, 'Нарезка (dev)', [
+                ElevatedButton(
+                  key: const Key('cheat_reshuffle'),
+                  onPressed: onReshuffle,
+                  child: const Text('Пересобрать нарезку'),
+                ),
+                ElevatedButton(
+                  key: const Key('cheat_solve'),
+                  onPressed: onSolve,
+                  child: const Text('Решить'),
                 ),
               ]),
             ],
@@ -123,8 +137,10 @@ Future<void> showCheatMenu(
   required void Function(int levelIndex) onSelectLevel,
   required VoidCallback onInstantWin,
   required void Function(int parts) onSetShipParts,
-  required void Function(int charges) onSetCharges,
-  required VoidCallback onOpenPrototype,
+  required FeedMode feedMode,
+  required ValueChanged<FeedMode> onSetFeedMode,
+  required VoidCallback onReshuffle,
+  required VoidCallback onSolve,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -133,8 +149,10 @@ Future<void> showCheatMenu(
       onSelectLevel: onSelectLevel,
       onInstantWin: onInstantWin,
       onSetShipParts: onSetShipParts,
-      onSetCharges: onSetCharges,
-      onOpenPrototype: onOpenPrototype,
+      feedMode: feedMode,
+      onSetFeedMode: onSetFeedMode,
+      onReshuffle: onReshuffle,
+      onSolve: onSolve,
     ),
   );
 }

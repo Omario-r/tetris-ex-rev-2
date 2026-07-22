@@ -5,75 +5,75 @@
 
 ## Назначение
 
-Экраны и склейка партии: игровой экран (держит игровой цикл), экран сборки фрагмента,
-экран собранного объекта и экран корабля мета-каркаса. Композиционный корень: собирает
-ядро, данные и виджеты. Плюс (эпик «Укладка», Стори 01 T3) параллельный прототип-экран
-нового ядра укладки — доступен из чит-меню, старый игровой цикл/`GameScreen` не трогает.
+Экраны и склейка партии: игровой экран укладки (эпик «Укладка», Стори 02 — на ядре
+`game_engine/packing`), экран сборки фрагмента, экран собранного объекта и экран корабля
+мета-каркаса. Композиционный корень: собирает ядро, данные и виджеты.
 
 ## Публичный интерфейс
 
-- `GameScreen({levelIndex=0})` — `StatefulWidget`. Держит `AnimationController` (цикл ~60fps →
-  `controller.tick(dt)`), `GameController`; рисует топбар + `BoardPainter` + `GameHud`; на победе
-  зовёт `ProgressService.advanceOnWin` и открывает авто-показ корабля.
-- Размер клетки поля (Стори 02 T4) — **адаптивный**, не константа: колонка
-  (топбар + поле + `GameHud`) обёрнута в `LayoutBuilder` внутри `SafeArea`;
-  `_computeCellSize(constraints, boardWidth, boardHeight)` = `min(28.0 канон,
-  (constraints.maxHeight - 44 топбар - 150 HUD) / boardHeight, constraints.maxWidth
-  / boardWidth)` — на высоких экранах (≥812 логич.) даёт канонные 28px как раньше,
-  на коротких (вплоть до 640 логич.) сжимается ровно настолько, чтобы топбар+поле+HUD
-  влезли без `RenderFlex overflow`, скроллов нет. Топбар (44) и зона HUD (150) — те же
-  константы, что несут T2/T3 (`GameHud._hudHeight`), НЕ пересчитываются.
-- Топбар (Стори 02 T3, канон `.topbar`/`.chip`/`.chip .sw`/`.pausebtn`, высота 44) заменил
-  старый «Level N + иконки»: слева чип «ДЕТАЛЬ N/7» (N = `fragmentIndex+1`, 7 = `kShipPartCount`,
-  без имени секции — решение PO) со свотчем материала текущей детали
-  (`ShipMaterials.defaultMaterials.materialForPart(level.fragmentIndex)`), справа dev-кнопки в
-  стиле `.pausebtn` (40×40, `matteBlack`/`gunmetal`, глиф `hudIcon` `#B1B7BE`) — те же ключи и
-  поведение читов/корабля, что раньше. Кнопки паузы нет (решение PO 2026-07-18).
+- `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
+  Стори 02 T2). Силуэт уровня — `LevelMap.levelAt(levelIndex).targetMask`, материал детали —
+  `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)` (единый источник «уровень i
+  ↔ деталь i»). Нарезка `slicePolyomino(silhouette, seed:_seed)` → `PackController`/`PackState`
+  (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
+  (`PackState.isComplete`) → **деталь собрана** → прежний мета-поток
+  (`ProgressService.advanceOnWin` → `ShipScreen.reveal`). Ни гравитации, ни таймера, ни
+  проигрыша; отдельного игрового цикла нет — только лёгкий пульс-`AnimationController`
+  (`repeat(reverse)`) для ободка «готово». Старое тетрис-ядро (`game`/`rules`/`BoardPainter`/
+  `GameHud`) `GameScreen` больше не тянет.
+- Макет (сверху вниз, канон мокапа `docs/design/ukladka-field.html`): топбар (44) → прогресс
+  `.prog`/`.proglbl` → поле (силуэт, центрировано, `Expanded`) → лоток `.tray`/`.traylbl`.
+  Прогресс-бар — заполнение силуэта (`occupiedCells.length / silhouette.cells.length`,
+  градиент `rust→hazardOrange`), подпись «уложено N / M кусков» (N=`placements.length`,
+  M=`pieces.length`).
+- Размер клетки поля — **адаптивный**: `_computeCellSize(constraints, boardWidth, boardHeight)`
+  = `max(8, min(28.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток)/boardHeight,
+  maxWidth/boardWidth))` (внутри `LayoutBuilder`+`SafeArea`); силуэты деталей мелкие
+  (≤4×3) → на телефоне держит канонные 28px, на коротких экранах не переполняет. Клетка
+  хранится в поле `_cellSize` (обновляется в `build`) — нужна pointer-обработчикам.
+- Топбар (канон `.topbar`/`.chip`/`.pausebtn`, высота 44): слева чип «ДЕТАЛЬ N/7» со свотчем
+  материала детали, справа dev-кнопки (`Key('cheat_button')` под `kDebugMode`,
+  `Key('ship_button')`). Виджеты `_PartChip`/`_Swatch`/`_DevButton` сохранены из Стори 02 T3.
+- Drag-and-drop — сырые pointer-события `Listener` (`onPointerDown/Move/Up/Cancel`, НЕ
+  `GestureDetector.onPan*` — фикс возврата Гейта 2 Стори 01: лоток
+  `SingleChildScrollView(Axis.horizontal)` выигрывал `onPan*` в gesture arena, кусок не
+  следовал за пальцем; raw pointer в арене не участвует). Тащим из лотка/с поля, офсет
+  `_dragLiftPx=56`px над пальцем, плавающий фидбэк `Key('packing_drag_feedback')` (graphite).
+  Отпустил над силуэтом → `place`/`move`, вне поля с уложенного → `remove` (в лоток),
+  `onPointerCancel` → сброс без укладки. Клетки лотка/драга — `graphite`
+  (`el-piece-tray`/`el-piece-drag`), уложенные — материал детали (`PackingPainter.partMaterial`).
+  Снап-превью (`el-drop-ok`/`el-drop-bad`) пересчитывается в `build` (`_computePreview` →
+  `PackController.canPlace`) и передаётся `PackingPainter.dragPreview`.
+- Завершение: `Key('packing_complete')` при `isComplete` (баннер «ДЕТАЛЬ СОБРАНА», без
+  кнопки «Заново») + пульс-ободок `doneGlow` на поле; через ~900 мс идемпотентно
+  (`_winHandled`/`_winScheduled`) — прежний мета-поток `_onWin`. Solve-хук `_solveAll()`
+  (раскладка по `PackSlice.solution`) — дев-кнопка `Key('cheat_solve')` И programmatic-хук
+  для тестов (доводит до `isComplete` без симуляции drag). `FeedMode {fullSet, tray3}`
+  объявлен в `game_screen.dart` (в `tray3` в лотке первые 3 из `trayOrder` + индикатор «+N»).
 - `ShipScreen()` — ручной статичный экран корабля: `ShipPainter` по `min(current_level,
   kShipPartCount)`; читает `ProgressService`. Вход — `Key('ship_button')` на `GameScreen`.
 - `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
   победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
   (или «Начать заново», если `isComplete`), без «Назад».
-- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, onSetCharges, onOpenPrototype})` /
-  `showCheatMenu(...)` — дев-читы (bottom sheet). Только вид: логика — колбэки в `GameScreen`. Вход —
-  `Key('cheat_button')`, виден лишь под `kDebugMode`. Читы: выбор уровня, мгновенная победа,
-  состояние корабля (N=0..`kShipPartCount`), заряды взрыва (N=0..5, эпик «Взрыв», Стори 01;
-  выставляет `GameController.setCharges` напрямую в активной партии), «Прототип укладки»
-  (`Key('cheat_open_prototype')`, эпик «Укладка», Стори 01 T3 — `GameScreen` реализует колбэк
-  `Navigator.push(PackingPrototypeScreen())`, партия под стеком не трогается). `levelCount` по
-  умолчанию `null` → `kShipPartCount` уровней.
-- `PackingPrototypeScreen()` (эпик «Укладка», Стори 01 T3) — `StatefulWidget`, параллельный
-  прототип-экран нового ядра укладки (`game_engine/packing`), доступен из `CheatMenu` (см. выше).
-  Силуэт — крест `defaultTargetMask` (6×6, 20 клеток; режется на 5 кусков — больше
-  порционного лотка-3, тумблеру подачи есть что показать; выбор зафиксирован комментарием
-  в файле). При старте/«Пересобрать» (`Key('packing_reshuffle')`)
-  режет силуэт `slicePolyomino(silhouette, seed: _seed)`, кладёт кусочки в `PackController`
-  (весь набор в лотке). Drag-and-drop — сырые pointer-события `Listener`
-  (`onPointerDown/Move/Up/Cancel`, НЕ `GestureDetector.onPan*`/`Draggable`/`DragTarget`:
-  возврат Гейта 2 2026-07-20 — лоток `SingleChildScrollView(Axis.horizontal)` выигрывал
-  `onPan*` в gesture arena при движении пальца, кусок не следовал за курсором, ложился
-  только вторым тапом; raw pointer в арене не участвует — фикс): тащим кусочек из
-  лотка/с поля, офсет `_dragLiftPx=56` px над пальцем (кусок рисуется выше точки касания
-  — риск drag-UX эпика), отпустили над силуэтом → `controller.place`/`move`, невалидно →
-  no-op (визуально возврат, т.к. painter не рисует «призрак» дважды), отпустили с уже
-  уложенного за пределами поля → `controller.remove` (в лоток); `onPointerCancel` сбрасывает
-  драг без попытки уложить (не подвисает). Сигнал завершения —
-  `Key('packing_complete')` при `state.isComplete` (баннер + `Key('packing_restart_button')`
-  «Заново» = пересборка). Тумблер подачи `FeedMode {fullSet, tray3}` — в дев-чите прототипа
-  (`Key('packing_cheat_button')`, только `kDebugMode`, bottom sheet с `Key('feed_full')`/
-  `Key('feed_tray3')`); режим хранится в module-level переменной файла (переживает
-  повторное открытие экрана в рамках сессии, персиста на диск нет). Дев-кнопка «Решить»
-  (`Key('packing_debug_solve')`, только `kDebugMode`) раскладывает все кусочки по эталонному
-  `PackSlice.solution` — и ручной dev-инструмент, и programmatic-хук для виджет-теста (без
-  симуляции drag-жестов).
+- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, feedMode, onSetFeedMode,
+  onReshuffle, onSolve, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
+  Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
+  `kDebugMode`. Секции: выбор уровня, мгновенная победа (мета-уровень, `_handleWin`),
+  состояние корабля (N=0..`kShipPartCount`), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
+  — тумблер `FeedMode`), **нарезка** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
+  — solve-хук). Зарядов взрыва и «Прототипа укладки» больше нет (выпил в Стори 02).
+  `levelCount` по умолчанию `null` → `kShipPartCount` уровней.
 
 ## Зависит от
 
-- `game_engine/game`, `game_engine/models`, `game_engine/data`, `game_engine/rules` (`randomizer`),
-  `application` (`ProgressService`), `presentation/theme`, `presentation/widgets`.
-- `game_engine/packing` (`PackController`/`PackState`/`slicePolyomino`) — только
-  `packing_prototype_screen` (эпик «Укладка», Стори 01 T3); `GameScreen` и старое ядро эту
-  зависимость не тянут.
+- `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`slicePolyomino`),
+  `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`),
+  `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`/`ShipMaterials`),
+  `presentation/widgets` (`PackingPainter`, `ship`). `GameScreen` больше НЕ зависит от
+  `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
+  `theme/level_skin` (пересадка на укладку, Стори 02 T2).
+- `cheat_menu.dart` импортирует `FeedMode` из `game_screen.dart` (взаимный импорт —
+  допустим в Dart; enum живёт у экрана, меню лишь типизирует параметр).
 - Это композиционный корень — потому зависимостей больше «правила трёх модулей»; ожидаемо
   для верхнего экрана, глубже дробить незачем.
 
@@ -83,35 +83,37 @@
 
 ## Инварианты
 
-- Игровой цикл живёт ЗДЕСЬ (не в `application/game_loop`, который стуб):
-  `AnimationController.repeat` → `_onTick` → `controller.tick(dt)` → `setState`.
+- Отдельного игрового цикла больше НЕТ (ядро укладки без гравитации/тиков): вместо
+  gravity-тикера — лёгкий пульс-`AnimationController.repeat(reverse)` только для ободка
+  «готово». Состояние укладки мутируется `PackController` (`place`/`move`/`remove`) в
+  pointer-обработчиках, не по тику.
+- Мутация ядра (`PackController`) — только через сам контроллер; `PackState`/`PackPiece`
+  иммутабельны. Невалидная укладка — no-op контроллера (не бросает).
 - Навигация: захватить `NavigatorState` (`Navigator.of(context)`) ДО `pushReplacement`;
-  после ухода с экрана `context` не трогать (проверка `mounted`). Победа обрабатывается один раз (`_winHandled`).
+  после ухода с экрана `context` не трогать (проверка `mounted`). Победа обрабатывается
+  один раз (`_winHandled`); укладка-завершение планирует её через ~900 мс (`_winScheduled`),
+  чит «мгновенная победа» — сразу.
 - Поток после победы: Game → `ProgressService.advanceOnWin` → `ShipScreen.reveal`
   (деталь +1) → «Далее» → Game(следующий). На последнем дев-уровне (индекс
-  `kShipPartCount-1`) → корабль 3/3 + «Начать заново» → `ProgressService.reset()` → Game(0).
+  `kShipPartCount-1`) → корабль N/N + «Начать заново» → `ProgressService.reset()` → Game(0).
 - Экран корабля открывается `Navigator.push` (НЕ `pushReplacement`): `GameScreen` остаётся
   под стеком, «Назад» из `AppBar` возвращает в ту же партию.
 - У `GameScreen` нет `AppBar` → его `body` обёрнут в `SafeArea` вручную; иначе шапка
   (в т.ч. кнопка «Корабль») уходит под системный статус-бар/вырез и не нажимается.
-- Чит-меню — только дев-сборка: вход рисуется под `if (kDebugMode)`; читы имитируются на
-  мета-уровне (`ProgressService` + навигация), движок (`game_engine`) не трогают.
+- Drag: `_boardKey` — origin координат клеток поля (globalToLocal). Якорь укладки —
+  клетка под верх-левым углом всплывшего куска (`pointer - _dragLiftPx`, `.floor()`);
+  снап-превью и `_endDrag` используют один расчёт `_anchorAt` (не расходятся).
+- Чит-меню — только дев-сборка: вход рисуется под `if (kDebugMode)`; читы «выбор уровня»/
+  «мгновенная победа»/«состояние корабля» имитируются на мета-уровне (`ProgressService` +
+  навигация), ядро укладки не трогают; «подача»/«пересобрать»/«решить» работают с ядром
+  экрана через `setState`.
 - `CheatMenu` — контент внутри `SingleChildScrollView` (`showModalBottomSheet(...,
-  isScrollControlled: true)`): секций стало 4 (эпик «Взрыв» добавил «Заряды взрыва»), на
-  маленьких экранах без скролла контент переполняет sheet (`RenderFlex overflow`, hotfix
-  2026-07-11). Новую секцию читов добавлять — не забывать, что скролл уже есть, отдельно
-  оборачивать не нужно.
-
-## Инварианты (доп. к T3)
-
-- `PackingPrototypeScreen` — параллельный экран нового ядра укладки: не пересаживает и не
-  трогает `GameScreen`/старое тетрис-ядро (`game`/`rules`) — заморозка эпика «Укладка» до
-  вердикта PO (Стори 01, контрольная точка).
-- Экран сам несёт свой `SafeArea` (нет `AppBar`, как у `GameScreen`); фон — `boardBg`
-  (`#16191D`, тот же токен, что и у поля).
+  isScrollControlled: true)`): на маленьких экранах без скролла контент переполняет sheet
+  (`RenderFlex overflow`, hotfix 2026-07-11). Новую секцию читов добавлять — не забывать,
+  что скролл уже есть, отдельно оборачивать не нужно.
 
 ## Как проверить
 
 `flutter test test/presentation/game_screen_test.dart test/navigation_test.dart
 test/presentation/ship_screen_test.dart test/presentation/cheat_menu_test.dart
-test/presentation/win_flow_test.dart test/presentation/packing_prototype_screen_test.dart`.
+test/presentation/win_flow_test.dart`.

@@ -161,7 +161,27 @@ _Закрыт._ Решение PO 2026-07-20: **(A) дизайн-сессия с
   (новые возможности `PackingPainter`, новые токены); `analyze` 0, `test` зелёный.
 
 ### T2 — Пересадка `GameScreen` на ядро укладки (мета-обвязка сохранена)
-- **Статус:** не начата
+- **Статус:** сделана (2026-07-22). `flutter analyze` — «No issues found!» (0);
+  `flutter test` — 381/381 зелёных (было 391; −10 из удалённого
+  `packing_prototype_screen_test.dart`). `GameScreen` пересажен на ядро укладки:
+  силуэт из `LevelMap.levelAt(levelIndex).targetMask`, материал детали
+  `materialForPart(fragmentIndex)`, нарезка `slicePolyomino` → `PackController`;
+  drag-логика (сырые pointer-события `Listener`) перенесена из удалённого
+  прототипа; снап-превью через `PackingPainter.dragPreview` (T1), уложенные клетки
+  — `partMaterial` (T1); топбар (`_PartChip`/`_DevButton`) сохранён; прогресс-бар
+  `rust→hazardOrange`, лоток `trayBg` + подпись + тумблер `FeedMode`/«+N»; победа
+  `PackState.isComplete` → баннер `packing_complete` + пульс `doneGlow` → ~900 мс →
+  прежний мета-поток `_onWin` (дословно). Solve-хук `_solveAll` (`Key('cheat_solve')`
+  + programmatic для тестов). Старое ядро (`game`/`rules`/`BoardPainter`/`GameHud`/
+  `level_skin`) `GameScreen` больше не импортирует (файлы движка живы — выпил в
+  T3/T4). Удалён `packing_prototype_screen.dart` + его тест. Чит-меню: убраны
+  заряды и «Прототип укладки», добавлены «Подача» (`feed_full`/`feed_tray3`),
+  «Пересобрать нарезку» (`cheat_reshuffle`), «Решить» (`cheat_solve`). Переписаны
+  тесты `game_screen_test`/`cheat_menu_test`/`win_flow_test` под укладку;
+  `navigation_test` не менялся (не ассертил старое ядро); `golden_scenario_test`
+  не тронут (живёт до T4). **Заметка для T3/Стори 03:** win_flow гоняет один
+  уровень укладкой (solve-хук) + мета-ветку последнего уровня читом — полный
+  прогон всего контента реальной укладкой отложен в Стори 03.
 - **Рекомендованный агент:** Исполнитель (**тяжёлая**) · Claude (Opus, `ispolnitel-heavy`)
 - **Цель:** основной игровой экран играется новым ядром укладки по утверждённому
   мокапу: тянешь кусочки из лотка в силуэт детали, снап-превью, заполнил без дыр
