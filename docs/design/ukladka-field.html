@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<!--
+  Мокап экрана: ИГРОВОЕ ПОЛЕ УКЛАДКИ (новое ядро, эпик #7 «Укладка»).
+  Игрок перетаскивает кусочки-полиомино из лотка в силуэт детали корабля,
+  пока не заполнит без дыр. Ни гравитации, ни таймера, ни проигрыша; уложенный
+  кусок можно переложить (VISION). Взрыва/скрапа/HUD-крестовины больше нет.
+
+  ЧЕРНОВИК дизайн-сессии (не утверждён PO). Интерактивен нарочно — чтобы PO
+  пощупал перетаскивание/снап мышью, а не только посмотрел статику.
+
+  КАНОН — только блок «ТОКЕНЫ» в :root (зеркало docs/DESIGN.md). Секция
+  «ПРЕДЛАГАЕМЫЕ НОВЫЕ ТОКЕНЫ» — кандидаты на внесение в DESIGN.md при утверждении.
+  Остальная разметка/скрипт — иллюстрация; значения из них не копировать.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап — Укладка (игровое поле)</title>
+<style>
+  /* ===== ТОКЕНЫ (канон = docs/DESIGN.md, палитра «Ронин» M) ===== */
+  :root {
+    --graphite:      hsl(215, 9%, 31%);  /* GRAF   #484E56 */
+    --graphite-dark: hsl(215, 9%, 26%);  /* GRAF2  #3C4148 */
+    --dark-niche:    hsl(216,11%, 17%);  /* DARK   #272A30 */
+    --hazard-orange: hsl( 23,62%, 46%);  /* ORAN   #BE642D */
+    --rust:          hsl( 19,58%, 38%);  /* RUST   #994C29 */
+    --gunmetal:      hsl(220,10%, 22%);  /* GUN    #32363E */
+    --matte-black:   hsl(220,12%, 13%);  /* BLACKM #1D2025 */
+    --space-bg:      hsl(220,14%,  7%);  /* фон экрана-«космоса» */
+    --board-bg:      hsl(219,13%, 10%);  /* фон поля */
+    --grid-line:     hsla(215, 9%, 60%, .06);
+    --ghost-target:  hsla( 23,62%, 55%, .55); /* пунктир силуэта (мишень) */
+    --hud-icon:      hsl(215, 9%, 72%);
+
+    /* ===== ПРЕДЛАГАЕМЫЕ НОВЫЕ ТОКЕНЫ (внести в DESIGN.md при утверждении) ===== */
+    /* Снап-превью при перетаскивании: кусок ЛЯЖЕТ сюда (валидно) — тёплый акцент,
+       мир «Ронина», а не genre-зелёный. */
+    --drop-ok:       hsla( 23,62%, 55%, .9);
+    --drop-ok-fill:  hsla( 23,62%, 46%, .20);
+    /* Невалидная укладка (за силуэтом / пересечение) — красный тревоги. */
+    --drop-bad:      hsla(  2,60%, 50%, .60);
+    --drop-bad-fill: hsla(  2,60%, 42%, .18);
+    /* Фон лотка — чуть отличен от поля, чтобы «полка» читалась как зона. */
+    --tray-bg:       hsl(220,13%,  9%);
+    /* Собранная деталь — тёплый ободок «готово» (пульс). */
+    --done-glow:     hsla( 30,70%, 60%, .55);
+  }
+
+  /* ===== Декорация мокапа (НЕ канон) ===== */
+  * { box-sizing: border-box; }
+  body { margin:0; background:#101216; font-family:system-ui,sans-serif; color:#cfd4da; padding:20px; }
+  .head { max-width:900px; margin:0 auto 18px; }
+  .head h1 { font-size:17px; margin:0 0 6px; color:#e6ebf0; }
+  .head p { font-size:13px; margin:0 0 6px; color:#8b949e; max-width:660px; line-height:1.55; }
+  .head .try { color:var(--hazard-orange); font-weight:600; }
+  .wrap { display:flex; gap:28px; justify-content:center; align-items:flex-start; flex-wrap:wrap; }
+
+  .device {
+    width:390px; height:844px; position:relative; overflow:hidden; flex:none;
+    background:var(--space-bg); outline:2px solid #3a4047; border-radius:28px;
+    display:flex; flex-direction:column;
+  }
+  .safe { height:50px; flex:none; }
+  .safe.bottom { height:26px; }
+
+  /* --- верхняя панель --- */
+  .topbar { margin:6px 14px 0; height:44px; flex:none;
+            display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .iconbtn { width:40px; height:40px; border-radius:10px; background:var(--matte-black);
+            border:1px solid var(--gunmetal); color:var(--hud-icon); flex:none;
+            display:flex; align-items:center; justify-content:center; font-size:16px; cursor:pointer; }
+  .title { text-align:center; flex:1; min-width:0; }
+  .title .kick { font-size:10px; letter-spacing:.14em; color:#7c848d; }
+  .title .name { font-size:14px; letter-spacing:.08em; color:#d7dde3; margin-top:1px; }
+  /* прогресс сборки детали — заполнение силуэта (не счёт, не таймер) */
+  .prog { margin:8px 14px 0; height:6px; flex:none; border-radius:3px;
+          background:var(--matte-black); border:1px solid var(--gunmetal); overflow:hidden; }
+  .prog > i { display:block; height:100%; width:33%; border-radius:3px;
+          background:linear-gradient(90deg,var(--rust),var(--hazard-orange)); transition:width .18s; }
+  .proglbl { margin:4px 14px 0; font-size:10.5px; letter-spacing:.06em; color:#7c848d; flex:none; }
+
+  /* --- поле (силуэт) --- */
+  .stage { flex:1; position:relative; display:flex; align-items:center; justify-content:center; }
+  .board { position:relative; background:var(--board-bg);
+           border:1px solid var(--gunmetal); border-radius:10px; padding:8px; }
+  .grid { position:relative; }
+  .gcell { position:absolute; }
+  .gcell.void { }                         /* вне силуэта — просто фон-космос */
+  .gcell.target::after { content:""; position:absolute; inset:3px;
+     border:1.5px dashed var(--ghost-target); border-radius:4px;
+     background:hsla(23,62%,46%,.05); }
+  /* снап-превью (валидно / нет) — рисуется поверх целевых клеток при драге */
+  .gcell.ok::after   { border:2px solid var(--drop-ok);  background:var(--drop-ok-fill);  border-style:solid; }
+  .gcell.bad::after  { content:""; position:absolute; inset:3px; border-radius:4px;
+     border:2px solid var(--drop-bad); background:var(--drop-bad-fill); }
+
+  /* уложенный блок — воксель, красится материалом детали (GUN) */
+  .blk { position:absolute; border-radius:4px; background:var(--gunmetal);
+     box-shadow: inset 0 4px 0 rgba(255,255,255,.09), inset 0 -4px 0 rgba(0,0,0,.35),
+                 inset 4px 0 0 rgba(255,255,255,.04), inset -4px 0 0 rgba(0,0,0,.18); cursor:grab; }
+  .blk::before { content:""; position:absolute; top:5px; left:5px; width:4px; height:4px;
+     border-radius:50%; background:rgba(0,0,0,.45); }  /* ривет (демо: 1 угол) */
+  .blk.placed { animation:pop .18s ease; }
+  @keyframes pop { from { transform:scale(.8); opacity:.4; } to { transform:scale(1); opacity:1; } }
+
+  /* сырой кусок (в лотке / в руке) — графит, тёплая кромка «активен» */
+  .raw { background:var(--graphite);
+     box-shadow: inset 0 4px 0 rgba(255,255,255,.12), inset 0 -4px 0 rgba(0,0,0,.35),
+                 inset 4px 0 0 rgba(255,255,255,.05), inset -4px 0 0 rgba(0,0,0,.2); }
+
+  /* --- лоток --- */
+  .tray { flex:none; margin:0 12px; padding:12px 6px; min-height:118px;
+          background:var(--tray-bg); border:1px solid var(--gunmetal);
+          border-radius:14px 14px 0 0; }
+  .tray .row { display:flex; gap:14px; overflow-x:auto; padding:0 8px 6px;
+          scrollbar-width:thin; }
+  .tray.slots .row { justify-content:center; overflow:visible; }
+  .piece { position:relative; flex:none; cursor:grab; touch-action:none;
+          filter:drop-shadow(0 3px 4px rgba(0,0,0,.4)); }
+  .piece:active { cursor:grabbing; }
+  .piece .pc { position:absolute; border-radius:3px; }
+  .tray.slots .slot { width:88px; height:88px; border-radius:10px; flex:none;
+          background:var(--matte-black); border:1px dashed var(--gunmetal);
+          display:flex; align-items:center; justify-content:center; }
+  .traylbl { text-align:center; font-size:10px; letter-spacing:.1em; color:#6c747d;
+          margin-top:2px; }
+  .more { align-self:center; font-size:11px; color:#8b949e; padding:0 6px; white-space:nowrap; }
+
+  /* «деталь собрана» */
+  .done { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+          background:radial-gradient(circle at 50% 45%, hsla(23,62%,30%,.28), transparent 60%);
+          pointer-events:none; }
+  .done.on { display:flex; }
+  .done .card { text-align:center; background:hsla(220,14%,7%,.82); padding:14px 24px;
+          border-radius:12px; border:1px solid var(--hazard-orange); box-shadow:0 0 24px var(--done-glow); }
+  .done .badge { font-size:13px; letter-spacing:.24em; color:var(--hazard-orange);
+          text-shadow:0 0 12px var(--done-glow); }
+  .board.complete { box-shadow:0 0 0 2px var(--done-glow), 0 0 26px var(--done-glow);
+          animation:pulse 1.6s ease-in-out infinite; }
+  @keyframes pulse { 0%,100%{box-shadow:0 0 0 2px var(--done-glow),0 0 18px var(--done-glow);}
+          50%{box-shadow:0 0 0 2px var(--done-glow),0 0 34px var(--done-glow);} }
+
+  /* слой перетаскивания */
+  #dragLayer { position:fixed; inset:0; pointer-events:none; z-index:50; }
+  #dragLayer .piece { position:absolute; filter:drop-shadow(0 10px 14px rgba(0,0,0,.6)); }
+
+  /* --- панель управления мокапом --- */
+  .panel { width:300px; background:#161b22; border:1px solid #2d333b; border-radius:12px; padding:16px; }
+  .panel h2 { font-size:12px; margin:0 0 12px; color:var(--hazard-orange); letter-spacing:.06em; }
+  .panel p { font-size:12px; color:#aeb6bf; line-height:1.5; margin:0 0 12px; }
+  .panel b { color:#e6ebf0; }
+  .toggle { display:flex; gap:8px; margin-bottom:14px; }
+  .toggle button { flex:1; padding:9px 6px; font-size:11px; letter-spacing:.04em; cursor:pointer;
+          background:var(--matte-black); color:#aeb6bf; border:1px solid var(--gunmetal);
+          border-radius:8px; }
+  .toggle button.on { border-color:var(--hazard-orange); color:#f0d6c2;
+          box-shadow:inset 0 0 0 1px var(--hazard-orange); }
+  .resetbtn { width:100%; padding:9px; font-size:11px; cursor:pointer; letter-spacing:.06em;
+          background:var(--dark-niche); color:#cbd2d9; border:1px solid var(--gunmetal); border-radius:8px; }
+  .hint { font-size:11px; color:#7c848d; line-height:1.5; margin-top:12px;
+          border-top:1px solid #2d333b; padding-top:10px; }
+
+  .note { position:absolute; max-width:150px; padding:4px 7px;
+     background:#2a1520; color:#f8a; font-size:10.5px; line-height:1.35;
+     border:1px dashed #f8a; border-radius:5px; z-index:10; }
+
+  /* ===== каталог элементов ===== */
+  .catalog { max-width:900px; margin:26px auto 0; }
+  .catalog h2 { font-size:14px; color:var(--hazard-orange); letter-spacing:.05em; margin:0 0 4px; }
+  .catalog > p { font-size:12px; color:#8b949e; margin:0 0 16px; line-height:1.5; }
+  .elgrid { display:flex; flex-wrap:wrap; gap:18px 16px; }
+  .el { width:150px; }
+  .el .frame { height:96px; display:flex; align-items:center; justify-content:center;
+     background:var(--board-bg); border:1px solid #21262c; border-radius:8px; position:relative; }
+  .el .name { font-size:11px; color:var(--hazard-orange); letter-spacing:.05em; margin:8px 0 3px; font-weight:700; }
+  .el .an { font-size:10.5px; color:#8b949e; line-height:1.45; }
+  /* большая клетка ×2 (база 34px → показ 68px) */
+  .bc { position:relative; width:68px; height:68px; background:var(--board-bg); border:1px solid #21262c; }
+  .bc.grid2 { border-right:2px solid hsla(215,9%,60%,.12); border-bottom:2px solid hsla(215,9%,60%,.12); }
+  .bc.tgt::after { content:""; position:absolute; inset:6px; border:3px dashed var(--ghost-target);
+     border-radius:6px; background:hsla(23,62%,46%,.05); }
+  .bc.ok2::after { content:""; position:absolute; inset:6px; border:3px solid var(--drop-ok);
+     border-radius:6px; background:var(--drop-ok-fill); }
+  .bc.bad2::after { content:""; position:absolute; inset:6px; border:3px solid var(--drop-bad);
+     border-radius:6px; background:var(--drop-bad-fill); }
+  .bblk { position:absolute; inset:2px; border-radius:6px; background:var(--gunmetal);
+     box-shadow: inset 0 6px 0 rgba(255,255,255,.09), inset 0 -6px 0 rgba(0,0,0,.35),
+                 inset 6px 0 0 rgba(255,255,255,.04), inset -6px 0 0 rgba(0,0,0,.18); }
+  .bblk::before { content:""; position:absolute; top:8px; left:8px; width:6px; height:6px;
+     border-radius:50%; background:rgba(0,0,0,.45); }
+  .bblk.raw2 { background:var(--graphite);
+     box-shadow: inset 0 6px 0 rgba(255,255,255,.12), inset 0 -6px 0 rgba(0,0,0,.35),
+                 inset 6px 0 0 rgba(255,255,255,.05), inset -6px 0 0 rgba(0,0,0,.2); }
+  .minipiece { position:relative; }
+  .minipiece .m { position:absolute; border-radius:3px; background:var(--graphite);
+     box-shadow: inset 0 3px 0 rgba(255,255,255,.12), inset 0 -3px 0 rgba(0,0,0,.35); }
+  .minipiece.lift { filter:drop-shadow(0 8px 10px rgba(0,0,0,.6)); }
+</style>
+</head>
+<body>
+
+<div class="head">
+  <h1>Укладка — игровое поле (черновик дизайн-сессии, эпик #7)</h1>
+  <p>Новое ядро: тянешь кусочек-полиомино из лотка в силуэт детали, пока не
+     заполнишь без дыр. Ни таймера, ни проигрыша; уложенный кусок можно поднять
+     и переложить. Взрыв / scrap / HUD-крестовина старого ядра — убраны.</p>
+  <p class="try">↓ Пощупай: тащи кусочки мышью в силуэт. Кусок «всплывает» над
+     курсором (палец не закрывает). Оранжевый контур — ляжет, красный — нельзя.
+     Уложенный блок тоже можно подхватить. Справа — тумблер подачи и сброс.</p>
+</div>
+
+<div class="wrap">
+
+  <div class="device">
+    <div class="safe"></div>
+
+    <div class="topbar">
+      <div class="iconbtn" title="меню/чит-меню">≡</div>
+      <div class="title">
+        <div class="kick">ДЕТАЛЬ 4 / 7</div>
+        <div class="name">РЕАКТОР</div>
+      </div>
+      <div class="iconbtn" title="назад к кораблю">◱</div>
+    </div>
+
+    <div class="prog"><i id="progBar"></i></div>
+    <div class="proglbl" id="progLbl">уложено 0 / 6 кусков</div>
+
+    <div class="stage">
+      <div class="board" id="board">
+        <div class="grid" id="grid"></div>
+        <div class="done" id="done"><div class="card"><div class="badge">ДЕТАЛЬ СОБРАНА</div></div></div>
+      </div>
+    </div>
+
+    <div class="tray" id="tray">
+      <div class="row" id="trayRow"></div>
+    </div>
+    <div class="traylbl" id="trayLbl">ЛОТОК · ПОЛНЫЙ НАБОР</div>
+    <div class="safe bottom"></div>
+  </div>
+
+  <div class="panel">
+    <h2>ПАНЕЛЬ МОКАПА</h2>
+    <p><b>Подача кусочков</b> — тумблер чит-меню дев-сборки (VISION): полный набор
+       на виду против порционного лотка-3. Вердикт — PO пальцами на устройстве.</p>
+    <div class="toggle">
+      <button id="mFull" class="on">Полный набор</button>
+      <button id="mThree">Лоток-3</button>
+    </div>
+    <button class="resetbtn" id="reset">↺ Сбросить деталь</button>
+    <div class="hint">Кусок кладётся, если ВСЕ его клетки попадают в силуэт и не
+       пересекают уже уложенное. Иначе — возвращается в лоток. Порядок укладки
+       свободный; «неудобно легло» — подними и переложи.</div>
+  </div>
+
+</div>
+
+<!-- ===== КАТАЛОГ ЭЛЕМЕНТОВ (канон; якоря для ТЗ) ===== -->
+<div class="catalog">
+  <h2>Каталог элементов — укладка</h2>
+  <p>Каждый повторяемый/динамический элемент — отдельно и крупно. ТЗ ссылается на
+     имя-якорь, не на «как в общем кадре». Размеры даны при клетке 34&nbsp;px.
+     Клетка <b>el-block</b> «Ронина» переиспользуется как есть (материал детали);
+     scrap / armed / ember старого ядра в укладке <b>не используются</b>.</p>
+
+  <div class="elgrid">
+
+    <div class="el" id="el-cell-target">
+      <div class="frame"><div class="bc grid2 tgt"></div></div>
+      <div class="name">el-cell-target</div>
+      <div class="an">Пустая клетка силуэта — цель. Пунктир hazard-оранжевым
+         (токен <code>ghostTarget</code>), лёгкая заливка. Сумма таких клеток =
+         форма детали.</div>
+    </div>
+
+    <div class="el" id="el-cell-void">
+      <div class="frame"><div class="bc grid2"></div></div>
+      <div class="name">el-cell-void</div>
+      <div class="an">Клетка вне силуэта. Просто фон поля, без пунктира —
+         сюда класть нельзя. Границы силуэта = граница между target и void.</div>
+    </div>
+
+    <div class="el" id="el-cell-filled">
+      <div class="frame"><div class="bc grid2"><div class="bblk"></div></div></div>
+      <div class="name">el-cell-filled</div>
+      <div class="an">Уложенная клетка. Красится материалом детали (здесь GUN),
+         воксель-фаска + ривет = <b>el-block</b> из docs/DESIGN.md.</div>
+    </div>
+
+    <div class="el" id="el-piece-tray">
+      <div class="frame">
+        <div class="minipiece" style="width:68px;height:68px">
+          <div class="m" style="left:0;top:0;width:32px;height:32px"></div>
+          <div class="m" style="left:34px;top:0;width:32px;height:32px"></div>
+          <div class="m" style="left:0;top:34px;width:32px;height:32px"></div>
+        </div>
+      </div>
+      <div class="name">el-piece-tray</div>
+      <div class="an">Кусок в лотке — «сырой» графит (<code>graphite</code>),
+         масштаб уменьшен (клетка ~28&nbsp;px). Тень отрывает от полки.</div>
+    </div>
+
+    <div class="el" id="el-piece-drag">
+      <div class="frame">
+        <div class="minipiece lift" style="width:68px;height:68px">
+          <div class="m raw-edge" style="left:0;top:0;width:32px;height:32px"></div>
+          <div class="m raw-edge" style="left:34px;top:0;width:32px;height:32px"></div>
+          <div class="m raw-edge" style="left:0;top:34px;width:32px;height:32px"></div>
+        </div>
+      </div>
+      <div class="name">el-piece-drag</div>
+      <div class="an">Кусок в руке — полный масштаб клетки (34&nbsp;px), «всплыл»
+         над пальцем (офсет ~1 клетка вверх), усиленная тень подъёма.</div>
+    </div>
+
+    <div class="el" id="el-drop-ok">
+      <div class="frame"><div class="bc grid2 ok2"></div></div>
+      <div class="name">el-drop-ok</div>
+      <div class="an">Снап-превью: кусок ЛЯЖЕТ. Сплошной тёплый контур
+         (<code>dropOk</code>) + заливка по всем клеткам будущего места.</div>
+    </div>
+
+    <div class="el" id="el-drop-bad">
+      <div class="frame"><div class="bc grid2 bad2"></div></div>
+      <div class="name">el-drop-bad</div>
+      <div class="an">Снап-превью: класть НЕЛЬЗЯ (за силуэтом / пересечение).
+         Красный контур+заливка (<code>dropBad</code>). Отпустил — вернулся в лоток.</div>
+    </div>
+
+  </div>
+</div>
+
+<div id="dragLayer"></div>
+
+<script>
+/* ================= ИНТЕРАКТИВ МОКАПА (иллюстрация, не прод-код) ================= */
+const CELL = 40;
+const MASK = [
+  "..TT..",
+  ".TTTT.",
+  "TTTTTT",
+  "TTTTTT",
+  ".TTTT.",
+  "..TT..",
+];
+const ROWS = MASK.length, COLS = MASK[0].length;
+
+// естественная нарезка силуэта (решение по построению); id + клетки (норм. 0..)
+const PIECES = [
+  {id:"A", cells:[[0,0],[1,0],[0,1],[1,1]]},           // O
+  {id:"B", cells:[[1,0],[0,1],[1,1],[0,2]]},           // S
+  {id:"C", cells:[[0,0],[0,1],[1,1],[1,2]]},           // Z
+  {id:"D", cells:[[1,0],[0,1],[1,1],[0,2]]},           // S (зерк.)
+  {id:"E", cells:[[0,0],[0,1],[1,1],[1,2]]},           // Z (зерк.)
+  {id:"F", cells:[[0,0],[1,0],[0,1],[1,1]]},           // O
+];
+
+const grid = document.getElementById("grid");
+const board = document.getElementById("board");
+const trayRow = document.getElementById("trayRow");
+const trayEl = document.getElementById("tray");
+const trayLbl = document.getElementById("trayLbl");
+const dragLayer = document.getElementById("dragLayer");
+const progBar = document.getElementById("progBar");
+const progLbl = document.getElementById("progLbl");
+const doneEl = document.getElementById("done");
+
+grid.style.width = COLS*CELL + "px";
+grid.style.height = ROWS*CELL + "px";
+
+let feed = "full";           // "full" | "three"
+let remaining = [];          // куски в лотке (id-список)
+let occ = {};                // "c,r" -> pieceId (уложено)
+let placedCells = {};        // pieceId -> [[c,r]...] абсолютные
+
+function isTarget(c,r){ return r>=0 && r<ROWS && c>=0 && c<COLS && MASK[r][c]==="T"; }
+function key(c,r){ return c+","+r; }
+const pieceById = id => PIECES.find(p=>p.id===id);
+
+/* ---- поле ---- */
+function buildGrid(){
+  grid.innerHTML = "";
+  for(let r=0;r<ROWS;r++) for(let c=0;c<COLS;c++){
+    const d=document.createElement("div");
+    d.className="gcell "+(isTarget(c,r)?"target":"void");
+    d.style.cssText=`left:${c*CELL}px;top:${r*CELL}px;width:${CELL}px;height:${CELL}px;position:absolute`;
+    d.dataset.c=c; d.dataset.r=r;
+    grid.appendChild(d);
+  }
+}
+function cellAt(c,r){ return grid.querySelector(`.gcell[data-c="${c}"][data-r="${r}"]`); }
+
+function renderPlaced(){
+  grid.querySelectorAll(".blk").forEach(b=>b.remove());
+  for(const id in placedCells){
+    for(const [c,r] of placedCells[id]){
+      const b=document.createElement("div");
+      b.className="blk placed"; b.dataset.pid=id;
+      b.style.cssText=`left:${c*CELL+2}px;top:${r*CELL+2}px;width:${CELL-4}px;height:${CELL-4}px;position:absolute`;
+      grid.appendChild(b);
+    }
+  }
+}
+
+/* ---- лоток ---- */
+function pieceExtent(cells){
+  let mc=0,mr=0; for(const [c,r] of cells){ mc=Math.max(mc,c); mr=Math.max(mr,r); }
+  return {w:mc+1,h:mr+1};
+}
+function makePieceEl(id, cell, cls){
+  const p=pieceById(id), {w,h}=pieceExtent(p.cells);
+  const el=document.createElement("div");
+  el.className="piece"; el.dataset.pid=id;
+  el.style.width=w*cell+"px"; el.style.height=h*cell+"px";
+  for(const [c,r] of p.cells){
+    const m=document.createElement("div");
+    m.className="pc raw";
+    m.style.cssText=`left:${c*cell}px;top:${r*cell}px;width:${cell-2}px;height:${cell-2}px;position:absolute`;
+    el.appendChild(m);
+  }
+  if(cls) el.classList.add(cls);
+  return el;
+}
+function renderTray(){
+  trayRow.innerHTML="";
+  const trayCell = 28;
+  const visible = feed==="three" ? remaining.slice(0,3) : remaining;
+  if(feed==="three"){
+    trayEl.classList.add("slots");
+    for(let i=0;i<3;i++){
+      const slot=document.createElement("div"); slot.className="slot";
+      if(visible[i]){ const el=makePieceEl(visible[i],trayCell); attachDrag(el); slot.appendChild(el); }
+      trayRow.appendChild(slot);
+    }
+    const rest = remaining.length-3;
+    if(rest>0){ const m=document.createElement("div"); m.className="more"; m.textContent="+"+rest; trayRow.appendChild(m); }
+    trayLbl.textContent = "ЛОТОК · ПОРЦИЯ-3";
+  } else {
+    trayEl.classList.remove("slots");
+    for(const id of visible){ const el=makePieceEl(id,trayCell); attachDrag(el); trayRow.appendChild(el); }
+    trayLbl.textContent = "ЛОТОК · ПОЛНЫЙ НАБОР";
+  }
+}
+
+/* ---- прогресс / готовность ---- */
+function targetCount(){ let n=0; for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++) if(isTarget(c,r)) n++; return n; }
+const TARGET_TOTAL = targetCount();
+function updateProgress(){
+  const placedN = Object.keys(placedCells).length;
+  const filled = Object.keys(occ).length;
+  progBar.style.width = Math.round(filled/TARGET_TOTAL*100)+"%";
+  progLbl.textContent = `уложено ${placedN} / ${PIECES.length} кусков`;
+  const complete = filled===TARGET_TOTAL;
+  doneEl.classList.toggle("on", complete);
+  board.classList.toggle("complete", complete);
+}
+
+/* ---- перетаскивание (сырые pointer-события; офсет над пальцем) ---- */
+let drag=null;
+function attachDrag(el){ el.addEventListener("pointerdown", e=>startDrag(e, el.dataset.pid, "tray")); }
+grid.addEventListener("pointerdown", e=>{
+  const b=e.target.closest(".blk"); if(!b) return;
+  const id=b.dataset.pid;
+  // поднять уложенный кусок обратно в руку
+  liftPlaced(id);
+  startDrag(e, id, "board");
+});
+
+function liftPlaced(id){
+  delete placedCells[id];
+  for(const k in occ){ if(occ[k]===id) delete occ[k]; }
+  if(!remaining.includes(id)) remaining.unshift(id);
+  renderPlaced(); renderTray(); updateProgress();
+}
+
+function startDrag(e, id, from){
+  e.preventDefault();
+  remaining = remaining.filter(x=>x!==id);
+  renderTray();
+  const ghost = makePieceEl(id, CELL);
+  dragLayer.appendChild(ghost);
+  const {w,h}=pieceExtent(pieceById(id).cells);
+  drag = { id, ghost, w, h, pw:w*CELL, ph:h*CELL, valid:false, anchor:null };
+  moveDrag(e);
+  window.addEventListener("pointermove", moveDrag);
+  window.addEventListener("pointerup", endDrag);
+}
+function moveDrag(e){
+  if(!drag) return;
+  // офсет: кусок «всплывает» над пальцем (по центру X, выше по Y на ~1 клетку)
+  const LIFT = CELL*1.1;
+  const left = e.clientX - drag.pw/2;
+  const top  = e.clientY - drag.ph - LIFT;
+  drag.ghost.style.left=left+"px"; drag.ghost.style.top=top+"px";
+  // снап: клетка поля под верх-левым углом куска
+  const grect = grid.getBoundingClientRect();
+  const ac = Math.round((left - grect.left)/CELL);
+  const ar = Math.round((top - grect.top)/CELL);
+  const cells = pieceById(drag.id).cells.map(([c,r])=>[c+ac, r+ar]);
+  const valid = cells.every(([c,r])=> isTarget(c,r) && !occ[key(c,r)]);
+  clearHints();
+  const near = ac>-2 && ac<COLS+1 && ar>-2 && ar<ROWS+1;
+  if(near){
+    for(const [c,r] of cells){ const cell=cellAt(c,r); if(cell) cell.classList.add(valid?"ok":"bad"); }
+  }
+  drag.valid = valid && near; drag.anchor=[ac,ar]; drag.cells=cells;
+}
+function endDrag(e){
+  window.removeEventListener("pointermove", moveDrag);
+  window.removeEventListener("pointerup", endDrag);
+  clearHints();
+  const d=drag; drag=null;
+  d.ghost.remove();
+  if(d.valid){
+    placedCells[d.id]=d.cells;
+    for(const [c,r] of d.cells) occ[key(c,r)]=d.id;
+    renderPlaced();
+  } else {
+    if(!remaining.includes(d.id)) remaining.push(d.id);
+  }
+  renderTray(); updateProgress();
+}
+function clearHints(){ grid.querySelectorAll(".gcell.ok,.gcell.bad").forEach(c=>c.classList.remove("ok","bad")); }
+
+/* ---- управление мокапом ---- */
+function resetAll(){
+  occ={}; placedCells={}; remaining=PIECES.map(p=>p.id);
+  buildGrid(); renderPlaced(); renderTray(); updateProgress();
+}
+document.getElementById("reset").onclick=resetAll;
+document.getElementById("mFull").onclick=()=>{ feed="full";
+  document.getElementById("mFull").classList.add("on"); document.getElementById("mThree").classList.remove("on"); renderTray(); };
+document.getElementById("mThree").onclick=()=>{ feed="three";
+  document.getElementById("mThree").classList.add("on"); document.getElementById("mFull").classList.remove("on"); renderTray(); };
+
+resetAll();
+</script>
+
+</body>
+</html>
