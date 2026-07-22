@@ -315,7 +315,24 @@ _Закрыт._ Решение PO 2026-07-20: **(A) дизайн-сессия с
   прототип удалён, читы под новое ядро); `analyze` 0, `test` зелёный.
 
 ### T3 — Выпил старого игрового UI: `BoardPainter`, `GameHud`, осиротевшие скины
-- **Статус:** не начата
+- **Статус:** сделана (2026-07-22). Удалены `lib/presentation/widgets/board_painter.dart`,
+  `lib/presentation/widgets/hud.dart` + тесты `board_painter_test.dart`/`hud_test.dart`.
+  Grep-гейт по `lib/`, `test/`, `tool/` подтвердил чистоту — удалены осиротевшие
+  скины `theme/level_skin.dart` (+ тест), `theme/scrap_block_skin.dart` (+ тест) и
+  `HaloHighlightOverlay` (из `theme/overlays.dart`, статик-поле `BlockTheme.haloHighlight`
+  из `block_theme.dart`) — единственным потребителем всех троих был `BoardPainter`.
+  `GhostTargetOverlay` оставлен (нужен `PackingPainter`). `canister_charge_painter.dart`
+  (+ `ChargeIconState`) **оставлен намеренно** — его единственный оставшийся
+  потребитель `tool/generate_app_icon.dart` (генератор иконки приложения), grep по
+  `lib/`/`test/` был бы ложным сигналом «осиротел». `block_material`/`block_paint_utils`
+  (`paintElBlock` для `PackingPainter`)/`ship_materials`/`overlays.dart`
+  (`GhostTargetOverlay`) не тронуты. Проверка: `flutter analyze` → «No issues found!»
+  (0); `flutter test` → 353/353 зелёных (было 381; −28 из 4 удалённых тестовых файлов);
+  `grep -rn "BoardPainter\|GameHud\|board_painter\|hud.dart" lib test` — только
+  doc-комментарии/паспорта (историческая справка, не живые импорты), 0 живых ссылок.
+  Паспорта `lib/presentation/widgets/README.md` и `lib/presentation/theme/README.md`
+  обновлены (удалённые файлы, актуальные «Зависит от»/«От него зависят»). Старое
+  ядро-движок (`game`/`rules`/`models`) не тронуто — его выпил в T4.
 - **Рекомендованный агент:** Исполнитель · Claude (Sonnet, `ispolnitel`)
 - **Цель:** удалить из presentation-слоя виджеты старого тетрис-ядра и их
   тесты + скины темы, ставшие ничьими после T2 — без зомби-кода.

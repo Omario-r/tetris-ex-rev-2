@@ -28,9 +28,6 @@ class BlockTheme {
   /// Ghost overlay for unfilled target cells.
   static const GhostTargetOverlay ghostTarget = GhostTargetOverlay();
 
-  /// Warm overlay for occupied halo cells.
-  static const HaloHighlightOverlay haloHighlight = HaloHighlightOverlay();
-
   /// Returns the skin for [material].
   BlockSkin of(BlockMaterial material) => _skins[material]!;
 
