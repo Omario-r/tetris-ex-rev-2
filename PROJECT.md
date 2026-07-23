@@ -62,7 +62,8 @@ HANDOFF-цепочка работает, но опыт PO негативный �
 
 ## Синхронизация
 
-- Синхронизировано с шаблоном @ `a4f2a57` (2026-07-19). Дополнительно доставлены
+- Синхронизировано с шаблоном @ `6cf708b` (2026-07-23). Дополнительно доставлены
   внесинхронные файлы: `CLAUDE.md` (маршрут Методолога), `.claude/settings.json`
-  (политика команд; `flutter analyze`/`flutter test` — в преднаборе allowlist),
-  `.claude/agents/critic.md` (тонкая карточка → канон `system/CRITIC.md`).
+  (политика команд; `flutter analyze`/`flutter test` — в преднаборе allowlist,
+  `git rm`/`git mv` — в allow с 2026-07-23), `.claude/agents/critic.md` (тонкая
+  карточка → канон `system/CRITIC.md`).
