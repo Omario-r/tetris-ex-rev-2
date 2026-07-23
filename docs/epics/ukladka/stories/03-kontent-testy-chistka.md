@@ -121,7 +121,29 @@ _нет_
 - **DoD задачи:** оба теста в проекте, зелёные; строка паспорта `data` обновлена.
 
 ### T2 — Чистка движка: `halo`/`rotation`/`Board`/слим шаблона уровня
-- **Статус:** не начата
+- **Статус:** сделана (2026-07-23). Grep-гейт по `lib`/`test`/`tool` перед каждым
+  удалением подтвердил единственного потребителя (карта Постановщика верна) —
+  эскалаций не потребовалось; `moveLimit` тоже удалён (живых чтений нет).
+  Удалено: `lib/game_engine/rules/` целиком (`halo.dart`, `rotation.dart`,
+  `README.md`), `lib/game_engine/models/board.dart`, `test/game_engine/rules/`
+  (`halo_test.dart`, `rotation_test.dart`), `test/game_engine/models/board_test.dart`;
+  `models/level_template.dart` слим (без `S`/`H`/`chargeBudget`/`moveLimit`, без
+  импорта `rules/halo`); `data/level_map.dart` без `_baseChargeBudgets`/
+  `_poComfortBuffer`/`_chargeBudgets`/`chargeBudget:`. Тесты адаптированы:
+  `level_template_test.dart` — группы `S`/`H`/«касание дна» составляли весь файл,
+  удалены целиком (`void main() {}`, 0 тестов); `level_map_test.dart` — тест
+  «halo H не пересекается с мишенью S» удалён, ассерты формы/центровки/масок
+  остались. `flutter analyze` — 0. `flutter test` — 209/209 зелёных (было 252,
+  минус удалённые тесты halo/rotation/board/S-H). Grep-гейт DoD
+  (`halo|HaloCalculator|checkWin|rotation.dart|chargeBudget|Board(` по `lib test`) —
+  живых ссылок нет (остались только исторические README-заметки и несвязанные
+  совпадения: `_buildBoard`/`BoardPainter` в `game_screen.dart`, слово «halo» как
+  название glow-эффекта в `theme/block_paint_utils.dart`/`canister_charge_painter.dart`).
+  Арх-дельта применена (`docs/ARCHITECTURE.md`: строка `rules` снята, `models` —
+  «Структуры данных ядра (маска мишени, шаблон уровня)» без зависимостей,
+  сноска ¹ о цикле `models↔rules` снята (② перенумерована в ¹), схема связей —
+  `packing ──► models ◄── data`, `application → data`). Паспорта `models`/`data`
+  обновлены (см. `lib/game_engine/models/README.md`, `lib/game_engine/data/README.md`).
 - **Рекомендованный агент:** Исполнитель · Claude (Sonnet, `ispolnitel`)
 - **Цель:** удалить последние остатки старого ядра из `game_engine`: halo-логику
   победы, стуб вращения, поле `Board`, мёртвые поля шаблона уровня и бюджеты

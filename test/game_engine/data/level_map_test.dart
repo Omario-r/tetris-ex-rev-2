@@ -80,10 +80,6 @@ void main() {
         expect(seen.length, equals(set.length),
             reason: 'мишень $i распадается на несвязные части');
       });
-
-      test('уровень $i: halo H не пересекается с мишенью S', () {
-        expect(level.H.intersection(level.S), isEmpty);
-      });
     }
   });
 }

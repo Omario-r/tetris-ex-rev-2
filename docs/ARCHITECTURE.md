@@ -12,21 +12,15 @@
 
 | Модуль | Путь | Назначение (1 строка) | Зависит от |
 |--------|------|----------------------|------------|
-| models | `lib/game_engine/models/` | Структуры данных ядра (поле, маска, шаблоны уровня/объекта) | rules ¹ |
-| rules | `lib/game_engine/rules/` | Чистые правила: halo/победа (+ мёртвый стуб `rotation` — выпил в Стори 03) | models ¹ |
+| models | `lib/game_engine/models/` | Структуры данных ядра (маска мишени, шаблон уровня) | — |
 | packing | `lib/game_engine/packing/` | Ядро укладки — основной движок игры: полиомино-кусок, состояние (силуэт+размещённые+лоток), валидация/завершение, нарезка силуэта | models |
 | data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (`ShipParts.parts.length` уровней, v1=7) | models |
-| application | `lib/application/` | Персист прогресса (`ProgressService`) | data ² |
+| application | `lib/application/` | Персист прогресса (`ProgressService`) | data ¹ |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
 | widgets | `lib/presentation/widgets/` | Пейнтеры укладки и корабля | packing, data, theme |
 | screens | `lib/presentation/screens/` | Экраны + композиционный корень партии укладки | packing, models, data, application, theme, widgets |
 
-¹ **models ↔ rules — взаимная зависимость:** `models/level_template` при создании зовёт
-`rules/halo` (`computeHalo8`), а `rules/halo` работает над `models` (`Board` в `checkWin`).
-Цикл на уровне модулей; допустим в Dart, но держать в уме при рефакторинге (см. BACKLOG;
-кандидат на развязку при зачистке Стори 03 эпика «Укладка»).
-
-² **application → game_engine/data:** `ProgressService._max` берёт `ShipParts.parts.length - 1`
+¹ **application → game_engine/data:** `ProgressService._max` берёт `ShipParts.parts.length - 1`
 (единый источник истины числа уровней) вместо хардкода — импорт строго вниз по слоям, разрешён
 (hotfix 2026-07-11: хардкод `15` разошёлся с реальным числом уровней после эпика «Контент» и
 ронял приложение на холодном старте с устаревшим persist-значением).
@@ -44,10 +38,10 @@ lib/main.dart (вход)
         ▼                                    │
    application  ◄────────────────────────────┘ (screens → ProgressService)
         │
-        ▼  (ProgressService._max ← ShipParts.parts.length, см. ²)
-   game_engine:  packing ──► models ◄──► rules
-                               ▲
-                      data ────┘  ◄──── application
+        ▼  (ProgressService._max ← ShipParts.parts.length, см. ¹)
+   game_engine:  packing ──► models ◄── data
+                                        ▲
+                                        application
 ```
 
 - packing ──► models (`TargetMask` как силуэт) — ядро укладки, **основной движок
