@@ -17,10 +17,7 @@ PackState _twoPieceState() {
   const silhouette = TargetMask(width: 2, height: 1, mask: 0x3);
   return const PackState(
     silhouette: silhouette,
-    placements: {
-      1: (x: 0, y: 0),
-      2: (x: 1, y: 0),
-    },
+    placements: {1: (x: 0, y: 0), 2: (x: 1, y: 0)},
     pieces: [
       PackPiece(id: 1, cells: [(x: 0, y: 0)]),
       PackPiece(id: 2, cells: [(x: 0, y: 0)]),
@@ -46,8 +43,12 @@ Future<(int, int, int, int)> _samplePixel(
   final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
   final data = byteData!;
   final i = (y * width + x) * 4;
-  return (data.getUint8(i), data.getUint8(i + 1), data.getUint8(i + 2),
-      data.getUint8(i + 3));
+  return (
+    data.getUint8(i),
+    data.getUint8(i + 1),
+    data.getUint8(i + 2),
+    data.getUint8(i + 3),
+  );
 }
 
 void main() {
@@ -76,13 +77,23 @@ void main() {
         255,
       );
 
-      expect(cell0, equals(expected),
-          reason: 'клетка кусочка id 1 должна быть покрашена partMaterial');
-      expect(cell1, equals(expected),
-          reason: 'клетка кусочка id 2 должна быть покрашена ТЕМ ЖЕ '
-              'partMaterial, а не циклической палитрой по pieceId');
-      expect(cell0, equals(cell1),
-          reason: 'единый материал детали — все уложенные клетки одного цвета');
+      expect(
+        cell0,
+        equals(expected),
+        reason: 'клетка кусочка id 1 должна быть покрашена partMaterial',
+      );
+      expect(
+        cell1,
+        equals(expected),
+        reason:
+            'клетка кусочка id 2 должна быть покрашена ТЕМ ЖЕ '
+            'partMaterial, а не циклической палитрой по pieceId',
+      );
+      expect(
+        cell0,
+        equals(cell1),
+        reason: 'единый материал детали — все уложенные клетки одного цвета',
+      );
     });
 
     test('без partMaterial (null) — прежнее поведение: не падает, материалы '
@@ -135,10 +146,7 @@ void main() {
         state: emptyState(),
         cellSize: 34.0,
         shipMaterials: ShipMaterials.defaultMaterials,
-        dragPreview: const PackDragPreview(
-          cells: [(x: 2, y: 2)],
-          valid: false,
-        ),
+        dragPreview: const PackDragPreview(cells: [(x: 2, y: 2)], valid: false),
       );
 
       expect(
@@ -173,12 +181,21 @@ void main() {
         dragPreview: const PackDragPreview(cells: [(x: 0, y: 0)], valid: true),
       );
 
-      expect(withValidPreview.shouldRepaint(withoutPreview), isTrue,
-          reason: 'null → превью — должен перерисоваться');
-      expect(withInvalidPreview.shouldRepaint(withValidPreview), isTrue,
-          reason: 'смена valid true→false — должен перерисоваться');
-      expect(withSameValidPreview.shouldRepaint(withValidPreview), isFalse,
-          reason: 'равный по значению PackDragPreview — repaint не нужен');
+      expect(
+        withValidPreview.shouldRepaint(withoutPreview),
+        isTrue,
+        reason: 'null → превью — должен перерисоваться',
+      );
+      expect(
+        withInvalidPreview.shouldRepaint(withValidPreview),
+        isTrue,
+        reason: 'смена valid true→false — должен перерисоваться',
+      );
+      expect(
+        withSameValidPreview.shouldRepaint(withValidPreview),
+        isFalse,
+        reason: 'равный по значению PackDragPreview — repaint не нужен',
+      );
     });
 
     test('клетки у краёв поля (углы силуэта) — рисует плашку без исключений '
@@ -220,6 +237,62 @@ void main() {
 
       expect(withMaterial.shouldRepaint(withoutMaterial), isTrue);
       expect(withoutMaterial.shouldRepaint(withMaterial), isTrue);
+    });
+  });
+
+  group('PackingPainter.occupiedCellsExcluding (возврат Стори 04 T5 — '
+      'ghost под поднятым куском)', () {
+    test('excludePieceId: null — совпадает с state.occupiedCells', () {
+      final state = _twoPieceState();
+
+      final result = PackingPainter.occupiedCellsExcluding(state, null);
+
+      expect(result, equals(state.occupiedCells));
+    });
+
+    test('уложенный кусок исключён — его клеток нет в результирующем сете', () {
+      final state = _twoPieceState();
+
+      final result = PackingPainter.occupiedCellsExcluding(state, 1);
+
+      expect(
+        result,
+        isNot(contains((x: 0, y: 0))),
+        reason: 'клетка кусочка id 1 (снят с поля — в руке) не занята',
+      );
+      expect(
+        result,
+        contains((x: 1, y: 0)),
+        reason: 'клетка кусочка id 2 (остался на поле) занята по-прежнему',
+      );
+      expect(result.length, equals(state.occupiedCells.length - 1));
+    });
+
+    test(
+      'excludePieceId не из placements (драг из лотка) — сет не меняется',
+      () {
+        final state = _twoPieceState();
+
+        final result = PackingPainter.occupiedCellsExcluding(state, 99);
+
+        expect(result, equals(state.occupiedCells));
+      },
+    );
+
+    test('смоук paint: уложенный кусок + excludePieceId его id — не бросает '
+        '(ghost на месте поднятого куска рисуется без исключений)', () {
+      final state = _twoPieceState();
+      final painter = PackingPainter(
+        state: state,
+        cellSize: 34.0,
+        shipMaterials: ShipMaterials.defaultMaterials,
+        excludePieceId: 1,
+      );
+
+      expect(
+        () => painter.paint(Canvas(ui.PictureRecorder()), const Size(68, 34)),
+        returnsNormally,
+      );
     });
   });
 }

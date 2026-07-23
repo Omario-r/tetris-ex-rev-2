@@ -116,12 +116,39 @@ class PackingPainter extends CustomPainter {
     return Rect.fromLTWH(x * cellSize, y * cellSize, cellSize, cellSize);
   }
 
+  /// Клетки всех размещённых кусочков [state], КРОМЕ кусочка
+  /// [excludePieceId] (мокап `ukladka-field.html`, `liftPlaced`: кусок,
+  /// взятый в руку, немедленно снимается с поля — под ним сразу читается
+  /// ghost мишени). Если [excludePieceId] — `null` или не встречается в
+  /// `state.placements` (кусок ещё в лотке, драг из лотка), результат
+  /// эквивалентен `state.occupiedCells`.
+  static Set<({int x, int y})> occupiedCellsExcluding(
+    PackState state,
+    int? excludePieceId,
+  ) {
+    if (excludePieceId == null ||
+        !state.placements.containsKey(excludePieceId)) {
+      return state.occupiedCells;
+    }
+    final result = <({int x, int y})>{};
+    for (final entry in state.placements.entries) {
+      if (entry.key == excludePieceId) continue;
+      final piece = state.pieces.firstWhere((p) => p.id == entry.key);
+      final origin = entry.value;
+      for (final cell in piece.cells) {
+        result.add((x: origin.x + cell.x, y: origin.y + cell.y));
+      }
+    }
+    return result;
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.drawRect(Offset.zero & size, Paint()..color = boardBg);
 
-    // Ghost — незаполненные клетки силуэта.
-    final occupied = state.occupiedCells;
+    // Ghost — незаполненные клетки силуэта (кусок в руке — excludePieceId —
+    // снят из occupied, возврат Стори 04 T5: ghost под ним читается сразу).
+    final occupied = occupiedCellsExcluding(state, excludePieceId);
     for (final cell in state.silhouette.cells) {
       if (!occupied.contains(cell)) {
         BlockTheme.ghostTarget.paint(canvas, _cellRect(cell.x, cell.y));
@@ -212,10 +239,7 @@ class PackDragPreview {
   @override
   int get hashCode => Object.hash(valid, Object.hashAll(cells));
 
-  static bool _listEquals(
-    List<({int x, int y})> a,
-    List<({int x, int y})> b,
-  ) {
+  static bool _listEquals(List<({int x, int y})> a, List<({int x, int y})> b) {
     if (identical(a, b)) return true;
     if (a.length != b.length) return false;
     for (var i = 0; i < a.length; i++) {

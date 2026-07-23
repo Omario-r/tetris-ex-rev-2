@@ -48,7 +48,13 @@
   токены-константы, потребитель — `presentation/screens`, эпик «Укладка» Стори 02 T2).
   `PackingPainter.paintPiece` (публичный статик) — единая точка правды «как выглядит кусочек»,
   переиспользуется экраном для лотка/drag-фидбэка. Только вид — не знает про drag-жесты (логика в
-  `presentation/screens`).
+  `presentation/screens`). `PackingPainter.occupiedCellsExcluding(state, excludePieceId)`
+  (публичный статик, возврат Стори 04 T5) — клетки всех размещённых кусочков `state`, кроме
+  `excludePieceId` (`null` или не встречается в `placements` → эквивалент `state.occupiedCells`).
+  Используется вместо `state.occupiedCells` в ghost-цикле `paint`: кусок, взятый в руку
+  (`excludePieceId`), немедленно освобождает свои клетки для ghost мишени — канон мокапа
+  (`liftPlaced`), при том что в движке (`PackState`/`PackController`) кусок остаётся в
+  `placements` до дропа (осознанное отличие реализации, см. модуль `game_engine/packing`).
 - `PackDragPreview({cells, valid})` (`packing_painter.dart`, эпик «Укладка» Стори 02 T1) —
   маленький immutable DTO снап-превью: `cells` (`List<({int x, int y})>`, тот же тип клетки, что у
   `PackState.occupiedCells`) — абсолютные клетки силуэта под текущим якорем драга; `valid` —
