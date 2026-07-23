@@ -20,6 +20,8 @@
       "Bash(git branch:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
+      "Bash(git rm:*)",
+      "Bash(git mv:*)",
       "Bash(flutter analyze:*)",
       "Bash(flutter test:*)",
       "Bash(dart analyze:*)",
