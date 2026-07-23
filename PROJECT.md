@@ -30,8 +30,9 @@
 - **Линтер** (DoD п. 1): `flutter analyze` — ноль ошибок и предупреждений.
 - **Тесты:** `flutter test`
 - **Смоук-тест / запуск проекта:** `flutter run`; сквозной смоук —
-  `flutter test test/widget_test.dart test/integration/golden_scenario_test.dart test/presentation/win_flow_test.dart`
-  (подробности и карта модулей — `docs/ARCHITECTURE.md`).
+  `flutter test test/widget_test.dart test/presentation/win_flow_test.dart`
+  (подробности и карта модулей — `docs/ARCHITECTURE.md`; `golden_scenario_test`
+  удалён со старым ядром — укладка/02 T4).
 
 ## Ростер и бэкенды
 

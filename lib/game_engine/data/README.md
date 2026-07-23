@@ -44,11 +44,11 @@
   недостижимая без опоры.
 - `LevelMap` — `static final`, НЕ `const` (`LevelTemplate` не const). `ShipParts` — `const`.
 - Контент масок деталей — прототипный, шлифуется по скриншотам (VISION: узнаваемость в приоритете).
-- Проходимость проверена: структурно (непустота, площадь, границы, 4-связность, `H∩S=∅` —
-  все уровни) и реальным падением фигур через `GameController` (уровни 1 и 6 — доказательство
-  физической проходимости, не только корректности геометрии).
+- Проходимость проверена структурно (непустота, площадь, границы, 4-связность, `H∩S=∅` —
+  все уровни); проверка реальным падением фигур через `GameController` снята вместе со старым
+  ядром (эпик «Укладка», Стори 02 T4) — новая содержательная проверка контента («каждая деталь
+  нарезается и укладывается новым ядром») — Стори 03.
 
 ## Как проверить
 
-`flutter test test/game_engine/data/level_map_test.dart test/game_engine/data/ship_parts_test.dart
-test/game_engine/data/level_playthrough_test.dart`.
+`flutter test test/game_engine/data/level_map_test.dart test/game_engine/data/ship_parts_test.dart`.

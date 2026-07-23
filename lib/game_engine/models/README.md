@@ -5,15 +5,15 @@
 
 ## Назначение
 
-Структуры данных ядра: поле, тетромино, падающая фигура, маска мишени и шаблоны
-уровня/объекта/фрагмента. Чистый Dart, без логики правил (правила — в `rules`).
+Структуры данных ядра: поле, маска мишени и шаблоны уровня/объекта/фрагмента.
+Падающая фигура тетриса (`FallingPiece`/`Piece`) удалена вместе со старым ядром
+партии (эпик «Укладка», Стори 02 T4). Чистый Dart, без логики правил (правила —
+в `rules`).
 
 ## Публичный интерфейс
 
 - `Board(width, height)` — сетка `Cell`; `getCell/setCell/isOccupied/isInside/clear/copyWith`.
 - `Cell.empty()` / `Cell.occupied()`, `CellState` — состояние клетки.
-- `PieceType{I,O,T,S,Z,J,L}`; `Piece(type, matrix)` c `rotateCW()` и `cells`; `PieceFactory.create(type)` — 7 стартовых форм.
-- `PieceMode{normal,explosive}`; `FallingPiece{piece,x,y,mode,armedUsed}` c `boardCells`, `copyWith`.
 - `TargetMask{width,height,mask}` c `contains(x,y)`, `cells`; `defaultTargetMask` (крест 6×6, `0x30CFFF30C`).
 - `LevelTemplate{boardWidth,boardHeight,targetMask,targetX,targetY,moveLimit?,objectId,fragmentIndex,chargeBudget}` — при создании вычисляет `S` и `H`; `defaultLevel`. `objectId`/`fragmentIndex` —
   ключ для `presentation/theme` (`LevelSkin.materialForObjectFragment`), не связаны с моделью
@@ -28,7 +28,7 @@
 
 ## От него зависят
 
-- `game_engine/rules`, `game_engine/game`, `game_engine/data` — типы данных.
+- `game_engine/rules`, `game_engine/data` — типы данных.
 - `presentation/theme`, `presentation/widgets`, `presentation/screens` — чтение состояния/шаблонов.
 
 ## Инварианты
@@ -36,11 +36,10 @@
 - Координаты: `(0,0)` слева сверху, `y` растёт вниз; линейный индекс `i = y*width + x`.
 - `Board` мутируется только через `setCell/clear`; `isOccupied` вне поля → `false`.
   `getCell/setCell` предполагают клетку внутри поля (`assert`).
-- `Piece.rotateCW` = транспонирование 4×4 + реверс строк (только CW); матрица всегда 4×4.
 - `TargetMask` MSB-first: бит `b = (w*h−1) − (y*w + x)`; окна до 8×8 (64-битный `int`).
 - `LevelTemplate` — НЕ const (`defaultLevel`, `LevelMap` создают экземпляры в рантайме).
 - `defaultTargetMask`/`defaultLevel` — фикстура тестов движка, НЕ игровой уровень: не удалять.
 
 ## Как проверить
 
-`flutter test test/game_engine/models/` (board, piece, falling_piece, target_mask, level_template).
+`flutter test test/game_engine/models/` (board, target_mask, level_template).

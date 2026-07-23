@@ -12,19 +12,19 @@
 
 | Модуль | Путь | Назначение (1 строка) | Зависит от |
 |--------|------|----------------------|------------|
-| models | `lib/game_engine/models/` | Структуры данных ядра (поле, фигура, маска, шаблоны уровня/объекта) | rules ¹ |
-| rules | `lib/game_engine/rules/` | Чистые правила: коллизии, halo/победа, взрыв, генерация фигур | models ¹ |
-| packing | `lib/game_engine/packing/` | Ядро укладки (новое): полиомино-кусок, состояние (силуэт+размещённые+лоток), валидация/завершение; нарезка силуэта (T2) | models |
-| game | `lib/game_engine/game/` | Состояние партии + оркестрация (`tick`, команды игрока) | models, rules |
+| models | `lib/game_engine/models/` | Структуры данных ядра (поле, маска, шаблоны уровня/объекта) | rules ¹ |
+| rules | `lib/game_engine/rules/` | Чистые правила: halo/победа (+ мёртвый стуб `rotation` — выпил в Стори 03) | models ¹ |
+| packing | `lib/game_engine/packing/` | Ядро укладки — основной движок игры: полиомино-кусок, состояние (силуэт+размещённые+лоток), валидация/завершение, нарезка силуэта | models |
 | data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (`ShipParts.parts.length` уровней, v1=7) | models |
 | application | `lib/application/` | Персист прогресса (`ProgressService`) | data ² |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
-| widgets | `lib/presentation/widgets/` | Пейнтеры поля и корабля, HUD | game, models, data, theme |
-| screens | `lib/presentation/screens/` | Экраны + игровой цикл (композиционный корень партии) | game, models, data, rules, application, theme, widgets |
+| widgets | `lib/presentation/widgets/` | Пейнтеры укладки и корабля | packing, data, theme |
+| screens | `lib/presentation/screens/` | Экраны + композиционный корень партии укладки | packing, models, data, application, theme, widgets |
 
 ¹ **models ↔ rules — взаимная зависимость:** `models/level_template` при создании зовёт
-`rules/halo` (`computeHalo8`), а `rules/*` работают над `models` (`Board`, `FallingPiece`).
-Цикл на уровне модулей; допустим в Dart, но держать в уме при рефакторинге (см. BACKLOG).
+`rules/halo` (`computeHalo8`), а `rules/halo` работает над `models` (`Board` в `checkWin`).
+Цикл на уровне модулей; допустим в Dart, но держать в уме при рефакторинге (см. BACKLOG;
+кандидат на развязку при зачистке Стори 03 эпика «Укладка»).
 
 ² **application → game_engine/data:** `ProgressService._max` берёт `ShipParts.parts.length - 1`
 (единый источник истины числа уровней) вместо хардкода — импорт строго вниз по слоям, разрешён
@@ -45,20 +45,18 @@ lib/main.dart (вход)
    application  ◄────────────────────────────┘ (screens → ProgressService)
         │
         ▼  (ProgressService._max ← ShipParts.parts.length, см. ²)
-   game_engine:  game ──► rules ◄──► models
-                  │                    ▲
-                  └──► data ◄──────────┴─── application
+   game_engine:  packing ──► models ◄──► rules
+                               ▲
+                      data ────┘  ◄──── application
 ```
 
-- packing ──► models (TargetMask как силуэт); новое ядро укладки, параллельно
-  game/rules (старое тетрис-ядро выпиливается в Стори 02 эпика «Укладка»).
-- `presentation/screens` и `presentation/widgets` теперь читают также
-  `game_engine/packing` (прототип укладки, Стори 01 эпика «Укладка»). Новых
-  модулей нет; связь `presentation → game_engine` уже была, здесь уточняется
-  охват.
+- packing ──► models (`TargetMask` как силуэт) — ядро укладки, **основной движок
+  игры** (`presentation/screens` и `presentation/widgets` читают его в главном
+  потоке). Старое тетрис-ядро — модуль `game`, `rules`-коллизии/взрыв/генератор,
+  `models`-падающая фигура — **удалено** (эпик «Укладка», Стори 02 T4).
 
-- `screens` — единственный композиционный корень: тянет ядро, данные и виджеты.
-- `application` тонкий: игровой цикл фактически в `screens/game_screen`, не в `application/game_loop` (стуб).
+- `screens` — единственный композиционный корень: тянет ядро укладки, данные и виджеты.
+- `application` тонкий: `application/game_loop` — мёртвый стуб (кандидат на удаление, Стори 03).
 - `widgets → data`: `ShipPainter` берёт форму деталей из `ShipParts` — тот же источник, что
   и мишени дев-уровней (`LevelMap`), поэтому «собранное на уровне» = «деталь корабля».
 
@@ -66,21 +64,23 @@ lib/main.dart (вход)
 
 - **Слои и импорты:** `presentation → application → game_engine`, импорты только вниз.
   В `game_engine/` запрещён `import 'package:flutter/...'` — чистый Dart.
-- **Стек:** без Flame. Рендер — `CustomPainter`; игровой цикл — `AnimationController`/`Ticker`
-  в `screens/game_screen`; персист — `shared_preferences`.
-- **API движка (`GameController`):** команды возвращают `void`; невозможное действие = **no-op**,
+- **Стек:** без Flame. Рендер — `CustomPainter`; анимация (пульс `doneGlow`) —
+  `AnimationController` в `screens/game_screen`; персист — `shared_preferences`.
+- **API движка (`PackController`):** команды возвращают `void`; невозможное действие = **no-op**,
   исключений не бросаем.
 - **Координаты:** `(0,0)` слева сверху, `y` растёт вниз; линейный индекс `i = y*width + x`.
-- **Детерминизм:** `SevenBagGenerator(seed)` / `FixedSequenceGenerator` — база тестов движка.
+- **Детерминизм:** `slicePolyomino(silhouette, seed)` — детерминированная нарезка; база тестов
+  ядра укладки.
 - **Именование:** файлы `snake_case`, классы `PascalCase`, `///`-комментарий на публичном API.
-  Импорты внутри `lib/` — относительные (единственное исключение — `rules/randomizer.dart` через `package:`).
+  Импорты внутри `lib/` — относительные.
 - **Навигация:** захватить `NavigatorState` до `pushReplacement`; `context` из `State` в колбэках
   после ухода с экрана не использовать (проверка `mounted`).
 - **Точка входа:** `lib/main.dart` → `ProgressService.getCurrentLevel()` → `GameScreen(levelIndex)`.
-- **Тестовая фикстура:** `defaultLevel` (крест 6×6, маска `0x30CFFF30C`) — НЕ игровой уровень;
-  на нём написаны тесты движка, не удалять при чистке контента.
+- **Тестовая фикстура:** `defaultLevel`/`defaultTargetMask` (крест 6×6, маска `0x30CFFF30C`) —
+  НЕ игровой уровень; на нём написаны тесты движка, не удалять при чистке контента.
 - **Команды и смоук-тест:** `flutter pub get` / `flutter run` / `flutter test` / `flutter analyze`
   (analyze — ноль ошибок и предупреждений). Смоук/сквозной сценарий:
-  `flutter test test/widget_test.dart test/integration/golden_scenario_test.dart
-  test/presentation/win_flow_test.dart` (последний — полный прогон всех уровней контента
-  до собранного корабля, эпик «Контент» Стори 03; `widget_test.dart` — пустая заглушка, см. BACKLOG).
+  `flutter test test/widget_test.dart test/presentation/win_flow_test.dart`
+  (`win_flow` — минимальный прогон укладки до победы + мета-финал; полный прогон всего
+  контента новым ядром — Стори 03 эпика «Укладка»; `widget_test.dart` — пустая заглушка,
+  см. BACKLOG. `golden_scenario_test` удалён вместе со старым ядром, Стори 02 T4).
