@@ -181,6 +181,29 @@ void main() {
           reason: 'равный по значению PackDragPreview — repaint не нужен');
     });
 
+    test('клетки у краёв поля (углы силуэта) — рисует плашку без исключений '
+        '(возврат Стори 04 T4: RRect-плашка на клетку, инсет 3px)', () {
+      final painter = PackingPainter(
+        state: emptyState(),
+        cellSize: 34.0,
+        shipMaterials: ShipMaterials.defaultMaterials,
+        dragPreview: const PackDragPreview(
+          cells: [
+            (x: 0, y: 0), // левый-верхний угол силуэта
+            (x: 3, y: 0), // правый-верхний угол (последний столбец)
+            (x: 0, y: 3), // левый-нижний угол (последняя строка)
+            (x: 3, y: 3), // правый-нижний угол силуэта 4×4
+          ],
+          valid: true,
+        ),
+      );
+
+      expect(
+        () => painter.paint(Canvas(ui.PictureRecorder()), const Size(136, 136)),
+        returnsNormally,
+      );
+    });
+
     test('shouldRepaint реагирует на смену partMaterial', () {
       final state = emptyState();
       final withoutMaterial = PackingPainter(

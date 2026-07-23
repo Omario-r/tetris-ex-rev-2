@@ -145,7 +145,10 @@ class PackingPainter extends CustomPainter {
     }
 
     // Снап-превью драга (el-drop-ok / el-drop-bad) — поверх ghost и уложенных
-    // клеток, только клетки в границах поля.
+    // клеток, только клетки в границах поля. Канон мокапа (`.gcell.ok/.bad
+    // ::after`, возврат Стори 04 T4): каждая клетка — ОТДЕЛЬНАЯ скруглённая
+    // плашка (инсет 3px от границ клетки, радиус 4), а не сплошной блок —
+    // между соседними клетками превью читается зазор.
     final preview = dragPreview;
     if (preview != null) {
       final strokeColor = preview.valid ? dropOk : dropBad;
@@ -162,9 +165,12 @@ class PackingPainter extends CustomPainter {
             cell.y >= state.silhouette.height) {
           continue;
         }
-        final rect = _cellRect(cell.x, cell.y);
-        canvas.drawRect(rect, fillPaint);
-        canvas.drawRect(rect.deflate(1.0), strokePaint);
+        final chip = RRect.fromRectAndRadius(
+          _cellRect(cell.x, cell.y).deflate(3.0),
+          const Radius.circular(4.0),
+        );
+        canvas.drawRRect(chip, fillPaint);
+        canvas.drawRRect(chip, strokePaint);
       }
     }
   }
