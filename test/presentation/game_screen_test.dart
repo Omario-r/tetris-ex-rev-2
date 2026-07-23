@@ -97,6 +97,33 @@ void main() {
     });
 
     testWidgets(
+        'панель поля больше холста PackingPainter на 16px по каждой оси '
+        '(паддинг 8px канона .board — возврат Гейта 3, замечание 3)',
+        (tester) async {
+      await pumpGame(tester);
+
+      final customPaintFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PackingPainter,
+      );
+      expect(customPaintFinder, findsOneWidget);
+      final canvasSize = tester.getSize(customPaintFinder);
+
+      // Панель поля — ближайший `DecoratedBox`-предок с заливкой `boardBg`
+      // (канон `.board`): паддинг живёт между этим контейнером и `CustomPaint`.
+      final panelFinder = find.ancestor(
+        of: customPaintFinder,
+        matching: find.byWidgetPredicate((w) =>
+            w is DecoratedBox &&
+            (w.decoration as BoxDecoration?)?.color == PackingPainter.boardBg),
+      );
+      expect(panelFinder, findsOneWidget);
+      final panelSize = tester.getSize(panelFinder);
+
+      expect(panelSize.width - canvasSize.width, closeTo(16.0, 0.01));
+      expect(panelSize.height - canvasSize.height, closeTo(16.0, 0.01));
+    });
+
+    testWidgets(
       'без overflow на коротком экране (360×640)',
       (tester) async {
         tester.view.physicalSize = const Size(360, 640);

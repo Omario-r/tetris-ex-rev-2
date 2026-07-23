@@ -58,6 +58,12 @@ class _GameScreenState extends State<GameScreen>
   /// кусок рисуется на столько пикселей выше точки касания.
   static const double _dragLiftPx = 56.0;
 
+  /// Паддинг панели поля (канон `.board` мокапа, `ukladka-field.html:85-86`):
+  /// отступ между рамкой панели и сеткой силуэта на каждую сторону — вокруг
+  /// мишени читается подложка `boardBg`, обводка снап-превью на крайних
+  /// клетках не срезается клипом панели.
+  static const double _boardPadding = 8.0;
+
   // --- Силуэт уровня и нарезка ---
   late TargetMask _silhouette;
   late int _fragmentIndex;
@@ -426,9 +432,11 @@ class _GameScreenState extends State<GameScreen>
     final availableHeight = constraints.maxHeight -
         _topbarHeight -
         _progZoneHeight -
-        _trayZoneHeight;
+        _trayZoneHeight -
+        2 * _boardPadding;
+    final availableWidth = constraints.maxWidth - 2 * _boardPadding;
     final fitByHeight = availableHeight / boardHeight;
-    final fitByWidth = constraints.maxWidth / boardWidth;
+    final fitByWidth = availableWidth / boardWidth;
     final size = math.min(_canonicalCellSize, math.min(fitByHeight, fitByWidth));
     return math.max(size, 8.0);
   }
@@ -588,25 +596,38 @@ class _GameScreenState extends State<GameScreen>
       animation: _pulseController,
       builder: (context, child) {
         final complete = state.isComplete;
-        return Container(
-          width: boardPixelWidth,
-          height: boardPixelHeight,
-          clipBehavior: Clip.antiAlias,
-          decoration: BoxDecoration(
-            color: PackingPainter.boardBg,
-            border: Border.all(color: BlockMaterial.gunmetal.color),
-            borderRadius: BorderRadius.circular(10.0),
-            boxShadow: complete
-                ? [
-                    BoxShadow(
-                      color: PackingPainter.doneGlow,
-                      blurRadius: 18.0 + 16.0 * _pulseController.value,
-                      spreadRadius: 2.0,
-                    ),
-                  ]
-                : null,
+        // `SizedBox` фиксирует внешний габарит панели (сетка + 2×паддинг);
+        // `DecoratedBox` (в отличие от `Container`) красит фон/рамку БЕЗ
+        // автоматической вставки внутреннего отступа под рамку — иначе
+        // Container сам добавил бы к паддингу ещё толщину рамки и сжал бы
+        // холст `CustomPaint` на её толщину (сетка перестала бы совпадать
+        // с `boardPixelWidth`/`Height`, на которых держится драг-математика).
+        return SizedBox(
+          width: boardPixelWidth + 2 * _boardPadding,
+          height: boardPixelHeight + 2 * _boardPadding,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: PackingPainter.boardBg,
+              border: Border.all(color: BlockMaterial.gunmetal.color),
+              borderRadius: BorderRadius.circular(10.0),
+              boxShadow: complete
+                  ? [
+                      BoxShadow(
+                        color: PackingPainter.doneGlow,
+                        blurRadius: 18.0 + 16.0 * _pulseController.value,
+                        spreadRadius: 2.0,
+                      ),
+                    ]
+                  : null,
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(10.0),
+              child: Padding(
+                padding: const EdgeInsets.all(_boardPadding),
+                child: child,
+              ),
+            ),
           ),
-          child: child,
         );
       },
       child: Listener(
