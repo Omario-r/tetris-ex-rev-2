@@ -215,6 +215,10 @@ _нет_
      остаётся (BACKLOG), не наполняй.
   3. Пройди `grep -rn "GameLoop\|game_loop"` по `lib`/`test` — пусто (кроме
      исторических заметок в docs).
+  4. (Дополнено после T2.) `test/game_engine/models/level_template_test.dart`
+     после чистки T2 опустел до `void main() {}` — удали пустой файл (пустышку
+     в наборе не держим; `widget_test.dart` НЕ трогай — это отдельная
+     BACKLOG-заглушка, на неё указывает смоук-команда).
 - **Арх-дельта (применяет Исполнитель):** в `docs/ARCHITECTURE.md` строку
   `application` оставить (модуль жив — `ProgressService`), но из текста убрать
   упоминание `game_loop`-стуба («application тонкий: …»). Больше связей не
