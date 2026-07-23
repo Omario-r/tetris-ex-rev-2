@@ -114,6 +114,31 @@ void main() {
     });
   });
 
+  group('PackController.canPlace — свес за окно маски (регрессия краша)', () {
+    test('якорь за правым краем — обе клетки вне окна, false без исключения',
+        () {
+      final controller = _freshController();
+
+      // _rowB — клетки (0,0)/(1,0); якорь atX=3 в окне 2×2 (width=2) даёт
+      // localX=3 и 4 — это ровно случай "бит-индекс -1" из трейса краша
+      // (localY*width+localX=4 > totalBits-1=3).
+      final result = PackController.canPlace(controller.state, 1, 3, 0);
+
+      expect(result, isFalse);
+    });
+
+    test('якорь за нижним краем — обе клетки вне окна, false без исключения',
+        () {
+      final controller = _freshController();
+
+      // _rowB — клетки (0,0)/(1,0); якорь atY=3 в окне 2×2 (height=2) даёт
+      // localY=3 для обеих клеток — тот же класс "отрицательный сдвиг".
+      final result = PackController.canPlace(controller.state, 1, 0, 3);
+
+      expect(result, isFalse);
+    });
+  });
+
   group('Полное заполнение фикстуры', () {
     test('оба кусочка уложены → isComplete == true', () {
       final controller = _freshController();

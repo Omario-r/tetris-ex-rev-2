@@ -93,7 +93,17 @@
 > Исполнитель за раз).
 
 ### T1 — Границы окна в `TargetMask.contains` (краш драга)
-- **Статус:** не начата
+- **Статус:** сделана (2026-07-23). `flutter analyze` — «No issues found!»;
+  `flutter test test/game_engine/` — «All tests passed!» (168 tests, включая
+  6 новых в `target_mask_test.dart` — OOB `contains(6,0)`/`contains(0,6)`/
+  `contains(-1,0)`/`contains(0,-1)`/`contains(6,5)` (бит-индекс −1 из трейса)
+  + смоук валидной клетки, и 2 новых в `pack_controller_test.dart` —
+  `canPlace` при якоре, уводящем кусок за правый/нижний край окна 2×2 в
+  ровно тот же класс отрицательного сдвига, → `false` без исключения).
+  Дифф — только `lib/game_engine/models/target_mask.dart`,
+  `test/game_engine/models/target_mask_test.dart`,
+  `test/game_engine/packing/pack_controller_test.dart`,
+  `lib/game_engine/models/README.md` (инвариант контракта `contains`).
 - **Рекомендованный агент:** Исполнитель · Claude (Sonnet, `ispolnitel`)
 - **Цель:** устранить краш `Invalid argument(s): -1` при драге куска над
   мишенью у края поля; вне окна маски `contains` честно отвечает `false`.

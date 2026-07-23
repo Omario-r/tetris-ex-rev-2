@@ -43,6 +43,32 @@ void main() {
     });
   });
 
+  group('TargetMask contains — вне окна (границы, без исключений)', () {
+    test('contains(6, 0) — за правым краем 6×6', () {
+      expect(defaultTargetMask.contains(6, 0), isFalse);
+    });
+
+    test('contains(0, 6) — за нижним краем 6×6', () {
+      expect(defaultTargetMask.contains(0, 6), isFalse);
+    });
+
+    test('contains(-1, 0) — отрицательный localX', () {
+      expect(defaultTargetMask.contains(-1, 0), isFalse);
+    });
+
+    test('contains(0, -1) — отрицательный localY', () {
+      expect(defaultTargetMask.contains(0, -1), isFalse);
+    });
+
+    test('contains(6, 5) — бит-индекс -1 из трейса краша', () {
+      expect(defaultTargetMask.contains(6, 5), isFalse);
+    });
+
+    test('смоук: валидная клетка внутри окна не задета фиксом', () {
+      expect(defaultTargetMask.contains(2, 0), isTrue);
+    });
+  });
+
   group('MSB-first битмаска', () {
     test('1x1 mask=1 содержит (0,0)', () {
       const m = TargetMask(width: 1, height: 1, mask: 1);

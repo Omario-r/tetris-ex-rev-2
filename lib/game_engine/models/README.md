@@ -31,6 +31,9 @@
 
 - Координаты: `(0,0)` слева сверху, `y` растёт вниз; линейный индекс `i = y*width + x`.
 - `TargetMask` MSB-first: бит `b = (w*h−1) − (y*w + x)`; окна до 8×8 (64-битный `int`).
+- `TargetMask.contains(x,y)` вне окна (`x`/`y` < 0 или ≥ width/height) — честный
+  `false`, без исключений (границы проверяются до битовой арифметики; фикс
+  краша `Invalid argument(s): -1`, укладка/04 T1).
 - `LevelTemplate` — НЕ const (`defaultLevel`, `LevelMap` создают экземпляры в рантайме).
 - `defaultTargetMask`/`defaultLevel` — фикстура тестов движка, НЕ игровой уровень: не удалять.
 

@@ -13,7 +13,12 @@ class TargetMask {
   });
 
   /// true если клетка (localX, localY) входит в S.
+  /// Вне окна (localX/localY отрицательны или ≥ width/height) — честный
+  /// `false` без исключения (нет валидного бит-индекса для внешней клетки).
   bool contains(int localX, int localY) {
+    if (localX < 0 || localX >= width || localY < 0 || localY >= height) {
+      return false;
+    }
     final totalBits = width * height;
     final bitIndex = (totalBits - 1) - (localY * width + localX);
     return (mask & (1 << bitIndex)) != 0;
