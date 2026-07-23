@@ -5,23 +5,24 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
+import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
-/// Пост-победный поток на ядре укладки (Стори 02):
+/// Пост-победный поток на ядре укладки (Стори 02/03):
 /// деталь собрана (`PackState.isComplete`) → авто-показ корабля → следующий
 /// уровень; на последнем дев-уровне → N/N + «Начать заново» → сброс.
 ///
-/// Минимальный зелёный прогон укладки: один уровень доводится до `isComplete`
-/// solve-хуком (`Key('cheat_solve')`) — без симуляции drag-жестов. Последняя
-/// мета-ветка (сброс на 7/7) проверяется читом «мгновенная победа» (тот же
-/// `_handleWin`/`_onWin`). **Полный прогон всего контента до собранного корабля
-/// (все kShipPartCount уровней реальной укладкой) — Стори 03.**
+/// Полный прогон всего контента (Стори 03): каждый из `kShipPartCount`
+/// уровней доводится до `isComplete` тем же solve-хуком (`Key('cheat_solve')`)
+/// — без симуляции drag-жестов — и проходится «Далее» до последнего уровня,
+/// затем «Начать заново» и сброс к уровню 1.
 Future<void> _pump(WidgetTester t) async {
   await t.pump();
   await t.pump(const Duration(milliseconds: 600));
 }
 
-/// Довести уровень до победы solve-хуком: деталь раскладывается по эталону,
-/// затем ~900 мс пульса — и запускается пост-победный поток.
+/// Довести текущий уровень до победы solve-хуком: деталь раскладывается по
+/// эталону (`PackSlice.solution`), затем ~900 мс пульса — и запускается
+/// пост-победный поток.
 Future<void> _solveWin(WidgetTester t) async {
   await t.tap(find.byKey(const Key('cheat_button')));
   await _pump(t);
@@ -29,13 +30,6 @@ Future<void> _solveWin(WidgetTester t) async {
   await _pump(t);
   // Пульс-задержка перед мета-переходом (~900 мс).
   await t.pump(const Duration(milliseconds: 1000));
-  await _pump(t);
-}
-
-Future<void> _instantWin(WidgetTester t) async {
-  await t.tap(find.byKey(const Key('cheat_button')));
-  await _pump(t);
-  await t.tap(find.byKey(const Key('cheat_instant_win')));
   await _pump(t);
 }
 
@@ -52,42 +46,46 @@ void main() {
   }
 
   testWidgets(
-    'укладка собрана (solve-хук) → корабль +1 → «Далее» → следующий уровень',
+    'полный прогон: все kShipPartCount уровней укладкой (solve-хук) → '
+    '«Далее» → … → последний уровень → «Начать заново» → сброс к уровню 1',
     (t) async {
       SharedPreferences.setMockInitialValues({'current_level': 0});
       await pumpGame(t, 0);
-      await _solveWin(t);
 
-      // Авто-показ корабля; деталь +1.
-      expect(find.byType(ShipScreen), findsOneWidget);
-      expect(find.text('Собрано 1 из 7'), findsOneWidget);
-      expect(find.text('Далее'), findsOneWidget);
-      expect(await ProgressService().getCurrentLevel(), 1);
+      for (var level = 0; level < kShipPartCount; level++) {
+        final game = t.widget<GameScreen>(find.byType(GameScreen));
+        expect(game.levelIndex, level);
+        expect(
+          find.text('ДЕТАЛЬ ${level + 1}/$kShipPartCount'),
+          findsOneWidget,
+        );
 
-      await t.tap(find.byKey(const Key('ship_next_button')));
-      await _pump(t);
-      final game = t.widget<GameScreen>(find.byType(GameScreen));
-      expect(game.levelIndex, 1);
-      expect(find.text('ДЕТАЛЬ 2/7'), findsOneWidget);
-    },
-  );
+        await _solveWin(t);
 
-  testWidgets(
-    'победа на последнем (7-м) уровне → 7/7 + «Начать заново» → сброс к уровню 1',
-    (t) async {
-      SharedPreferences.setMockInitialValues({'current_level': 6});
-      await pumpGame(t, 6);
-      await _instantWin(t);
+        final isLastDevLevel = level == kShipPartCount - 1;
 
-      expect(find.text('Собрано 7 из 7'), findsOneWidget);
-      expect(find.text('Начать заново'), findsOneWidget);
+        // Авто-показ корабля; деталь +1.
+        expect(find.byType(ShipScreen), findsOneWidget);
+        expect(
+          find.text('Собрано ${level + 1} из $kShipPartCount'),
+          findsOneWidget,
+        );
+        expect(
+          find.text(isLastDevLevel ? 'Начать заново' : 'Далее'),
+          findsOneWidget,
+        );
+        if (!isLastDevLevel) {
+          expect(await ProgressService().getCurrentLevel(), level + 1);
+        }
 
-      await t.tap(find.byKey(const Key('ship_next_button')));
-      await _pump(t);
+        await t.tap(find.byKey(const Key('ship_next_button')));
+        await _pump(t);
+      }
 
+      // Сброс после последнего уровня: назад к уровню 1.
       final game = t.widget<GameScreen>(find.byType(GameScreen));
       expect(game.levelIndex, 0);
-      expect(find.text('ДЕТАЛЬ 1/7'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1/$kShipPartCount'), findsOneWidget);
       expect(await ProgressService().getCurrentLevel(), 0);
     },
   );

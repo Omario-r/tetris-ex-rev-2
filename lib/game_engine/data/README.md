@@ -51,4 +51,4 @@
 
 ## Как проверить
 
-`flutter test test/game_engine/data/level_map_test.dart test/game_engine/data/ship_parts_test.dart`.
+`flutter test test/game_engine/data/level_map_test.dart test/game_engine/data/ship_parts_test.dart test/game_engine/data/content_packing_test.dart`.
