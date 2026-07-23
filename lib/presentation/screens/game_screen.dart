@@ -46,13 +46,13 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen>
     with SingleTickerProviderStateMixin {
   // --- Канон макета (мокап при 812-высоте) ---
-  static const double _canonicalCellSize = 28.0;
+  static const double _canonicalCellSize = 40.0;
   static const double _topbarHeight = 44.0;
   static const double _progZoneHeight = 34.0;
   static const double _trayZoneHeight = 132.0;
 
   /// Размер клетки кусочка в лотке (`el-piece-tray`, уменьшенный масштаб).
-  static const double _trayCellSize = 24.0;
+  static const double _trayCellSize = 32.0;
 
   /// Офсет кусочка над пальцем при drag (`el-piece-drag`, риск drag-UX эпика):
   /// кусок рисуется на столько пикселей выше точки касания.
@@ -534,6 +534,7 @@ class _GameScreenState extends State<GameScreen>
         Padding(
           padding: const EdgeInsets.fromLTRB(14.0, 8.0, 14.0, 0.0),
           child: Container(
+            width: double.infinity,
             height: 6.0,
             clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(

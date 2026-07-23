@@ -27,10 +27,11 @@
   градиент `rust→hazardOrange`), подпись «уложено N / M кусков» (N=`placements.length`,
   M=`pieces.length`).
 - Размер клетки поля — **адаптивный**: `_computeCellSize(constraints, boardWidth, boardHeight)`
-  = `max(8, min(28.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток)/boardHeight,
+  = `max(8, min(40.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток)/boardHeight,
   maxWidth/boardWidth))` (внутри `LayoutBuilder`+`SafeArea`); силуэты деталей мелкие
-  (≤4×3) → на телефоне держит канонные 28px, на коротких экранах не переполняет. Клетка
+  (≤4×3) → на телефоне держит канонные 40px, на коротких экранах не переполняет. Клетка
   хранится в поле `_cellSize` (обновляется в `build`) — нужна pointer-обработчикам.
+  Клетка лотка `_trayCellSize=32.0` (~0.8 полевой, канон мокапа/прототипа Стори 01).
 - Топбар (канон `.topbar`/`.chip`/`.pausebtn`, высота 44): слева чип «ДЕТАЛЬ N/7» со свотчем
   материала детали, справа dev-кнопки (`Key('cheat_button')` под `kDebugMode`,
   `Key('ship_button')`). Виджеты `_PartChip`/`_Swatch`/`_DevButton` сохранены из Стори 02 T3.
