@@ -1,49 +1,24 @@
 <!DOCTYPE html>
 <!--
-  Мокап дизайн-сессии: РОНИН-1 — «пазл из рисунка».
-  Утверждён PO (подход) — дизайн-сессия 2026-07-24. Открытый пункт: смысловая
-  разметка секций (границы деталей, сколько деталей в Ронине) — продуктовое
-  решение PO при декомпозиции контента; мокап показывает механизм.
-
-  МОДЕЛЬ (уточнение PO): корабль — ЕДИНЫЙ детальный рисунок «Ронина». Сетка режет
-  его на клетки-ПАЗЛ: каждая клетка несёт свой кусок ОРИГИНАЛА (не мозаика, не
-  плоский материал). Уложил клетку — проступает настоящий кусок носа.
-
-  ВАЖНО: рисунок здесь — НАСТОЯЩИЙ рендер ship_ronin_v4 (канон, утв. PO). Скрипт
-  рендера скопирован из docs/design/ship_ronin_v4.html БЕЗ изменений (рисует
-  корабль в offscreen `off`); панели ниже сэмплируют тайлы ИЗ НЕГО. Канон рисунка
-  живёт в ship_ronin_v4.html — здесь копия только для иллюстрации нарезки.
-
-   • РАЗМЕР ИГРОВОГО ПОЛЯ ВЫВОДИТСЯ ИЗ ДЕЛЕНИЯ ГОНДОЛЫ (самый мелкий модуль —
-     эталон играбельности). Окно 8×12 — производная от гондолы, не от корабля;
-   • крупные секции корабля ДЕЛЯТСЯ на детали, каждая влезающая в поле. Полную
-     ширину корабля в поле НЕ кладём — это принцип нарезки, не ограничение;
-   • поле игры = ОКНО, вырезанное из сетки корабля 1:1 (клетка = 1 воксель
-     рендера, C=24); без масштабирования;
-   • и поле, и экран корабля берут пиксели из ОДНОГО рендера (след = маска);
-   • шов листов обшивки — уже в самом рисунке (воксельная сетка рендера).
-
-  КАНОН значений — docs/DESIGN.md. Число окна 8×12 — предложение (калибр гондолы).
+  Мокап Ронин-1 — два экрана: (1) Ронин, размеченный на квадратную сетку клеток;
+  (2) экран корабля с контуром. Рисунок — реальный рендер ship_ronin_v4 (канон,
+  утв. PO): скрипт рендера скопирован БЕЗ изменений, рисует корабль в offscreen
+  `off`; экраны ниже сэмплируют его. Канон значений — docs/DESIGN.md.
 -->
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Мокап — Ронин-1: пазл из настоящего рисунка</title>
+<title>Мокап — Ронин: размеченный на клетки + экран корабля</title>
 <style>
   * { box-sizing:border-box; }
   body { margin:0; background:#0f1216; color:#cfd4da; font-family:system-ui,sans-serif; padding:22px; }
-  h1 { font-size:18px; margin:0 0 6px; color:#e6ebf0; }
-  .lead { font-size:13px; color:#8b949e; max-width:840px; line-height:1.6; margin:0 0 22px; }
-  .lead b { color:#cbd2d9; } .lead code { color:#cbd2d9; }
+  h1 { font-size:18px; margin:0 0 18px; color:#e6ebf0; }
   .wrap { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
   .card { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:18px; }
-  .card h2 { font-size:13px; margin:0 0 10px; color:#BE642D; letter-spacing:.05em; }
-  .card .cap { font-size:12px; color:#8b949e; max-width:440px; line-height:1.55; margin:12px 0 0; }
-  .card .cap b { color:#cbd2d9; } .card .cap code { color:#cbd2d9; }
+  .card h2 { font-size:13px; margin:0 0 12px; color:#8b949e; letter-spacing:.05em; font-weight:600; }
   canvas { display:block; }
-  .row { display:flex; gap:18px; align-items:flex-start; }
-  .lbl { font-size:10.5px; color:#7c848d; text-align:center; margin-top:6px; letter-spacing:.04em; }
+  .dim { font-size:11.5px; color:#8b949e; margin-top:10px; text-align:center; letter-spacing:.04em; }
 
   .device { width:320px; height:680px; position:relative; overflow:hidden; flex:none;
             background:hsl(220,14%,7%); outline:2px solid #3a4047; border-radius:26px;
@@ -61,65 +36,21 @@
   .btn { flex:1; padding:12px 6px; font-size:12px; letter-spacing:.05em; text-align:center;
          border-radius:10px; border:1px solid hsl(220,10%,22%); background:hsl(220,12%,13%); color:#cbd2d9; }
   .btn.primary { border-color:#BE642D; color:#f0d6c2; box-shadow:inset 0 0 0 1px #BE642D; }
-
-  .catalog { margin-top:26px; }
-  .catalog h2 { font-size:14px; color:#BE642D; margin:0 0 4px; letter-spacing:.05em; }
-  .catalog > p { font-size:12px; color:#8b949e; margin:0 0 16px; max-width:840px; line-height:1.55; }
-  .catalog code { color:#cbd2d9; }
-  .elgrid { display:flex; flex-wrap:wrap; gap:18px 16px; }
-  .el { width:172px; }
-  .el .frame { height:112px; display:flex; align-items:center; justify-content:center;
-     background:hsl(219,13%,10%); border:1px solid #21262c; border-radius:8px; }
-  .el .name { font-size:11px; color:#BE642D; font-weight:700; margin:8px 0 3px; }
-  .el .an { font-size:10.5px; color:#8b949e; line-height:1.45; }
 </style>
 </head>
 <body>
 
-<h1>Ронин-1 — пазл из настоящего рисунка (итерация 3)</h1>
-<p class="lead">Рисунок ниже — <b>реальный <code>ship_ronin_v4</code></b> (канон, утв. PO),
-   не суррогат. Сетка режет его на клетки; каждая несёт <b>свой кусок оригинала</b>.
-   Весь борт режется на куски, куски группируются в <b>секции-детали</b> (кривой
-   край, не прямоугольник); деталь играется в окне <b>8×12</b>. И поле, и экран
-   корабля сэмплируют из одного рендера.</p>
-
-<div style="max-width:840px;margin:0 0 22px;padding:12px 14px;border:1px solid #7a4a2c;
-   border-radius:10px;background:#20140c;font-size:13px;line-height:1.6;color:#e9c3a6;">
-   <b style="color:#f0a37a;">Правило нарезки (канон).</b> За основу размера
-   игрового поля берётся <b>деление гондолы</b> — самого мелкого модуля (эталон
-   играбельности). Все остальные, более крупные секции корабля <b>делятся на
-   детали, каждая из которых влезает в поле</b>. Полную ширину корабля в поле
-   <b>не помещаем</b> — это принцип нарезки, а не ограничение движка.
-</div>
+<h1>Ронин — размеченный на клетки</h1>
 
 <div class="wrap">
   <div class="card">
-    <h2>A · ВЕСЬ РОНИН РАССЕЧЁН — КУСКИ → СЕКЦИИ</h2>
-    <div class="row">
-      <div><canvas id="drawGrid"></canvas><div class="lbl">весь борт · тонкий шов = кусок, оранжевый = граница детали</div></div>
-      <div><canvas id="zoomCell"></canvas><div class="lbl">деталь НОС крупно (кривой край)</div></div>
-    </div>
-    <div class="cap">Генератор режет <b>весь борт</b> на куски единым пазлом (на
-       стыках сходятся), потом куски <b>группируются в секции-детали</b> по смыслу.
-       Граница детали идёт по краям кусков — оттого <b>кривая</b>, не прямоугольник.
-       Тинт = секция; оранжевая ломаная = контур детали НОС.</div>
+    <h2>РОНИН В СЕТКЕ</h2>
+    <canvas id="gridShip"></canvas>
+    <div class="dim">44 × 108 клеток</div>
   </div>
 
   <div class="card">
-    <h2>B · ДЕТАЛЬ НОС = УРОВЕНЬ (кривой силуэт)</h2>
-    <div class="row">
-      <div><canvas id="fieldEmpty"></canvas><div class="lbl">силуэт детали (пусто)</div></div>
-      <div><canvas id="fieldHalf"></canvas><div class="lbl">уложено ~половина</div></div>
-    </div>
-    <div class="cap">Деталь НОС в окне 8×12 — <b>не прямоугольник</b>, а своя кривая
-       форма (остальное окно = void). Нос уже гондольного окна и влезает как есть;
-       секции шире окна (мидель) <b>делятся на детали</b> под тот же размер —
-       ширину корабля в поле не кладём. Пустая клетка — пунктир-мишень
-       (<code>ghostTarget</code>); уложенная — проступает кусок рисунка.</div>
-  </div>
-
-  <div class="card">
-    <h2>C · ЭКРАН КОРАБЛЯ</h2>
+    <h2>ЭКРАН КОРАБЛЯ</h2>
     <div class="device">
       <div class="safe"></div>
       <div class="dtop">
@@ -131,28 +62,6 @@
       <div class="dfoot"><div class="btn primary">Продолжить сборку</div></div>
       <div class="safe b"></div>
     </div>
-    <div class="cap">Собранные модули (нос, мостик) — из рендера, в полном свете.
-       Несобранное — <b>только тонкий контур-силуэт</b> борта («сюда дорастёт»),
-       без картинки. Ни отсечки, ни притушенного рисунка. Одна кнопка.</div>
-  </div>
-</div>
-
-<div class="catalog">
-  <h2>Каталог элементов — Ронин-1</h2>
-  <p>Поле укладки (drag/снап, лоток, <code>el-drop-*</code>) — в
-     <code>ukladka-field.html</code>. Здесь — что меняет модель «пазл из рисунка».</p>
-  <div class="elgrid">
-    <div class="el"><div class="frame"><canvas id="c-tile"></canvas></div>
-      <div class="name">el-cell-filled</div>
-      <div class="an">Уложенная клетка = <b>тайл рендера корабля</b> (drawImage из
-         единого рисунка). Не плоский материал.</div></div>
-    <div class="el"><div class="frame"><canvas id="c-tgt"></canvas></div>
-      <div class="name">el-cell-target</div>
-      <div class="an">Пустая клетка силуэта — пунктир <code>ghostTarget</code>.</div></div>
-    <div class="el"><div class="frame"><canvas id="c-ghost"></canvas></div>
-      <div class="name">el-ship-outline</div>
-      <div class="an">Несобранная часть борта — только тонкий контур-силуэт, без
-         рисунка. Намёк, куда дорастёт корабль.</div></div>
   </div>
 </div>
 
@@ -651,126 +560,32 @@ return {off,W,H,C,OX,OY,px,py,span,ROWS};
 })();
 </script>
 
-<!-- ============ ПАНЕЛИ: сэмплинг тайлов из настоящего рендера ============ -->
+<!-- ============ ЭКРАНЫ: Ронин в клеточной сетке + экран корабля с контуром ============ -->
 <script>
 "use strict";
 const SHIP=window.__SHIP;
 const {off,C,px,py,span,ROWS}=SHIP;
 const SC=2;                         // offscreen 2x
-const WC=8, WR=12;                  // окно 8×12 (габарит-бюджет детали)
-function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
-function inHull(c,r){ const sp=span[r]; return sp && c>=sp[0] && c<=sp[1]; }
-function K(c,r){ return c+','+r; }
-function tile(g,c,r,dx,dy,s){ g.drawImage(off, px(c)*SC, py(r)*SC, C*SC, C*SC, dx,dy,s,s); }
+const NCOL=44, NROW=108;            // размер Ронина в клетках (на утверждении PO)
+const HH=27;                        // высота bbox корпуса в клетках рендера
 function dpr(cv,w,h){ const k=window.devicePixelRatio||1; cv.width=w*k; cv.height=h*k;
   cv.style.width=w+'px'; cv.style.height=h+'px'; const g=cv.getContext('2d'); g.scale(k,k);
   g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; return g; }
-function dash(g,dx,dy,s){ g.save(); g.strokeStyle='hsla(23,62%,55%,.55)'; g.lineWidth=1.4;
-  g.setLineDash([4,3]); g.strokeRect(dx+2,dy+2,s-4,s-4);
-  g.fillStyle='hsla(23,62%,46%,.05)'; g.fillRect(dx+2,dy+2,s-4,s-4); g.restore(); }
 
-/* ===== рассекаем ВЕСЬ Ронин на куски, потом группируем в секции ===== */
-const HULL=[];
-for(let r=0;r<ROWS;r++) if(span[r]) for(let c=span[r][0];c<=span[r][1];c++) HULL.push([c,r]);
-const PIECE={};           // "c,r" -> pieceId
-const pieceCells={};      // pieceId -> [[c,r]...]
+/* Ронин в квадратной клеточной сетке */
 (function(){
-  const rand=mulberry32(20260724), asg=new Set(); let pid=0;
-  for(const [c0,r0] of HULL){
-    if(asg.has(K(c0,r0))) continue;
-    const tgt=3+Math.floor(rand()*3), grp=[[c0,r0]];
-    asg.add(K(c0,r0)); PIECE[K(c0,r0)]=pid;
-    while(grp.length<tgt){
-      const cand=[];
-      for(const [c,r] of grp) for(const [a,b] of [[c+1,r],[c-1,r],[c,r+1],[c,r-1]])
-        if(inHull(a,b)&&!asg.has(K(a,b))) cand.push([a,b]);
-      if(!cand.length) break;
-      const [a,b]=cand[Math.floor(rand()*cand.length)];
-      asg.add(K(a,b)); PIECE[K(a,b)]=pid; grp.push([a,b]);
-    }
-    pieceCells[pid]=grp; pid++;
-  }
-})();
-/* секция куска — по центроиду (смысловые пояса «Ронина») */
-function sectionOfPiece(pid){
-  const g=pieceCells[pid]; let sr=0; for(const [,r] of g) sr+=r; sr/=g.length;
-  if(sr<4)  return 'nose';   // 0-3: остриё + визор-мостик = деталь НОС
-  if(sr<8)  return 'fwd';    // 4-7: носовая секция
-  if(sr<13) return 'bandA';
-  if(sr<18) return 'mid';
-  if(sr<21) return 'bandB';
-  return 'eng';
-}
-const SECT={ nose:'hsla(23,85%,55%,.22)', fwd:'hsla(45,70%,55%,.16)',
-  bandA:'hsla(280,12%,62%,.10)', mid:'hsla(205,40%,60%,.10)',
-  bandB:'hsla(280,12%,62%,.10)', eng:'hsla(280,10%,55%,.07)' };
-function sectionOfCell(c,r){ return sectionOfPiece(PIECE[K(c,r)]); }
-
-/* рисуем участок Ронина: тайлы + тинт секций + швы кусков + кривые границы секций */
-function drawCut(g, ox, oy, c0, r0, s, {tiles=true,tint=true}={}){
-  for(const [c,r] of HULL){
-    const dx=ox+(c-c0)*s, dy=oy+(r-r0)*s;
-    if(tiles) tile(g,c,r,dx,dy,s);
-    if(tint){ g.fillStyle=SECT[sectionOfCell(c,r)]||'transparent'; g.fillRect(dx,dy,s,s); }
-  }
-  // швы между кусками (тонко) и границы секций-деталей (толще, ярче) = кривой край
-  for(const [c,r] of HULL){
-    const dx=ox+(c-c0)*s, dy=oy+(r-r0)*s, p=PIECE[K(c,r)], sec=sectionOfCell(c,r);
-    const edges=[[c+1,r,dx+s,dy,dx+s,dy+s],[c-1,r,dx,dy,dx,dy+s],
-                 [c,r+1,dx,dy+s,dx+s,dy+s],[c,r-1,dx,dy,dx+s,dy]];
-    for(const [a,b,x1,y1,x2,y2] of edges){
-      const nHull=inHull(a,b);
-      const diffSec = !nHull || sectionOfCell(a,b)!==sec;
-      const diffPiece = !nHull || PIECE[K(a,b)]!==p;
-      if(diffSec){ g.strokeStyle='hsla(23,80%,60%,.85)'; g.lineWidth=2; }
-      else if(diffPiece){ g.strokeStyle='hsla(220,14%,6%,.6)'; g.lineWidth=1; }
-      else continue;
-      g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke();
-    }
-  }
-}
-
-/* A: ВЕСЬ Ронин рассечён — куски → секции (кривой край детали) */
-(function(){
-  const s=15, c0=3, r0=0, cols=9, rows=27;
-  const g=dpr(document.getElementById('drawGrid'), cols*s, rows*s);
-  g.fillStyle='#0e1116'; g.fillRect(0,0,cols*s,rows*s);
-  drawCut(g,0,0,c0,r0,s,{tiles:true,tint:true});
-  // легенда убрана — секции читаются тинтом; НОС = оранжевый
-  const z=dpr(document.getElementById('zoomCell'), 150, 150);
-  z.fillStyle='#0e1116'; z.fillRect(0,0,150,150);
-  // зум: одна деталь НОС крупно (кривой контур)
-  const nose=HULL.filter(([c,r])=>sectionOfCell(c,r)==='nose');
-  let minc=99,minr=99,maxc=0,maxr=0; for(const[c,r]of nose){minc=Math.min(minc,c);minr=Math.min(minr,r);maxc=Math.max(maxc,c);maxr=Math.max(maxr,r);}
-  const zs=Math.min(150/((maxc-minc+1)), 150/((maxr-minr+1)));
-  for(const [c,r] of nose){ tile(z,c,r,(c-minc)*zs,(r-minr)*zs,zs); }
-  for(const [c,r] of nose){ const dx=(c-minc)*zs, dy=(r-minr)*zs;
-    for(const [a,b,x1,y1,x2,y2] of [[c+1,r,dx+zs,dy,dx+zs,dy+zs],[c-1,r,dx,dy,dx,dy+zs],[c,r+1,dx,dy+zs,dx+zs,dy+zs],[c,r-1,dx,dy,dx+zs,dy]]){
-      if(inHull(a,b) && sectionOfCell(a,b)==='nose') continue;
-      z.strokeStyle='hsla(23,80%,60%,.9)'; z.lineWidth=2; z.beginPath(); z.moveTo(x1,y1); z.lineTo(x2,y2); z.stroke();
-    }
-  }
+  const u=6;                          // экранных px на клетку
+  const W=NCOL*u, H=NROW*u;
+  const g=dpr(document.getElementById('gridShip'), W, H);
+  g.fillStyle='#0e1116'; g.fillRect(0,0,W,H);
+  g.drawImage(off, px(2)*SC, py(0)*SC, 11*C*SC, HH*C*SC, 0,0, W,H);
+  // клеточная сетка
+  g.strokeStyle='rgba(255,255,255,.05)'; g.lineWidth=1;
+  for(let c=0;c<=NCOL;c++){const x=c*u; g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
+  for(let r=0;r<=NROW;r++){const y=r*u; g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
 })();
 
-/* B: деталь НОС как уровень — кривой силуэт в окне 8×12 */
-const NOSE=HULL.filter(([c,r])=>sectionOfCell(c,r)==='nose');
-let Nc=99,Nr=99; for(const[c,r]of NOSE){Nc=Math.min(Nc,c);Nr=Math.min(Nr,r);}
-const noseSet=new Set(NOSE.map(([c,r])=>K(c,r)));
-function drawNose(id, filledFn){
-  const s=26, g=dpr(document.getElementById(id), WC*s, WR*s);
-  g.fillStyle='hsl(219,13%,10%)'; g.fillRect(0,0,WC*s,WR*s);
-  // центрируем деталь в окне
-  const offc=1, offr=1;
-  for(const [c,r] of NOSE){
-    const dx=(c-Nc+offc)*s, dy=(r-Nr+offr)*s;
-    if(filledFn(c,r)) tile(g,c,r,dx,dy,s); else dash(g,dx,dy,s);
-  }
-}
-drawNose('fieldEmpty', ()=>false);
-drawNose('fieldHalf', (c,r)=> (c+r)%2===0 );
-
-/* C: экран корабля — рисуем ТОЛЬКО собранное (нос+мостик); несобранное = тонкий
-   контур-силуэт борта (намёк цели), без картинки. */
+/* Экран корабля: собранное (нос+мостик) — из рендера; несобранное — тонкий контур */
 (function(){
   const sx=44, sy=26, sw=SHIP.W-88, sh=SHIP.H-40;   // обрезаем поля
   const destW=210, scale=destW/sw, destH=sh*scale;
@@ -786,6 +601,16 @@ drawNose('fieldHalf', (c,r)=> (c+r)%2===0 );
   for(let y=ROWS-1;y>=0;y--){ g.lineTo(DX(span[y][1]+1),DY(y+1)); g.lineTo(DX(span[y][1]+1),DY(y)); }
   g.closePath();
   g.strokeStyle='hsla(215,14%,52%,.16)'; g.lineWidth=1; g.stroke();
+  // гондолы (поды) по бортам — часть силуэта «сюда дорастёт» (тот же shipOutline)
+  const TX=X=>(X-sx)*scale, TY=Y=>(Y-sy)*scale;
+  const bw=1.06*C, bh=2.9*C, byt=py(13.55), pr=7*scale;
+  function podOutline(bx){
+    const x=TX(bx), y=TY(byt), w=bw*scale, h=bh*scale;
+    g.beginPath(); g.moveTo(x+pr,y);
+    g.arcTo(x+w,y,x+w,y+h,pr); g.arcTo(x+w,y+h,x,y+h,pr);
+    g.arcTo(x,y+h,x,y,pr); g.arcTo(x,y,x+w,y,pr); g.closePath(); g.stroke();
+  }
+  podOutline(px(3)-bw+2); podOutline(px(12)-2);
   // собранная часть — блит из рендера, клип по силуэту строк 0..BUILT
   g.save();
   g.beginPath();
@@ -796,19 +621,6 @@ drawNose('fieldHalf', (c,r)=> (c+r)%2===0 );
   g.closePath(); g.clip();
   g.drawImage(off, sx*SC, sy*SC, sw*SC, sh*SC, 0,0,destW,destH);
   g.restore();
-})();
-
-/* каталог */
-(function(){
-  let g;
-  g=dpr(document.getElementById('c-tile'),88,88); g.fillStyle='#0e1116'; g.fillRect(0,0,88,88);
-  tile(g,7,8,8,8,72);           // кусок с маркировкой «7 7»
-  g=dpr(document.getElementById('c-tgt'),88,88); g.fillStyle='hsl(219,13%,10%)'; g.fillRect(0,0,88,88);
-  dash(g,8,8,72);
-  g=dpr(document.getElementById('c-ghost'),88,88); g.fillStyle='#0e1116'; g.fillRect(0,0,88,88);
-  g.strokeStyle='hsla(215,14%,52%,.28)'; g.lineWidth=1;
-  g.beginPath(); g.moveTo(20,16); g.lineTo(68,16); g.lineTo(68,60); g.lineTo(56,72);
-  g.lineTo(32,72); g.lineTo(20,60); g.closePath(); g.stroke();
 })();
 </script>
 </body>
