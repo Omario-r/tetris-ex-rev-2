@@ -14,7 +14,7 @@ import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
 /// каждый в свою клетку. Достаточно для проверки цвета уложенных клеток без
 /// лишней сложности нарезки/связности.
 PackState _twoPieceState() {
-  const silhouette = TargetMask(width: 2, height: 1, mask: 0x3);
+  const silhouette = TargetMask(rows: ['##']);
   return const PackState(
     silhouette: silhouette,
     placements: {1: (x: 0, y: 0), 2: (x: 1, y: 0)},
@@ -114,7 +114,7 @@ void main() {
 
   group('PackingPainter — dragPreview (снап-превью drop-ok/drop-bad)', () {
     PackState emptyState() {
-      const silhouette = TargetMask(width: 4, height: 4, mask: 0xFFFF);
+      const silhouette = TargetMask(rows: ['####', '####', '####', '####']);
       return const PackState(
         silhouette: silhouette,
         placements: {},

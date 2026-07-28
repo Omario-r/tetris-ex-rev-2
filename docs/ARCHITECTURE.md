@@ -71,8 +71,9 @@ lib/main.dart (вход)
 - **Навигация:** захватить `NavigatorState` до `pushReplacement`; `context` из `State` в колбэках
   после ухода с экрана не использовать (проверка `mounted`).
 - **Точка входа:** `lib/main.dart` → `ProgressService.getCurrentLevel()` → `GameScreen(levelIndex)`.
-- **Тестовая фикстура:** `defaultLevel`/`defaultTargetMask` (крест 6×6, маска `0x30CFFF30C`) —
-  НЕ игровой уровень; на нём написаны тесты движка, не удалять при чистке контента.
+- **Тестовая фикстура:** `defaultLevel`/`defaultTargetMask` (крест 6×6, строки
+  `..##..`/`######`) — НЕ игровой уровень; на нём написаны тесты движка, не удалять
+  при чистке контента.
 - **Команды и смоук-тест:** `flutter pub get` / `flutter run` / `flutter test` / `flutter analyze`
   (analyze — ноль ошибок и предупреждений). Смоук/сквозной сценарий:
   `flutter test test/widget_test.dart test/presentation/win_flow_test.dart`

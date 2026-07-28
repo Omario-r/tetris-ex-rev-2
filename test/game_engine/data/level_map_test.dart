@@ -10,7 +10,7 @@ void main() {
         final part = ShipParts.parts[i].mask;
         expect(target.width, equals(part.width));
         expect(target.height, equals(part.height));
-        expect(target.mask, equals(part.mask));
+        expect(target.rows, equals(part.rows));
       });
     }
 

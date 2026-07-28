@@ -4,7 +4,7 @@ import 'package:explosive_tetris/game_engine/packing/pack_piece.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_state.dart';
 
 // Силуэт 2×2, все клетки заняты (0xF = 0b1111, MSB-first, все биты — 1).
-const _fullSquare = TargetMask(width: 2, height: 2, mask: 0xF);
+const _fullSquare = TargetMask(rows: ['##', '##']);
 
 const _rowA = PackPiece(id: 0, cells: [(x: 0, y: 0), (x: 1, y: 0)]);
 const _rowB = PackPiece(id: 1, cells: [(x: 0, y: 0), (x: 1, y: 0)]);

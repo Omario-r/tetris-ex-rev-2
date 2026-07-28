@@ -12,7 +12,11 @@
 
 ## Публичный интерфейс
 
-- `TargetMask{width,height,mask}` c `contains(x,y)`, `cells`; `defaultTargetMask` (крест 6×6, `0x30CFFF30C`).
+- `TargetMask{rows}` — строки `#`/`.` сверху вниз (см. «Инварианты»); `width`/`height` —
+  геттеры от `rows`; `contains(x,y)`, `cells`, `padTo({width,height,dx,dy})` (вкладывает
+  маску в окно большего размера со сдвигом — центрирование детали в поле);
+  `isWellFormed` — геттер-инвариант (не `assert` в конструкторе, см. «Инварианты»).
+  `defaultTargetMask` (крест 6×6, строки `..##..`/`######`).
 - `LevelTemplate{boardWidth,boardHeight,targetMask,targetX,targetY,objectId,fragmentIndex}`;
   `defaultLevel`. `objectId`/`fragmentIndex` — ключ для `presentation/theme`
   (`LevelSkin.materialForObjectFragment`), не связаны с моделью «объектов» (удалена
@@ -30,10 +34,18 @@
 ## Инварианты
 
 - Координаты: `(0,0)` слева сверху, `y` растёт вниз; линейный индекс `i = y*width + x`.
-- `TargetMask` MSB-first: бит `b = (w*h−1) − (y*w + x)`; окна до 8×8 (64-битный `int`).
+- `TargetMask` хранит форму как `List<String>` (строки сверху вниз, `#`/`.`), НЕ
+  битовой маской — снимает потолок 8×8 (64-битный `int`): окно любого размера
+  (детали «Ронина» до 10×14 — 100+ бит не влезли бы в `int`).
 - `TargetMask.contains(x,y)` вне окна (`x`/`y` < 0 или ≥ width/height) — честный
-  `false`, без исключений (границы проверяются до битовой арифметики; фикс
+  `false`, без исключений (границы проверяются до чтения `rows`; фикс
   краша `Invalid argument(s): -1`, укладка/04 T1).
+- `TargetMask` — const-конструктор БЕЗ `assert` на форму `rows` (const-конструктор
+  не может читать `rows.length`/`rows.first.length` — это сделало бы масковые
+  литералы деталей не-const, а `ShipParts.parts`/`RoninParts.parts` обязаны быть
+  `static const`). Инвариант окна (список непуст, строки непусты и одной длины)
+  живёт в геттере `isWellFormed`, безопасном на любом `rows` (включая пустой) —
+  проверяется тестами модуля и инвариант-тестом разметки контента, не рантаймом.
 - `LevelTemplate` — НЕ const (`defaultLevel`, `LevelMap` создают экземпляры в рантайме).
 - `defaultTargetMask`/`defaultLevel` — фикстура тестов движка, НЕ игровой уровень: не удалять.
 

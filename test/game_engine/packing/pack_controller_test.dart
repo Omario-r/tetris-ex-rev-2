@@ -6,7 +6,7 @@ import 'package:explosive_tetris/game_engine/packing/pack_state.dart';
 
 // Силуэт 2×2, все клетки заняты; два кусочка по 2 клетки (верхняя и
 // нижняя строка квадрата) — минимальная фикстура для полной укладки.
-const _fullSquare = TargetMask(width: 2, height: 2, mask: 0xF);
+const _fullSquare = TargetMask(rows: ['##', '##']);
 
 const _rowA = PackPiece(id: 0, cells: [(x: 0, y: 0), (x: 1, y: 0)]);
 const _rowB = PackPiece(id: 1, cells: [(x: 0, y: 0), (x: 1, y: 0)]);

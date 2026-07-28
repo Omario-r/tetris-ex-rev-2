@@ -69,20 +69,76 @@ void main() {
     });
   });
 
-  group('MSB-first битмаска', () {
-    test('1x1 mask=1 содержит (0,0)', () {
-      const m = TargetMask(width: 1, height: 1, mask: 1);
+  group('TargetMask через rows — соответствие строк клеткам', () {
+    test('1x1 "#" содержит (0,0)', () {
+      const m = TargetMask(rows: ['#']);
       expect(m.contains(0, 0), isTrue);
     });
 
-    test('2x2 mask=8 содержит (0,0)', () {
-      const m = TargetMask(width: 2, height: 2, mask: 8);
+    test('2x2 верхний-левый угол занят', () {
+      const m = TargetMask(rows: ['#.', '..']);
       expect(m.contains(0, 0), isTrue);
+      expect(m.contains(1, 0), isFalse);
+      expect(m.contains(0, 1), isFalse);
+      expect(m.contains(1, 1), isFalse);
     });
 
-    test('2x2 mask=1 содержит (1,1)', () {
-      const m = TargetMask(width: 2, height: 2, mask: 1);
+    test('2x2 нижний-правый угол занят', () {
+      const m = TargetMask(rows: ['..', '.#']);
       expect(m.contains(1, 1), isTrue);
+      expect(m.contains(0, 0), isFalse);
+    });
+
+    test('width/height берутся из rows', () {
+      const m = TargetMask(rows: ['###', '###']);
+      expect(m.width, equals(3));
+      expect(m.height, equals(2));
+    });
+  });
+
+  group('TargetMask.isWellFormed', () {
+    test('true на нормальной маске', () {
+      const m = TargetMask(rows: ['##', '##']);
+      expect(m.isWellFormed, isTrue);
+    });
+
+    test('false на строках разной длины', () {
+      const m = TargetMask(rows: ['##', '#']);
+      expect(m.isWellFormed, isFalse);
+    });
+
+    test('false на пустом списке rows (без падения)', () {
+      const m = TargetMask(rows: []);
+      expect(m.isWellFormed, isFalse);
+    });
+
+    test('false на строках нулевой длины (без падения)', () {
+      const m = TargetMask(rows: ['', '']);
+      expect(m.isWellFormed, isFalse);
+    });
+  });
+
+  group('TargetMask.padTo', () {
+    test('кладёт исходные клетки со сдвигом', () {
+      const m = TargetMask(rows: ['##', '##']);
+      final padded = m.padTo(width: 6, height: 6, dx: 2, dy: 2);
+      expect(padded.width, equals(6));
+      expect(padded.height, equals(6));
+      for (final cell in m.cells) {
+        expect(padded.contains(cell.x + 2, cell.y + 2), isTrue);
+      }
+    });
+
+    test('не добавляет чужих клеток — совпадает число клеток', () {
+      const m = TargetMask(rows: ['##', '##']);
+      final padded = m.padTo(width: 6, height: 6, dx: 2, dy: 2);
+      expect(padded.cells.length, equals(m.cells.length));
+    });
+
+    test('клетки вне окна сдвига не появляются на исходном месте', () {
+      const m = TargetMask(rows: ['##', '##']);
+      final padded = m.padTo(width: 6, height: 6, dx: 2, dy: 2);
+      expect(padded.contains(0, 0), isFalse);
     });
   });
 }

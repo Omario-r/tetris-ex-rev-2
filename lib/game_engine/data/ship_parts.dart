@@ -38,43 +38,43 @@ class ShipParts {
   static const List<ShipPartDef> parts = [
     // 0 — Нос / кабина (4×2): .##. / ####
     ShipPartDef(
-      mask: TargetMask(width: 4, height: 2, mask: 0x6F),
+      mask: TargetMask(rows: ['.##.', '####']),
       shipX: 4,
       shipY: 0,
     ),
     // 1 — Верхний корпус (4×3): #### / #### / ####
     ShipPartDef(
-      mask: TargetMask(width: 4, height: 3, mask: 0xFFF),
+      mask: TargetMask(rows: ['####', '####', '####']),
       shipX: 4,
       shipY: 2,
     ),
     // 2 — Нижний корпус (4×3): #### / #### / ####
     ShipPartDef(
-      mask: TargetMask(width: 4, height: 3, mask: 0xFFF),
+      mask: TargetMask(rows: ['####', '####', '####']),
       shipX: 4,
       shipY: 5,
     ),
     // 3 — Левое крыло (3×3): ..# / .## / ### (смыкается с корпусом справа)
     ShipPartDef(
-      mask: TargetMask(width: 3, height: 3, mask: 0x5F),
+      mask: TargetMask(rows: ['..#', '.##', '###']),
       shipX: 1,
       shipY: 4,
     ),
     // 4 — Правое крыло (3×3): #.. / ##. / ### (смыкается с корпусом слева)
     ShipPartDef(
-      mask: TargetMask(width: 3, height: 3, mask: 0x137),
+      mask: TargetMask(rows: ['#..', '##.', '###']),
       shipX: 8,
       shipY: 4,
     ),
     // 5 — Двигатель / сопло (4×2): #### / .##. (сужается книзу)
     ShipPartDef(
-      mask: TargetMask(width: 4, height: 2, mask: 0xF6),
+      mask: TargetMask(rows: ['####', '.##.']),
       shipX: 4,
       shipY: 8,
     ),
     // 6 — Хвостовой киль / выхлоп (2×2): ## / ##
     ShipPartDef(
-      mask: TargetMask(width: 2, height: 2, mask: 0xF),
+      mask: TargetMask(rows: ['##', '##']),
       shipX: 5,
       shipY: 10,
     ),
