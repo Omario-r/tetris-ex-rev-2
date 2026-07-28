@@ -12,7 +12,10 @@
 ## Публичный интерфейс
 
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
-  Стори 02 T2). Силуэт уровня — `LevelMap.levelAt(levelIndex).targetMask`; материал уложенных
+  Стори 02 T2). Силуэт уровня — `LevelMap.levelAt(levelIndex).targetMask`, **поле фиксировано
+  10×14** для всех 13 уровней (Ронин-1/01 T3: `LevelMap.fieldWidth/Height`, деталь центрирована
+  в поле, `targetMask` уже размера поля) — экран геометрию поля из мишени не выводит, только
+  читает её размер. Материал уложенных
   клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все 13 деталей (Ронин-1/01
   T3, было `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)`: 7-элементная карта
   не покрывала 13 деталей «Ронина» — `RangeError` на 8-м уровне; `ShipMaterials` из экрана
@@ -30,11 +33,11 @@
   градиент `rust→hazardOrange`), подпись «уложено N / M кусков» (N=`placements.length`,
   M=`pieces.length`).
 - Размер клетки поля — **адаптивный**: `_computeCellSize(constraints, boardWidth, boardHeight)`
-  = `max(8, min(40.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток - 16 паддинг
+  = `max(8, min(34.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток - 16 паддинг
   поля)/boardHeight, (maxWidth - 16 паддинг поля)/boardWidth))` (внутри
-  `LayoutBuilder`+`SafeArea`); силуэты деталей мелкие (≤4×3) → на телефоне держит канонные
-  40px, на коротких экранах не переполняет. Клетка хранится в поле `_cellSize` (обновляется в
-  `build`) — нужна pointer-обработчикам.
+  `LayoutBuilder`+`SafeArea`); канон 34px — поле 10×14 при клетке 34 (Ронин-1/01 T4, было 40px
+  под мелкие дев-силуэты ≤4×3), на коротких экранах клетка ужимается (нижний порог 8px).
+  Клетка хранится в поле `_cellSize` (обновляется в `build`) — нужна pointer-обработчикам.
 - Панель поля — канон `.board` мокапа (`ukladka-field.html:85-86`, возврат Гейта 3 T2):
   `_boardPadding=8.0` между рамкой панели и сеткой силуэта — вокруг мишени читается подложка
   `boardBg`, обводка снап-превью на крайних клетках не срезается клипом. Габарит панели =
@@ -44,9 +47,13 @@
   инварианты) → `ClipRRect` (скругление 10 для содержимого) → `Padding(_boardPadding)` →
   `Listener`/`CustomPaint` (`_boardKey` без изменений).
   Клетка лотка `_trayCellSize=32.0` (~0.8 полевой, канон мокапа/прототипа Стори 01).
-- Топбар (канон `.topbar`/`.chip`/`.pausebtn`, высота 44): слева чип «ДЕТАЛЬ N/7» со свотчем
-  материала детали, справа dev-кнопки (`Key('cheat_button')` под `kDebugMode`,
-  `Key('ship_button')`). Виджеты `_PartChip`/`_Swatch`/`_DevButton` сохранены из Стори 02 T3.
+- Топбар (канон `.topbar`/`.title`/`.pausebtn` мокапа `ukladka-field.html`, высота 44,
+  Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / 13»
+  (N=`fragmentIndex+1`, 13=`kShipPartCount`) и `.name` название детали заглавными
+  (`RoninParts.parts[fragmentIndex].title.toUpperCase()`, напр. «НОС, ЛЕВЫЙ БОРТ»); свотча
+  материала в топбаре больше нет (был у прежнего чипа, Стори 02 T3). Справа dev-кнопки
+  (`Key('cheat_button')` под `kDebugMode`, `Key('ship_button')`). Виджеты `_PartTitle`
+  (заменил `_PartChip`/`_Swatch`) / `_DevButton`.
 - Drag-and-drop — сырые pointer-события `Listener` (`onPointerDown/Move/Up/Cancel`, НЕ
   `GestureDetector.onPan*` — фикс возврата Гейта 2 Стори 01: лоток
   `SingleChildScrollView(Axis.horizontal)` выигрывал `onPan*` в gesture arena, кусок не
@@ -80,7 +87,8 @@
 ## Зависит от
 
 - `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`slicePolyomino`),
-  `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`),
+  `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`, `RoninParts` — только
+  чтение, название детали для топбара, Ронин-1/01 T4),
   `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`/`ShipMaterials`),
   `presentation/widgets` (`PackingPainter`, `ship`). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,

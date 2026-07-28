@@ -27,11 +27,9 @@ class ShipScreen extends StatefulWidget {
   const ShipScreen.reveal({
     super.key,
     required int collectedCount,
-    required VoidCallback onNext,
-    bool isComplete = false,
-  }) : _revealCount = collectedCount,
-       _onNext = onNext,
-       _isComplete = isComplete;
+    required this._onNext,
+    this._isComplete = false,
+  }) : _revealCount = collectedCount;
 
   bool get _isReveal => _onNext != null;
 

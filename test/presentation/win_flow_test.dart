@@ -56,7 +56,7 @@ void main() {
         final game = t.widget<GameScreen>(find.byType(GameScreen));
         expect(game.levelIndex, level);
         expect(
-          find.text('ДЕТАЛЬ ${level + 1}/$kShipPartCount'),
+          find.text('ДЕТАЛЬ ${level + 1} / $kShipPartCount'),
           findsOneWidget,
         );
 
@@ -85,7 +85,7 @@ void main() {
       // Сброс после последнего уровня: назад к уровню 1.
       final game = t.widget<GameScreen>(find.byType(GameScreen));
       expect(game.levelIndex, 0);
-      expect(find.text('ДЕТАЛЬ 1/$kShipPartCount'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1 / $kShipPartCount'), findsOneWidget);
       expect(await ProgressService().getCurrentLevel(), 0);
     },
   );

@@ -42,9 +42,13 @@ void main() {
           reason: 'поле должно рисоваться PackingPainter (ядро укладки)');
     });
 
-    testWidgets('топбар-чип «ДЕТАЛЬ 1/13» на уровне 0', (tester) async {
+    testWidgets(
+        'топбар: «ДЕТАЛЬ 1 / 13» + название детали на уровне 0',
+        (tester) async {
       await pumpGame(tester);
-      expect(find.text('ДЕТАЛЬ 1/13'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1 / 13'), findsOneWidget);
+      // Уровень 0 ↔ деталь order 1 (`RoninParts.parts[0]`) — «Нос, левый борт».
+      expect(find.text('НОС, ЛЕВЫЙ БОРТ'), findsOneWidget);
     });
 
     testWidgets('лоток: подпись «ЛОТОК · ПОЛНЫЙ НАБОР» + кусочки в ряду',

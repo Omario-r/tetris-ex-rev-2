@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../application/progress_service.dart';
 import '../../game_engine/data/level_map.dart';
+import '../../game_engine/data/ronin_parts.dart';
 import '../../game_engine/models/target_mask.dart';
 import '../../game_engine/packing/pack_controller.dart';
 import '../../game_engine/packing/pack_piece.dart';
@@ -46,7 +47,7 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen>
     with SingleTickerProviderStateMixin {
   // --- Канон макета (мокап при 812-высоте) ---
-  static const double _canonicalCellSize = 40.0;
+  static const double _canonicalCellSize = 34.0;
   static const double _topbarHeight = 44.0;
   static const double _progZoneHeight = 34.0;
   static const double _trayZoneHeight = 132.0;
@@ -503,10 +504,7 @@ class _GameScreenState extends State<GameScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _PartChip(
-              fragmentIndex: _fragmentIndex,
-              material: _partMaterial,
-            ),
+            _PartTitle(fragmentIndex: _fragmentIndex),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -782,84 +780,45 @@ class _GameScreenState extends State<GameScreen>
   }
 }
 
-/// Чип детали в топбаре — канон `.chip`/`.chip .sw` (Стори 02 T3):
-/// matteBlack fill, gunmetal 1px border, radius 8, свотч материала детали +
-/// текст «ДЕТАЛЬ N/7» разрядкой.
-class _PartChip extends StatelessWidget {
-  const _PartChip({required this.fragmentIndex, required this.material});
+/// Заголовок топбара — канон `.title`/`.kick`/`.name` мокапа
+/// (`docs/design/ukladka-field.html`, Ронин-1/01 T4): «ДЕТАЛЬ N / 13» +
+/// название детали заглавными (`RoninParts.parts[fragmentIndex].title`).
+/// Заменяет прежний чип со свотчем материала (Стори 02 T3) — свотча в
+/// топбаре больше нет.
+class _PartTitle extends StatelessWidget {
+  const _PartTitle({required this.fragmentIndex});
 
   /// Индекс текущей детали (0-based); в тексте отображается `fragmentIndex+1`.
   final int fragmentIndex;
 
-  /// Материал текущей детали (заливка свотча).
-  final BlockMaterial material;
-
-  static const Color _matteBlack = Color(0xFF1D2025); // matteBlack token
-  static const Color _gunmetal = Color(0xFF32363E); // gunmetal token
-  static const Color _textColor = Color(0xFFAEB6BF); // chip text color
+  static const Color _kickColor = Color(0xFF7C848D); // `.title .kick`
+  static const Color _nameColor = Color(0xFFD7DDE3); // `.title .name`
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 7.0, horizontal: 11.0),
-      decoration: BoxDecoration(
-        color: _matteBlack,
-        border: Border.all(color: _gunmetal, width: 1.0),
-        borderRadius: BorderRadius.circular(8.0),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _Swatch(color: material.color),
-          const SizedBox(width: 8.0),
-          Text(
-            'ДЕТАЛЬ ${fragmentIndex + 1}/$kShipPartCount',
-            style: const TextStyle(
-              color: _textColor,
-              fontSize: 12.0,
-              letterSpacing: 0.72, // .06em @ 12px
-            ),
+    final title = RoninParts.parts[fragmentIndex].title.toUpperCase();
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'ДЕТАЛЬ ${fragmentIndex + 1} / $kShipPartCount',
+          style: const TextStyle(
+            color: _kickColor,
+            fontSize: 10.0,
+            letterSpacing: 1.4, // .14em @ 10px
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Свотч материала детали — канон `.chip .sw` (Стори 02 T3): 14×14, radius 3,
-/// лёгкий bevel (inset top-light/bottom-dark, приближено полосами).
-class _Swatch extends StatelessWidget {
-  const _Swatch({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(3.0),
-      child: SizedBox(
-        width: 14.0,
-        height: 14.0,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Container(color: color),
-            Column(
-              children: [
-                Container(
-                  height: 1,
-                  color: Colors.white.withValues(alpha: 0.10),
-                ),
-                const Expanded(child: SizedBox.shrink()),
-                Container(
-                  height: 1,
-                  color: Colors.black.withValues(alpha: 0.35),
-                ),
-              ],
-            ),
-          ],
         ),
-      ),
+        const SizedBox(height: 1.0),
+        Text(
+          title,
+          style: const TextStyle(
+            color: _nameColor,
+            fontSize: 13.0,
+            letterSpacing: 0.78, // .06em @ 13px
+          ),
+        ),
+      ],
     );
   }
 }
