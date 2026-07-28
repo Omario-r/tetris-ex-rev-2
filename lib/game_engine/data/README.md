@@ -5,19 +5,28 @@
 
 ## Назначение
 
-Контент: детали корабля (`ShipParts`) и карта уровней (`LevelMap`), по одному уровню на деталь.
-Данные, не логика. Старая карта объектов (4×4, «коллекция объектов») удалена (эпик «Контент»,
-Стори 02) — модель v1 «один корабль», не коллекция.
+Контент: разметка «Ронина» (`RoninParts` — 13 деталей на сетке 44×108, канон Дизайнера) и
+карта уровней (`LevelMap`), по одному уровню на деталь. Данные, не логика. `ShipParts` (7
+дев-деталей v1) — **осиротевший**: вытеснен `RoninParts` (Ронин-1/01 T2), физический выпил
+файла и его теста — Стори 06 (решение PO 2026-07-29). До T3 `LevelMap` ещё строит уровни из
+`ShipParts` — переезд на `RoninParts` (поле 10×14, центрирование) в T3.
 
 ## Публичный интерфейс
 
-- `ShipParts.parts` — `static const List<ShipPartDef>` (7 деталей корабля v1: маска-форма +
-  якорь в сетке корабля `gridSize=12`). Единый источник ФОРМЫ: `parts[i].mask` рисуется и как
-  мишень уровня `i`, и как деталь корабля (`ShipPainter`) → они совпадают. Детали смыкаются
-  в один связный силуэт «звездолёт с крыльями» (порядок = порядок сборки).
-- `LevelMap.levelAt(levelIndex)` — `LevelTemplate` для `levelIndex` 0..`ShipParts.parts.length-1`
-  (= `kShipPartCount-1`). Мишень = `ShipParts.parts[i].mask`, поставлена **у самого дна поля**
-  (пол — опора для падающих фигур; Стори 02 «Контента» — было со свободным зазором, убрали).
+- `RoninGrid` — сетка корабля: `cols=44`, `rows=108`, `renderCell=4`, `originCol=2` (клетка
+  рендера = 4×4 клетки сетки, сетка сдвинута относительно рендера на `originCol`).
+- `RoninPartDef` — деталь: `id`, `order` (1..13, порядок сборки), `module`
+  (`'prow'`|`'bridge'`|`'fwd'`), `title` (для топбара), `originCol`/`originRow` (левый-верх bbox
+  маски в координатах `RoninGrid`), `cells` (бюджет уровня), `seed` (пока `null` везде —
+  подбирается в Стори 04), `mask` (`TargetMask`, bbox-маска детали).
+- `RoninParts.parts` — `static const List<RoninPartDef>`, 13 деталей «Ронина-1», отсортированы
+  по `order` (индекс == `order - 1`). Источник — `docs/design/ronin-parts.js` (канон Дизайнера,
+  утв. PO 2026-07-29), перенесён 1:1 без правок формы. `partAtOrder(order)` / `byId(id)`
+  (неизвестный `id` → `ArgumentError`).
+- `ShipParts.parts` — 7 дев-деталей, `gridSize=12`. **Осиротевший**: работающий код на него не
+  ссылается (кроме `ship_parts.dart`/его теста), держится зелёным до выпила в Стори 06.
+- `LevelMap.levelAt(levelIndex)` — `LevelTemplate`; на T2 источник ещё `ShipParts` (не тронут
+  этой задачей).
 
 ## Зависит от
 
@@ -26,25 +35,24 @@
 ## От него зависят
 
 - `presentation/screens` — `game_screen` (`levelAt`).
-- `presentation/widgets` — `ship.dart`/`ShipPainter` (`ShipParts` — форма деталей).
+- `presentation/widgets` — `ship.dart`/`ShipPainter` (пока форма деталей — `ShipParts`; переезд
+  на `RoninParts` — T3).
 
 ## Инварианты
 
-- Все уровни = детали корабля: `levelAt(i).targetMask == ShipParts.parts[i].mask` (форма
-  собранного на уровне = деталь корабля). Число уровней = `ShipParts.parts.length`
-  (= `kShipPartCount`). Правило «площадь кратна 4» снято (VISION, эпик «Контент») — узнаваемость
-  в приоритете, неровности закрывает расчистка.
-- Мишень **floor-anchored**: `targetY = boardHeight - mask.height` (без зазора) — падающая
-  фигура естественно ложится на дно ровно по мишени; убирает риск «мишень висит в воздухе»,
-  недостижимая без опоры.
-- `LevelMap` — `static final`, НЕ `const` (`LevelTemplate` не const). `ShipParts` — `const`.
-- Контент масок деталей — прототипный, шлифуется по скриншотам (VISION: узнаваемость в приоритете).
-- Проходимость проверена структурно (непустота, площадь, границы, 4-связность — все уровни)
-  и содержательно новым ядром укладки (`content_packing_test.dart`: нарезка + эталонная
-  укладка до `isComplete`, все 7 деталей — Стори 03 T1). Проверка реальным падением фигур
-  через `GameController` (старое ядро) и halo-геометрия (`H∩S=∅`) сняты вместе со старым
-  ядром (эпик «Укладка», Стори 02 T4 / Стори 03 T2).
+- `RoninParts.parts`: ровно 13, `id` уникальны, `order` — перестановка 1..13; каждая
+  `mask.isWellFormed`, bbox ≤ 10×14; `cells` == число `#` в маске, 60 ≤ `cells` ≤ 80; маска
+  связна по 4-соседству, origin — точный bbox; деталь целиком внутри `RoninGrid`; детали
+  попарно не пересекаются; объединение всех 13 — 960 клеток, связно (`ronin_parts_test.dart`).
+  Проходимость (нарезка + эталонная укладка, сиды 0/1/2, все 13) — `ronin_packing_test.dart`.
+- Уровни (пока) = дев-детали: `levelAt(i).targetMask == ShipParts.parts[i].mask`; число
+  уровней = `ShipParts.parts.length` (= `kShipPartCount`) — сменится на `RoninParts` в T3.
+  Мишень **floor-anchored** (`targetY = boardHeight - mask.height`) — снимается вместе с
+  гравитацией в T3 (центрирование в поле 10×14).
+- `LevelMap` — `static final`, НЕ `const`. `ShipParts`/`RoninParts` — `const`.
+- Дев-контент масок — прототипный (не относится к `RoninParts`: канон Дизайнера, 1:1 перенос).
+  Проходимость дев-деталей: структурно + содержательно (`content_packing_test.dart`).
 
 ## Как проверить
 
-`flutter test test/game_engine/data/level_map_test.dart test/game_engine/data/ship_parts_test.dart test/game_engine/data/content_packing_test.dart`.
+`flutter test test/game_engine/data/`.
