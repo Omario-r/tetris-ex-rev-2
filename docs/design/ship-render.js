@@ -1,104 +1,58 @@
-<!DOCTYPE html>
-<!--
-  Мокап Ронин-1 — два экрана: (1) Ронин, размеченный на квадратную сетку клеток;
-  (2) экран корабля с контуром. Рисунок — реальный рендер ship_ronin_v4 (канон,
-  утв. PO): скрипт рендера скопирован БЕЗ изменений, рисует корабль в offscreen
-  `off`; экраны ниже сэмплируют его. Канон значений — docs/DESIGN.md.
--->
-<html lang="ru">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Мокап — Ронин: размеченный на клетки + экран корабля</title>
-<style>
-  * { box-sizing:border-box; }
-  body { margin:0; background:#0f1216; color:#cfd4da; font-family:system-ui,sans-serif; padding:22px; }
-  h1 { font-size:18px; margin:0 0 18px; color:#e6ebf0; }
-  .wrap { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
-  .card { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:18px; }
-  .card h2 { font-size:13px; margin:0 0 12px; color:#8b949e; letter-spacing:.05em; font-weight:600; }
-  canvas { display:block; }
-  .dim { font-size:11.5px; color:#8b949e; margin-top:10px; text-align:center; letter-spacing:.04em; }
+/*
+  ship-render.js — рендер крейсера «Ронин» v4. КАНОН РИСУНКА, утв. PO 2026-07-12
+  (подтверждён 2026-07-13). Единственный экземпляр: страницы docs/design/*.html
+  подключают этот файл, копий кода рендера в проекте больше нет.
 
-  .device { width:320px; height:680px; position:relative; overflow:hidden; flex:none;
-            background:hsl(220,14%,7%); outline:2px solid #3a4047; border-radius:26px;
-            display:flex; flex-direction:column; }
-  .safe { height:38px; flex:none; } .safe.b { height:22px; }
-  .dtop { margin:4px 16px 0; height:38px; display:flex; align-items:center; justify-content:space-between; }
-  .dtop .t { text-align:center; flex:1; }
-  .dtop .t .k { font-size:9px; letter-spacing:.16em; color:#7c848d; }
-  .dtop .t .n { font-size:13px; letter-spacing:.1em; color:#d7dde3; }
-  .iconbtn { width:34px; height:34px; border-radius:9px; background:hsl(220,12%,13%);
-             border:1px solid hsl(220,10%,22%); color:hsl(215,9%,72%); display:flex;
-             align-items:center; justify-content:center; font-size:15px; flex:none; }
-  .shipstage { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; }
-  .dfoot { flex:none; padding:0 16px; display:flex; gap:10px; }
-  .btn { flex:1; padding:12px 6px; font-size:12px; letter-spacing:.05em; text-align:center;
-         border-radius:10px; border:1px solid hsl(220,10%,22%); background:hsl(220,12%,13%); color:#cbd2d9; }
-  .btn.primary { border-color:#BE642D; color:#f0d6c2; box-shadow:inset 0 0 0 1px #BE642D; }
-</style>
-</head>
-<body>
+  Рисует корабль в offscreen-канву `off` (2x) и отдаёт её вместе с системой
+  координат. Клетка рендера = C px; корпус занимает строки 0..ROWS-1,
+  колонки span[y][0]..span[y][1].
 
-<h1>Ронин — размеченный на клетки</h1>
-
-<div class="wrap">
-  <div class="card">
-    <h2>РОНИН В СЕТКЕ</h2>
-    <canvas id="gridShip"></canvas>
-    <div class="dim">44 × 108 клеток</div>
-  </div>
-
-  <div class="card">
-    <h2>ЭКРАН КОРАБЛЯ</h2>
-    <div class="device">
-      <div class="safe"></div>
-      <div class="dtop">
-        <div class="iconbtn">≡</div>
-        <div class="t"><div class="k">РОНИН · СБОРКА</div><div class="n">2 / 12</div></div>
-        <div class="iconbtn">⤢</div>
-      </div>
-      <div class="shipstage"><canvas id="ship"></canvas></div>
-      <div class="dfoot"><div class="btn primary">Продолжить сборку</div></div>
-      <div class="safe b"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ============ РЕНДЕР ship_ronin_v4 (КОПИЯ БЕЗ ИЗМЕНЕНИЙ; канон — тот файл) ============ -->
-<script>
+  Потребители: ship_ronin_v4.html (референс), ronin-grid.html, ronin-ship.html,
+  ronin-parts-catalog.html. Разметка деталей — ronin-parts.js.
+*/
 window.__SHIP = (function(){
 "use strict";
+/* ---------- базовые константы ---------- */
 const C=24, GW=15, GH=30;
 const OX=4*C, OY=1.9*C;
 const W=(GW+8)*C, H=(GH+8.6)*C;
 const px=x=>OX+x*C, py=y=>OY+y*C;
 const cx=px(7.5);
+
+/* детерминированный рандом */
 function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 const rnd=mulberry32(20260712);
+
+/* ---------- силуэт: [x0,x1] на строку (центр 7.5, слимнее, больше ступеней) ---------- */
 const span=[];
 span[0]=[5,9]; span[1]=[5,9];
 span[2]=[4,10]; span[3]=[4,10];
 for(let y=4;y<=20;y++)span[y]=[3,11];
 for(let y=21;y<=24;y++)span[y]=[4,10];
 span[25]=[5,9]; span[26]=[5,9];
-const ROWS=27;
+const ROWS=27; // 0..26 воксельные; ниже — сопло и факел (графика)
+
+/* ---------- секции-пояса ---------- */
 const BANDS=[
  {r:[0,1],  kind:'prow'},
  {r:[2,3],  kind:'bridge'},
  {r:[4,7],  kind:'fwd'},
- {r:[8,12], kind:'bandA'},
+ {r:[8,12], kind:'bandA'},   // главный оранжевый пояс
  {r:[13,17],kind:'mid'},
  {r:[18,20],kind:'bandB'},
  {r:[21,24],kind:'eng'},
  {r:[25,26],kind:'skirt'},
 ];
+
+/* материалы: [h,s,l] */
 const M={
  GRAF:[215,9,31], GRAF2:[215,9,26], DARK:[216,11,17],
  ORAN:[23,62,46], RUST:[19,58,38],
  GUN:[220,10,22], BLACKM:[220,12,13],
 };
 const hsl=(m,dl=0,da=1)=>`hsla(${m[0]},${m[1]}%,${Math.max(3,Math.min(92,m[2]+dl))}%,${da})`;
+
+/* ---------- нарезка на панели-плиты ---------- */
 const plates=[];
 for(const b of BANDS){
   let y=b.r[0];
@@ -109,7 +63,7 @@ for(const b of BANDS){
     const wide=(b.kind==='bandA'||b.kind==='bandB');
     let x=x0, i=0;
     while(x<=x1){
-      let pw = wide? 3+Math.floor(rnd()*3) : 2+Math.floor(rnd()*3);
+      let pw = wide? 3+Math.floor(rnd()*3) : 2+Math.floor(rnd()*3); // 3..5 / 2..4
       if(x1-x+1-pw===1) pw++;
       pw=Math.min(pw, x1-x+1);
       plates.push({x,y,w:pw,h:ph,kind:b.kind,i:i++,jl:(rnd()*7-3.5),rv:rnd()});
@@ -118,9 +72,10 @@ for(const b of BANDS){
     y+=ph;
   }
 }
+/* материал плиты по поясу */
 function plateMat(p){
-  const inInset = p.x>=6&&p.x+p.w<=9&&p.y>=9&&p.y+p.h<=12;
-  const inName  = p.x<=5&&p.y>=8&&p.y<13;
+  const inInset = p.x>=6&&p.x+p.w<=9&&p.y>=9&&p.y+p.h<=12;  // ниша под люк
+  const inName  = p.x<=5&&p.y>=8&&p.y<13;                    // поле под маркировку
   switch(p.kind){
     case 'prow':  return M.DARK;
     case 'bridge':return M.GRAF2;
@@ -132,6 +87,8 @@ function plateMat(p){
     case 'skirt': return M.BLACKM;
   }
 }
+
+/* ---------- контур корпуса (ступенчатый полигон) ---------- */
 function hullPath(g){
   g.beginPath();
   g.moveTo(px(span[0][0]), py(0));
@@ -140,12 +97,18 @@ function hullPath(g){
   for(let y=ROWS-1;y>=0;y--){ g.lineTo(px(span[y][1]+1),py(y+1)); g.lineTo(px(span[y][1]+1),py(y)); }
   g.closePath();
 }
+
+/* ---------- вспомогательные ---------- */
 function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
 function glowDot(g,x,y,r,col){const gr=g.createRadialGradient(x,y,0,x,y,r*4);gr.addColorStop(0,col);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(x,y,r*4,0,7);g.fill();g.fillStyle=col;g.beginPath();g.arc(x,y,r,0,7);g.fill();}
 
+/* ================================================================
+   РЕНДЕР ВСЕЙ СЦЕНЫ в offscreen 2x
+================================================================ */
 const off=document.createElement('canvas'); off.width=W*2; off.height=H*2;
 const g=off.getContext('2d'); g.setTransform(2,0,0,2,0,0);
 
+/* --- фон: космос --- */
 (function(){
   const bg=g.createLinearGradient(0,0,0,H);
   bg.addColorStop(0,'#05070d'); bg.addColorStop(.6,'#080b13'); bg.addColorStop(1,'#0d0a08');
@@ -154,6 +117,8 @@ const g=off.getContext('2d'); g.setTransform(2,0,0,2,0,0);
   for(let i=0;i<110;i++){const x=sr()*W,y=sr()*H*.92,a=.12+sr()*.5,r=sr()<.85?.7:1.3;
     g.fillStyle=`rgba(220,230,255,${a})`;g.beginPath();g.arc(x,y,r,0,7);g.fill();}
 })();
+
+/* --- планета (тёплый Марс внизу-справа) --- */
 (function(){
   const pcx=W*.74, pcy=H*1.72, pr=H*.95;
   g.save();
@@ -172,12 +137,18 @@ const g=off.getContext('2d'); g.setTransform(2,0,0,2,0,0);
     g.beginPath();g.ellipse(sx,sy,14+sr()*30,5+sr()*9,a+1.57,0,7);g.fill();}
   g.globalAlpha=1; g.restore();
 })();
+
+/* --- ореол факела за кораблём (до корпуса) --- */
 (function(){
   const gy=py(30.8);
   const halo=g.createRadialGradient(cx,gy,0,cx,gy,6.4*C);
   halo.addColorStop(0,'rgba(140,215,255,.34)');halo.addColorStop(.5,'rgba(120,200,255,.13)');halo.addColorStop(1,'rgba(120,200,255,0)');
   g.fillStyle=halo;g.beginPath();g.arc(cx,gy,6.4*C,0,7);g.fill();
 })();
+
+/* ================================================================
+   КОРПУС
+================================================================ */
 for(const p of plates){
   const m=plateMat(p);
   const X=px(p.x),Y=py(p.y),Wd=p.w*C,Hd=p.h*C;
@@ -190,11 +161,14 @@ for(const p of plates){
   g.strokeStyle='rgba(0,0,0,.4)'; g.lineWidth=1.5;
   g.strokeRect(X+.75,Y+.75,Wd-1.5,Hd-1.5);
 }
+/* лёгкая воксельная сетка */
 g.save(); hullPath(g); g.clip();
 g.strokeStyle='rgba(255,255,255,.045)'; g.lineWidth=1;
 for(let x=0;x<=GW;x++){g.beginPath();g.moveTo(px(x),py(0));g.lineTo(px(x),py(ROWS));g.stroke();}
 for(let y=0;y<=ROWS;y++){g.beginPath();g.moveTo(px(0),py(y));g.lineTo(px(GW),py(y));g.stroke();}
 g.restore();
+
+/* швы между поясами */
 for(const yb of [2,4,8,13,18,21,25]){
   const s0=Math.max(span[yb][0],span[yb-1][0]), s1=Math.min(span[yb][1],span[yb-1][1]);
   g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=2.5;
@@ -202,6 +176,8 @@ for(const yb of [2,4,8,13,18,21,25]){
   g.strokeStyle='rgba(255,255,255,.12)';g.lineWidth=1;
   g.beginPath();g.moveTo(px(s0),py(yb)-2);g.lineTo(px(s1+1),py(yb)-2);g.stroke();
 }
+
+/* --- крупная светотень --- */
 g.save(); hullPath(g); g.clip();
 let sh=g.createLinearGradient(px(0),0,px(15),0);
 sh.addColorStop(0,'rgba(255,255,255,.12)');sh.addColorStop(.4,'rgba(255,255,255,0)');
@@ -220,6 +196,11 @@ for(let i=0;i<5;i++){const wx=px(3+wr()*9),wy=py(4+wr()*20);
   g.fillStyle='rgba(255,255,255,.04)';g.fillRect(wx,wy,3.5,.35*C);}
 g.restore();
 
+/* ================================================================
+   ДЕТАЛИ ПО СЕКЦИЯМ
+================================================================ */
+
+/* --- нос: шеврон + датчик-блок + строб --- */
 g.save(); g.beginPath();
 g.rect(px(span[0][0]),py(0),(span[0][1]-span[0][0]+1)*C,2*C); g.clip();
 g.fillStyle=hsl(M.ORAN,0,.95);
@@ -229,6 +210,7 @@ g.lineTo(cx,py(1.38));g.lineTo(cx+2.1*C,py(.38));g.lineTo(cx+2.1*C,py(.9));g.clo
 g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;
 g.beginPath();g.moveTo(cx-2.1*C,py(.24));g.lineTo(cx,py(1.22));g.lineTo(cx+2.1*C,py(.24));g.stroke();
 g.restore();
+/* датчик-блок на носу */
 g.fillStyle=hsl(M.DARK,-2);
 g.fillRect(cx-.5*C,py(-.55),1*C,.6*C);
 g.fillStyle=hsl(M.GUN,6);
@@ -237,6 +219,8 @@ g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;
 g.strokeRect(cx-.5*C,py(-.55),1*C,.6*C); g.strokeRect(cx-.26*C,py(-.95),.52*C,.42*C);
 g.fillStyle='rgba(180,220,255,.9)'; g.fillRect(cx-.18*C,py(-.78),.36*C,2.2);
 glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
+
+/* --- мостик: визор со щелями --- */
 (function(){
   const vx=px(4.65),vy=py(2.62),vw=5.7*C,vh=.58*C;
   rr(g,vx,vy,vw,vh,4); g.fillStyle='#101318'; g.fill();
@@ -250,10 +234,12 @@ glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
   }
   g.restore();
 })();
+/* номер борта */
 g.font='bold 12px "Arial Narrow","DejaVu Sans",sans-serif';
 g.textAlign='center'; g.textBaseline='middle';
 g.fillStyle='rgba(223,230,236,.85)';
 g.fillText('V V - 7 7', cx, py(4.62));
+/* торпедные люки на носовой секции */
 for(const s of [-1,1]){
   const tx=cx+s*1.45*C-.42*C, ty=py(5.95);
   g.save(); g.shadowColor='rgba(0,0,0,.5)'; g.shadowBlur=5;
@@ -263,11 +249,15 @@ for(const s of [-1,1]){
   g.beginPath();g.moveTo(tx+.42*C,ty+3);g.lineTo(tx+.42*C,ty+.66*C-3);g.stroke();
   g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2);
 }
+
+/* трафарет «77» на носовой секции (как бортовые надписи референса) */
 g.save();
 g.font='bold 26px "Arial Narrow","DejaVu Sans",sans-serif';
 g.fillStyle='rgba(228,234,240,.78)';
 g.fillText('7 7', px(4.85), py(7.28));
 g.restore();
+
+/* --- маркировка «РОНИН» --- */
 (function(){
   const word='РОНИН';
   g.font='bold 21px "Arial Narrow","DejaVu Sans",sans-serif';
@@ -276,6 +266,8 @@ g.restore();
   g.strokeStyle='rgba(30,18,8,.5)'; g.lineWidth=2;
   g.beginPath();g.moveTo(px(3.4),py(8.25));g.lineTo(px(3.4),py(12.75));g.stroke();
 })();
+
+/* --- стыковочный люк-октагон --- */
 (function(){
   const ox=cx, oy=py(10.5), R=.9*C;
   g.save(); g.shadowColor='rgba(0,0,0,.6)'; g.shadowBlur=8;
@@ -301,6 +293,8 @@ g.restore();
   g.strokeStyle='rgba(255,255,255,.22)';g.lineWidth=1.2;
   g.beginPath();g.moveTo(ox-R*.35,oy);g.lineTo(ox+R*.35,oy);g.stroke();
 })();
+
+/* --- бортовые огни-иллюминаторы (щели) --- */
 (function(){
   const ws=[[4.0,5.45,'c'],[10.2,5.45,'c'],[3.6,10.42,'w'],[9.9,9.42,'w'],[3.7,13.42,'c'],[10.5,13.42,'c'],[3.6,19.42,'w'],[9.9,19.42,'w']];
   for(const [x,y,k] of ws){
@@ -310,12 +304,17 @@ g.restore();
     rr(g,px(x),py(y),.8*C,.16*C,2); g.fill(); g.restore();
   }
 })();
+
+/* --- манёвровые гондолы на миделе (объёмы, без «стволов») --- */
 function pod(side){
   const bw=1.06*C, bh=2.9*C, byt=py(13.55);
   const bx = side<0 ? px(3)-bw+2 : px(12)-2;
+  // кронштейны к корпусу
   g.fillStyle=hsl(M.DARK,-2);
+  const hx = side<0 ? bx+bw-3 : bx+3-8;
   g.fillRect(side<0?bx+bw-4:bx-6, py(14.15), 10, 5.5);
   g.fillRect(side<0?bx+bw-4:bx-6, py(15.6), 10, 5.5);
+  // корпус гондолы
   g.save(); g.shadowColor='rgba(0,0,0,.55)'; g.shadowBlur=7;
   const grd=g.createLinearGradient(bx,byt,bx,byt+bh);
   grd.addColorStop(0,hsl(M.GRAF,8));grd.addColorStop(1,hsl(M.GRAF,-10));
@@ -323,6 +322,7 @@ function pod(side){
   g.strokeStyle='rgba(0,0,0,.65)'; g.lineWidth=2; rr(g,bx,byt,bw,bh,7); g.stroke();
   g.strokeStyle='rgba(255,255,255,.16)'; g.lineWidth=1.2;
   g.beginPath();g.moveTo(bx+2.5,byt+bh-4);g.lineTo(bx+2.5,byt+4);g.lineTo(bx+bw-2.5,byt+4);g.stroke();
+  // сопла-чашки вверх и вниз
   for(const dir of [-1,1]){
     const ny = dir<0 ? byt : byt+bh;
     g.fillStyle='#101215';
@@ -336,14 +336,18 @@ function pod(side){
     g.strokeStyle='rgba(255,255,255,.2)';g.lineWidth=1;
     g.beginPath();g.ellipse(bx+bw/2,ny+dir*9,bw*.37,2.6,0,0,7);g.stroke();
   }
+  // оранжевый пояс + жалюзи
   g.fillStyle=hsl(M.ORAN); g.fillRect(bx+2,byt+bh*.46,bw-4,.3*C);
   g.fillStyle='rgba(0,0,0,.42)';
   for(let i=0;i<2;i++) g.fillRect(bx+bw*.2,byt+.5*C+i*7,bw*.6,2.6);
   g.fillStyle='rgba(0,0,0,.42)';
   for(let i=0;i<2;i++) g.fillRect(bx+bw*.2,byt+bh-.72*C+i*7,bw*.6,2.6);
+  // навигационный огонь на внешней скуле
   glowDot(g,side<0?bx+3.5:bx+bw-3.5,byt+.5*C,2.4,side<0?'rgba(255,80,70,.95)':'rgba(90,255,140,.95)');
 }
 pod(-1); pod(1);
+
+/* --- RCS-квады --- */
 function rcs(X,Y,flip){
   g.fillStyle=hsl(M.GUN,10);
   rr(g,X-.3*C,Y-.3*C,.6*C,.6*C,3); g.fill();
@@ -359,6 +363,8 @@ function rcs(X,Y,flip){
 }
 rcs(px(3),py(4.5),-1); rcs(px(12),py(4.5),1);
 rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
+
+/* --- грузовой люк (лево) и шлюз (право) --- */
 (function(){
   const X=px(3.55),Y=py(14.15),Wd=1.9*C,Hd=1.6*C;
   g.save(); g.shadowColor='rgba(0,0,0,.5)'; g.shadowBlur=6;
@@ -382,6 +388,8 @@ rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
   g.strokeStyle='#8d959e';g.lineWidth=2.4;
   g.beginPath();g.moveTo(ax+aw*.3,ay+ah*.62);g.lineTo(ax+aw*.7,ay+ah*.62);g.stroke();
 })();
+
+/* --- решётка-радиатор поперёк миделя --- */
 (function(){
   const X=px(4.5),Y=py(16.35),Wd=6.0*C,Hd=.5*C;
   g.fillStyle='#0f1215'; rr(g,X,Y,Wd,Hd,3); g.fill();
@@ -392,6 +400,10 @@ rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
   gr.addColorStop(0,'rgba(255,120,40,0)');gr.addColorStop(.5,'rgba(255,120,40,.25)');gr.addColorStop(1,'rgba(255,120,40,0)');
   g.fillStyle=gr; g.fillRect(X,Y+Hd*.3,Wd,Hd*.4);
 })();
+
+/* ================================================================
+   КОРМА: машинное отделение → юбка → сопло
+================================================================ */
 function pipeV(X,y0,y1){
   const gr=g.createLinearGradient(X-4,0,X+4,0);
   gr.addColorStop(0,'#5e3b1e');gr.addColorStop(.35,'#96683a');gr.addColorStop(.6,'#7d5028');gr.addColorStop(1,'#4a2e17');
@@ -411,6 +423,7 @@ pipeV(px(4.6),21.15,24.8); pipeV(px(10.4),21.15,24.8);
   g.fillStyle=gr; g.fillRect(px(4.6),Y-3.4,5.8*C,6.8);
   g.strokeStyle='rgba(0,0,0,.5)';g.lineWidth=1.2;g.strokeRect(px(4.6),Y-3.4,5.8*C,6.8);
 })();
+/* сферические полубаки */
 for(const X of [px(6.0),px(9.0)]){
   const Y=py(21.05);
   const gr=g.createRadialGradient(X-3,Y+3,1,X,Y+5,12);
@@ -418,6 +431,7 @@ for(const X of [px(6.0),px(9.0)]){
   g.fillStyle=gr;g.beginPath();g.arc(X,Y+5,10,Math.PI,0);g.closePath();g.fill();
   g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.4;g.stroke();
 }
+/* большой горизонтальный бак */
 (function(){
   const X=px(5.7),Y=py(22.25),Wd=3.6*C,Hd=.95*C,R=Hd/2;
   g.save(); g.shadowColor='rgba(0,0,0,.55)'; g.shadowBlur=7;
@@ -433,6 +447,7 @@ for(const X of [px(6.0),px(9.0)]){
   }
   g.fillStyle='rgba(255,255,255,.25)'; rr(g,X+R*.5,Y+2.5,Wd-R,3,1.5); g.fill();
 })();
+/* вентиляция с огнём внутри */
 for(const X of [px(4.35),px(9.85)]){
   for(let i=0;i<3;i++){
     const Y=py(23.35)+i*7.5;
@@ -440,6 +455,7 @@ for(const X of [px(4.35),px(9.85)]){
     g.fillStyle='rgba(255,122,51,.85)'; g.fillRect(X+3,Y+1,12,1.4);
   }
 }
+/* гофра-переход над юбкой */
 (function(){
   const Y=py(24.55),Hd=.42*C, X0=px(4.15),X1=px(10.85);
   g.save(); g.beginPath(); g.rect(X0,Y,X1-X0,Hd); g.clip();
@@ -450,6 +466,8 @@ for(const X of [px(4.35),px(9.85)]){
   g.restore();
   g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;g.strokeRect(X0,Y,X1-X0,Hd);
 })();
+
+/* --- юбка: рёбра + гидроштоки --- */
 (function(){
   const Y0=py(25),Y1=py(27),X0=px(5),X1=px(10);
   g.save(); g.beginPath(); g.rect(X0,Y0,X1-X0,Y1-Y0); g.clip();
@@ -472,6 +490,8 @@ for(const X of [px(4.35),px(9.85)]){
     g.beginPath();g.arc(X0+ (i+.5)*(X1-X0)/5, Y1-.3*C, 1.9,0,7);g.fill();
   }
 })();
+
+/* --- вернье-сопла на ступени машинного отделения --- */
 for(const s of [-1,1]){
   const vx=cx+s*3.05*C, vt=py(25.06), ve=py(26.35);
   g.beginPath();
@@ -488,6 +508,8 @@ for(const s of [-1,1]){
   g.fillStyle=mp;
   g.beginPath();g.moveTo(vx-.38*C,ve);g.lineTo(vx+.38*C,ve);g.lineTo(vx+.1*C,ve+1.55*C);g.lineTo(vx-.1*C,ve+1.55*C);g.closePath();g.fill();
 }
+
+/* --- сопло-колокол (шире юбки, как у референса) --- */
 (function(){
   const throatW=1.75*C, exitW=4.2*C;
   const yT=py(27.0), yE=py(29.9);
@@ -527,6 +549,8 @@ for(const s of [-1,1]){
   g.beginPath();g.ellipse(cx,yE,exitW*.97,.32*C,0,Math.PI*.06,Math.PI*.94);g.stroke();
   g.restore();
 })();
+
+/* --- главный факел --- */
 (function(){
   const yE=py(29.9), pw=3.9*C, len=5.1*C;
   const pg=g.createLinearGradient(0,yE,0,yE+len);
@@ -554,74 +578,9 @@ for(const s of [-1,1]){
   g.fillStyle='rgba(230,247,255,.26)';
   g.beginPath();g.ellipse(cx,yE+2.8*C,.55*C,.28*C,0,0,7);g.fill();
 })();
+
+/* --- контур корпуса --- */
 hullPath(g); g.strokeStyle='#07090c'; g.lineWidth=2.4; g.stroke();
 
-return {off,W,H,C,OX,OY,px,py,span,ROWS};
+return {off, W, H, C, OX, OY, px, py, cx, span, ROWS, M, hsl};
 })();
-</script>
-
-<!-- ============ ЭКРАНЫ: Ронин в клеточной сетке + экран корабля с контуром ============ -->
-<script>
-"use strict";
-const SHIP=window.__SHIP;
-const {off,C,px,py,span,ROWS}=SHIP;
-const SC=2;                         // offscreen 2x
-const NCOL=44, NROW=108;            // размер Ронина в клетках (на утверждении PO)
-const HH=27;                        // высота bbox корпуса в клетках рендера
-function dpr(cv,w,h){ const k=window.devicePixelRatio||1; cv.width=w*k; cv.height=h*k;
-  cv.style.width=w+'px'; cv.style.height=h+'px'; const g=cv.getContext('2d'); g.scale(k,k);
-  g.imageSmoothingEnabled=true; g.imageSmoothingQuality='high'; return g; }
-
-/* Ронин в квадратной клеточной сетке */
-(function(){
-  const u=6;                          // экранных px на клетку
-  const W=NCOL*u, H=NROW*u;
-  const g=dpr(document.getElementById('gridShip'), W, H);
-  g.fillStyle='#0e1116'; g.fillRect(0,0,W,H);
-  g.drawImage(off, px(2)*SC, py(0)*SC, 11*C*SC, HH*C*SC, 0,0, W,H);
-  // клеточная сетка
-  g.strokeStyle='rgba(255,255,255,.05)'; g.lineWidth=1;
-  for(let c=0;c<=NCOL;c++){const x=c*u; g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
-  for(let r=0;r<=NROW;r++){const y=r*u; g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
-})();
-
-/* Экран корабля: собранное (нос+мостик) — из рендера; несобранное — тонкий контур */
-(function(){
-  const sx=44, sy=26, sw=SHIP.W-88, sh=SHIP.H-40;   // обрезаем поля
-  const destW=210, scale=destW/sw, destH=sh*scale;
-  const g=dpr(document.getElementById('ship'), destW, destH);
-  g.clearRect(0,0,destW,destH);
-  const DX=c=>(px(c)-sx)*scale, DY=r=>(py(r)-sy)*scale;
-  const BUILT=3;   // собрано: строки 0..3 (нос+мостик)
-  // контур всего борта — тонкая линия «сюда дорастёт»
-  g.beginPath();
-  g.moveTo(DX(span[0][0]), DY(0));
-  for(let y=0;y<ROWS;y++){ g.lineTo(DX(span[y][0]),DY(y)); g.lineTo(DX(span[y][0]),DY(y+1)); }
-  g.lineTo(DX(span[ROWS-1][1]+1),DY(ROWS));
-  for(let y=ROWS-1;y>=0;y--){ g.lineTo(DX(span[y][1]+1),DY(y+1)); g.lineTo(DX(span[y][1]+1),DY(y)); }
-  g.closePath();
-  g.strokeStyle='hsla(215,14%,52%,.16)'; g.lineWidth=1; g.stroke();
-  // гондолы (поды) по бортам — часть силуэта «сюда дорастёт» (тот же shipOutline)
-  const TX=X=>(X-sx)*scale, TY=Y=>(Y-sy)*scale;
-  const bw=1.06*C, bh=2.9*C, byt=py(13.55), pr=7*scale;
-  function podOutline(bx){
-    const x=TX(bx), y=TY(byt), w=bw*scale, h=bh*scale;
-    g.beginPath(); g.moveTo(x+pr,y);
-    g.arcTo(x+w,y,x+w,y+h,pr); g.arcTo(x+w,y+h,x,y+h,pr);
-    g.arcTo(x,y+h,x,y,pr); g.arcTo(x,y,x+w,y,pr); g.closePath(); g.stroke();
-  }
-  podOutline(px(3)-bw+2); podOutline(px(12)-2);
-  // собранная часть — блит из рендера, клип по силуэту строк 0..BUILT
-  g.save();
-  g.beginPath();
-  g.moveTo(DX(span[0][0]), DY(0));
-  for(let y=0;y<=BUILT;y++){ g.lineTo(DX(span[y][0]),DY(y)); g.lineTo(DX(span[y][0]),DY(y+1)); }
-  g.lineTo(DX(span[BUILT][1]+1),DY(BUILT+1));
-  for(let y=BUILT;y>=0;y--){ g.lineTo(DX(span[y][1]+1),DY(y+1)); g.lineTo(DX(span[y][1]+1),DY(y)); }
-  g.closePath(); g.clip();
-  g.drawImage(off, sx*SC, sy*SC, sw*SC, sh*SC, 0,0,destW,destH);
-  g.restore();
-})();
-</script>
-</body>
-</html>

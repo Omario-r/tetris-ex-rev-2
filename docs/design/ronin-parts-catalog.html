@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!--
+  Каталог деталей «Ронина-1»: каждая деталь — отдельно и крупно, в рамке поля
+  укладки 10x14, плюс локатор «где на корабле». Это каталог элементов к экранам
+  ronin-grid.html и ronin-ship.html: ТЗ и реализация привязываются к id детали.
+  КАНОН разметки — ronin-parts.js; канон правил — docs/DESIGN.md.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Каталог деталей — «Ронин-1»</title>
+<style>
+  /* ===== ТОКЕНЫ (канон; имена и значения = docs/DESIGN.md) ===== */
+  :root {
+    --boardBg:     hsl(219 13% 10%);
+    --seam:        hsla(220 14% 4% / 55%);
+    --ghostTarget: hsl(23 62% 55% / 55%);
+    --shipOutline: hsla(215 14% 52% / 16%);
+    --spaceBg:     hsl(220 14% 7%);
+  }
+  /* ===== Декорация страницы (НЕ канон) ===== */
+  * { box-sizing:border-box; }
+  body { margin:0; background:#0f1216; color:#cfd4da; font:13px/1.55 system-ui,sans-serif; padding:22px; }
+  h1 { font-size:18px; margin:0 0 4px; color:#e6ebf0; }
+  .sub { color:#8b949e; max-width:780px; margin:0 0 20px; }
+  .grid { display:flex; flex-wrap:wrap; gap:18px; }
+  .part { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:14px; }
+  .hd { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .hd .ord { font-size:11px; color:#0f1216; background:#c9a37a; border-radius:999px;
+             padding:1px 8px; font-weight:700; }
+  .hd .id { color:#c9a37a; font-family:ui-monospace,monospace; font-size:12.5px; }
+  .hd .ttl { color:#8b949e; font-size:12px; }
+  .row { display:flex; gap:14px; align-items:flex-start; }
+  .field { background:var(--boardBg); border:1px solid #222932; border-radius:8px; padding:6px; }
+  .loc { background:var(--spaceBg); border:1px solid #222932; border-radius:8px; padding:5px; }
+  canvas { display:block; }
+  .meta { font-size:11.5px; color:#8b949e; margin-top:8px; letter-spacing:.03em; }
+  .meta b { color:#cfd4da; font-weight:600; }
+  .legend { color:#9aa3ad; font-size:12.5px; max-width:780px; margin:0 0 20px;
+            border-left:2px solid #2c333d; padding-left:12px; }
+  .legend b { color:#c9a37a; font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>Каталог деталей — «Ронин-1»</h1>
+<p class="sub">13 деталей: нос (2), мостик (3), носовой пояс (8). Каждая показана так, как её увидит игрок
+на поле укладки, — силуэт в рамке поля 10×14, заполненный настоящим куском корабля.</p>
+<p class="legend">
+  <b>Рамка</b> — поле укладки 10×14 клеток, силуэт детали в нём отцентрован.
+  <b>Пунктир</b> (<code>ghostTarget</code>) — контур мишени, каким игрок видит его до укладки.
+  <b>Тонкие линии внутри</b> (<code>seam</code>) — разделители клеток; каждая четвёртая совпадает со швом плиты
+  рисунка, остальные швами не притворяются. <b>Справа</b> — место детали на борту.
+</p>
+
+<div class="grid" id="cat"></div>
+
+<script src="ship-render.js"></script>
+<script src="ronin-parts.js"></script>
+<script src="ronin-draw.js"></script>
+<script>
+(function(){
+"use strict";
+const P = window.RONIN_PARTS, D = window.RONIN_DRAW, SHIP = window.__SHIP;
+const FW = 10, FH = 14;              // поле укладки в клетках (канон, DESIGN.md)
+const u  = 24;                       // px на клетку в каталоге
+const lu = 2.4;                      // px на клетку в локаторе
+
+const cat = document.getElementById('cat');
+P.parts.forEach(part => {
+  const w = part.mask[0].length, h = part.mask.length;
+  const [c0, r0] = part.origin;
+  const offC = Math.floor((FW - w) / 2), offR = Math.floor((FH - h) / 2);   // центрируем в поле
+
+  const el = document.createElement('div');
+  el.className = 'part';
+  el.innerHTML =
+    `<div class="hd"><span class="ord">${part.order}</span>` +
+    `<span class="id">${part.id}</span><span class="ttl">${part.title}</span></div>` +
+    `<div class="row"><div class="field"><canvas></canvas></div>` +
+    `<div><div class="loc"><canvas></canvas></div></div></div>` +
+    `<div class="meta"><b>${part.cells}</b> клеток · bbox <b>${w}×${h}</b> · ` +
+    `origin <b>${c0},${r0}</b> · модуль <b>${part.module}</b></div>`;
+  cat.appendChild(el);
+  const [cvField, cvLoc] = el.querySelectorAll('canvas');
+
+  /* --- деталь на поле укладки --- */
+  const g = D.dpr(cvField, FW*u, FH*u);
+  const map = (col, row) => [ (col - c0 + offC) * u, (row - r0 + offR) * u ];
+  g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--boardBg').trim();
+  g.fillRect(0, 0, FW*u, FH*u);
+  /* слабая сетка поля — чтобы читался размер 10x14 */
+  g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
+  for (let c = 0; c <= FW; c++){ g.beginPath(); g.moveTo(c*u+.5, 0); g.lineTo(c*u+.5, FH*u); g.stroke(); }
+  for (let r = 0; r <= FH; r++){ g.beginPath(); g.moveTo(0, r*u+.5); g.lineTo(FW*u, r*u+.5); g.stroke(); }
+  D.drawPart(g, part, map, u);                                    // кусок оригинала
+  D.drawCellSeams(g, part, map, u, 'hsla(220,14%,4%,.55)');       // seam — только на поле
+  D.strokeOutline(g, part, map, u, 'hsla(23,62%,55%,.55)', 2);    // ghostTarget
+
+  /* --- локатор: где на корабле --- */
+  const lw = P.grid.cols * lu, lh = P.grid.rows * lu;
+  const gl = D.dpr(cvLoc, lw, lh);
+  const T = (x, y) => [ (x - D.rx(0)) * (lu / (SHIP.C / P.grid.renderCell)),
+                        (y - D.ry(0)) * (lu / (SHIP.C / P.grid.renderCell)) ];
+  gl.globalAlpha = .3;                                            // весь борт — бледно
+  gl.drawImage(SHIP.off,
+    D.rx(0)*D.SC, D.ry(0)*D.SC, (D.rx(P.grid.cols)-D.rx(0))*D.SC, (D.ry(P.grid.rows)-D.ry(0))*D.SC,
+    0, 0, lw, lh);
+  gl.globalAlpha = 1;
+  gl.strokeStyle = 'hsla(215,14%,52%,.16)'; gl.lineWidth = 1;     // shipOutline
+  D.shipOutlinePath(gl, T);
+  const lmap = (col, row) => [ col * lu, row * lu ];
+  D.drawPart(gl, part, lmap, lu);
+  D.strokeOutline(gl, part, lmap, lu, 'hsla(23,62%,55%,.75)', 1.2);
+});
+})();
+</script>
+</body>
+</html>

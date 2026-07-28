@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<!--
+  Экран корабля-композита: собранные детали — из рисунка, несобранное — тонкий
+  контур борта (включая гондолы). Ползунок прогресса — чтобы PO увидел порядок
+  сборки: что игрок увидит первым, вторым, третьим.
+  КАНОН разметки — ronin-parts.js; канон правил — docs/DESIGN.md.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап — экран корабля («Ронин»)</title>
+<style>
+  /* ===== ТОКЕНЫ (канон; имена и значения = docs/DESIGN.md) ===== */
+  :root {
+    --spaceBg:      hsl(220 14% 7%);
+    --shipOutline:  hsla(215 14% 52% / 16%);
+    --hazardOrange: hsl(23 62% 46%);
+    --hudIcon:      hsl(215 9% 72%);
+    --matteBlack:   hsl(220 12% 13%);
+    --gunmetal:     hsl(220 10% 22%);
+  }
+  /* ===== Декорация страницы (НЕ канон) ===== */
+  * { box-sizing:border-box; }
+  body { margin:0; background:#0f1216; color:#cfd4da; font:13px/1.55 system-ui,sans-serif; padding:22px; }
+  h1 { font-size:18px; margin:0 0 4px; color:#e6ebf0; }
+  .sub { color:#8b949e; max-width:720px; margin:0 0 18px; }
+  .wrap { display:flex; gap:24px; flex-wrap:wrap; align-items:flex-start; }
+  .card { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:18px; }
+  .card h2 { font-size:12px; margin:0 0 12px; color:#8b949e; letter-spacing:.06em; font-weight:600; }
+
+  .device { width:320px; height:680px; position:relative; overflow:hidden; flex:none;
+            background:var(--spaceBg); outline:2px solid #3a4047; border-radius:26px;
+            display:flex; flex-direction:column; }
+  .safe { height:38px; flex:none; } .safe.b { height:22px; }
+  .dtop { margin:4px 16px 0; height:38px; display:flex; align-items:center; justify-content:space-between; }
+  .dtop .t { text-align:center; flex:1; }
+  .dtop .t .k { font-size:9px; letter-spacing:.16em; color:#7c848d; }
+  .dtop .t .n { font-size:13px; letter-spacing:.1em; color:#d7dde3; }
+  .iconbtn { width:34px; height:34px; border-radius:9px; background:var(--matteBlack);
+             border:1px solid var(--gunmetal); color:var(--hudIcon); display:flex;
+             align-items:center; justify-content:center; font-size:15px; flex:none; }
+  .shipstage { flex:1; display:flex; align-items:center; justify-content:center; overflow:hidden; }
+  .dfoot { flex:none; padding:0 16px; display:flex; gap:10px; }
+  .btn { flex:1; padding:12px 6px; font-size:12px; letter-spacing:.05em; text-align:center;
+         border-radius:10px; border:1px solid var(--gunmetal); background:var(--matteBlack); color:#cbd2d9; }
+  .btn.primary { border-color:var(--hazardOrange); color:#f0d6c2; box-shadow:inset 0 0 0 1px var(--hazardOrange); }
+
+  .ctl { margin-top:16px; display:flex; align-items:center; gap:12px; }
+  .ctl input { flex:1; accent-color:#BE642D; }
+  .ctl .val { font-variant-numeric:tabular-nums; color:#e6ebf0; min-width:52px; text-align:right; }
+  .now { margin-top:10px; color:#9aa3ad; font-size:12.5px; min-height:34px; }
+  .now code { color:#c9a37a; }
+  .note { max-width:300px; color:#9aa3ad; font-size:12.5px; margin-top:14px;
+          border-top:1px solid #262d36; padding-top:12px; }
+  .note b { color:#c9a37a; font-weight:600; }
+</style>
+</head>
+<body>
+
+<h1>Экран корабля — композит</h1>
+<p class="sub">Собранное показано из рисунка, в полном свете; несобранное — только тонкий контур борта
+(<code>shipOutline</code>), включая гондолы. Потяни ползунок: так корабль растёт в принятом порядке сборки.</p>
+
+<div class="wrap">
+  <div class="card">
+    <h2>ЭКРАН КОРАБЛЯ</h2>
+    <div class="device">
+      <div class="safe"></div>
+      <div class="dtop">
+        <div class="iconbtn">≡</div>
+        <div class="t"><div class="k">РОНИН · СБОРКА</div><div class="n" id="hud">0 / 13</div></div>
+        <div class="iconbtn">⤢</div>
+      </div>
+      <div class="shipstage"><canvas id="ship"></canvas></div>
+      <div class="dfoot"><div class="btn primary">Продолжить сборку</div></div>
+      <div class="safe b"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>ПРОГРЕСС СБОРКИ</h2>
+    <div class="ctl">
+      <input id="slider" type="range" min="0" max="13" value="3" step="1">
+      <div class="val" id="val">3 / 13</div>
+    </div>
+    <div class="now" id="now"></div>
+    <div class="note">
+      <b>Что видно первым.</b> Порядок парами сверху вниз: половинки носа, затем визор
+      мостика и его борта, затем носовой пояс — сначала у киля, потом скулы. Пара
+      идёт подряд, чтобы симметричный объект достраивался сразу и не висел половиной.<br><br>
+      <b>Сетку клеток на корабле не рисуем</b> — швы даёт сам рисунок. Разделители клеток
+      живут только на поле укладки (решение PO 2026-07-28).
+    </div>
+  </div>
+</div>
+
+<script src="ship-render.js"></script>
+<script src="ronin-parts.js"></script>
+<script src="ronin-draw.js"></script>
+<script>
+(function(){
+"use strict";
+const P = window.RONIN_PARTS, D = window.RONIN_DRAW, SHIP = window.__SHIP;
+
+const sx = 44, sy = 26, sw = SHIP.W - 88, sh = SHIP.H - 40;   // кадр: обрезаем поля
+const destW = 210, scale = destW / sw, destH = sh * scale;
+const g = D.dpr(document.getElementById('ship'), destW, destH);
+const T   = (x, y) => [ (x - sx) * scale, (y - sy) * scale ];
+const map = (col, row) => T(D.rx(col), D.ry(row));
+const u   = (D.rx(1) - D.rx(0)) * scale;                      // клетка сетки на экране
+
+function render(n){
+  g.clearRect(0, 0, destW, destH);
+  g.strokeStyle = 'hsla(215,14%,52%,.16)'; g.lineWidth = 1;   /* shipOutline */
+  D.shipOutlinePath(g, T);
+  P.parts.filter(p => p.order <= n).forEach(p => D.drawPart(g, p, map, u));
+
+  document.getElementById('hud').textContent = n + ' / ' + P.parts.length;
+  document.getElementById('val').textContent = n + ' / ' + P.parts.length;
+  const last = P.parts.find(p => p.order === n);
+  document.getElementById('now').innerHTML = last
+    ? `последняя: <code>${last.id}</code> — ${last.title} · ${last.cells} клеток`
+    : 'ничего не собрано — виден только контур борта';
+}
+const slider = document.getElementById('slider');
+slider.addEventListener('input', () => render(+slider.value));
+render(+slider.value);
+})();
+</script>
+</body>
+</html>
