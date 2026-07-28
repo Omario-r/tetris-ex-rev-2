@@ -21,10 +21,12 @@
       (`el-piece-tray` / `el-piece-drag`) — контраст «сырьё → корабль» сохранён.
 - [ ] Кадр `el-field-partial` воспроизводится: `seam` только по уложенным клеткам,
       граница уложенного идёт по кускам, а не по плитам рисунка.
-- [ ] Карта `ShipMaterials` вытеснена и **удалена целиком** (`ship_materials.dart`,
-      её тест, фолбэк `PackingPainter.materialForPiece`, временный материал
-      Стори 01): `grep -rn 'ShipMaterials\|materialForPart\|materialForPiece' lib test`
-      — пусто. Токены материалов (`BlockMaterial`) остаются, они нужны лотку.
+- [ ] Карта `ShipMaterials` вытеснена из работающего кода: фолбэк
+      `PackingPainter.materialForPiece` и временный материал Стори 01 убраны,
+      `grep -rn 'ShipMaterials\|materialForPart\|materialForPiece' lib` не находит
+      ссылок вне самого `ship_materials.dart`. **Файл и его тест сносятся в
+      Стори 06** (решение PO 2026-07-29). Токены материалов (`BlockMaterial`)
+      остаются живыми — они нужны лотку.
 - [ ] `flutter analyze` — 0; `flutter test` — зелёный (в т.ч. обновлённый
       `packing_painter_test`); смоук-команда — зелёная.
 - [ ] **Гейт 2, визуально:** поле в середине сборки против `el-field-partial` и
@@ -66,7 +68,8 @@
   из рисунка + `seam`).
 - `lib/presentation/screens/` — `game_screen.dart` (прокидывание детали/рендера
   вместо материала).
-- `lib/presentation/theme/` — удаление `ship_materials.dart`.
+- `lib/presentation/theme/` — `ship_materials.dart` выводится из употребления
+  (файл сносится в Стори 06).
 
 ## Открытые вопросы к PO
 
