@@ -448,6 +448,13 @@ _нет_
      `CheatMenu` уже внутри `SingleChildScrollView`).
   5. Тексты вида «ДЕТАЛЬ N/7» в коде и тестах — вычистить; число берётся из
      `kShipPartCount`, не хардкодом.
+  5а. Заодно, в том же модуле: `lib/presentation/screens/ship_screen.dart:33–34` —
+     два `info` линтера `prefer_initializing_formals` (`_onNext`, `_isComplete`).
+     Замечания не от этого эпика: их принесла более новая версия анализатора
+     (тулчейн PO обновился), файл не менялся. Правка на две строки —
+     инициализирующие формальные параметры вместо присваивания в теле;
+     держим вывод `flutter analyze` чистым до конца эпика. Строка в
+     `docs/BACKLOG.md` про эти `info` при этом снимается.
   6. Обновить тесты под новый контент и топбар:
      `test/presentation/game_screen_test.dart`,
      `test/presentation/cheat_menu_test.dart`,
