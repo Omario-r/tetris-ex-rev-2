@@ -19,6 +19,10 @@
   origin — левый верхний угол bbox маски в координатах сетки.
   mask   — строки bbox: '#' клетка детали, '.' чужая или пустая.
   cells  — число '#' (бюджет уровня, VISION: 60–80 клеток = 10–20 кусочков по 3–5).
+  seed   — фиксированный seed нарезки детали на кусочки: уровень всегда один и
+           тот же (решение PO 2026-07-28). null = ещё не подобран; значения
+           подбирает Исполнитель прогоном pack_slicer в контентной стори.
+           Язык форм кусочков (колючесть, порог компактных) — docs/DESIGN.md.
   order  — порядок в сборке: это и есть то, что игрок увидит на корабле первым.
   Инварианты разметки (проверены при нарезке): bbox <= 10 x 14 (поле укладки),
   60 <= cells <= 80, маска связна, детали не пересекаются и покрывают борт без дыр.
@@ -30,7 +34,7 @@ window.RONIN_PARTS = {
   grid: { cols:44, rows:108, renderCell:4, originCol:2 },
   parts: [
   { id:'prow_l', order:1, module:'prow', title:'Нос, левый борт',
-    origin:[12,0], cells:80,
+    origin:[12,0], cells:80, seed:null,
     mask:[
             '##########',
             '##########',
@@ -41,7 +45,7 @@ window.RONIN_PARTS = {
             '##########',
             '##########' ] },
   { id:'prow_r', order:2, module:'prow', title:'Нос, правый борт',
-    origin:[22,0], cells:80,
+    origin:[22,0], cells:80, seed:null,
     mask:[
             '##########',
             '##########',
@@ -52,7 +56,7 @@ window.RONIN_PARTS = {
             '##########',
             '##########' ] },
   { id:'bridge_c', order:3, module:'bridge', title:'Мостик, визор',
-    origin:[17,8], cells:72,
+    origin:[17,8], cells:72, seed:null,
     mask:[
             '.########.',
             '.########.',
@@ -63,7 +67,7 @@ window.RONIN_PARTS = {
             '##########',
             '##########' ] },
   { id:'bridge_l', order:4, module:'bridge', title:'Мостик, левый борт',
-    origin:[8,8], cells:76,
+    origin:[8,8], cells:76, seed:null,
     mask:[
             '##########',
             '##########',
@@ -74,7 +78,7 @@ window.RONIN_PARTS = {
             '#########.',
             '#########.' ] },
   { id:'bridge_r', order:5, module:'bridge', title:'Мостик, правый борт',
-    origin:[26,8], cells:76,
+    origin:[26,8], cells:76, seed:null,
     mask:[
             '##########',
             '##########',
@@ -85,7 +89,7 @@ window.RONIN_PARTS = {
             '.#########',
             '.#########' ] },
   { id:'fwd1_cl', order:6, module:'fwd', title:'Носовой пояс, верх — левее киля',
-    origin:[12,16], cells:72,
+    origin:[12,16], cells:72, seed:null,
     mask:[
             '..########',
             '##########',
@@ -98,7 +102,7 @@ window.RONIN_PARTS = {
             '..####....',
             '..####....' ] },
   { id:'fwd1_cr', order:7, module:'fwd', title:'Носовой пояс, верх — правее киля',
-    origin:[22,16], cells:72,
+    origin:[22,16], cells:72, seed:null,
     mask:[
             '########..',
             '##########',
@@ -111,7 +115,7 @@ window.RONIN_PARTS = {
             '....####..',
             '....####..' ] },
   { id:'fwd1_l', order:8, module:'fwd', title:'Носовой пояс, верх — левая скула',
-    origin:[4,16], cells:74,
+    origin:[4,16], cells:74, seed:null,
     mask:[
             '##########',
             '########..',
@@ -124,7 +128,7 @@ window.RONIN_PARTS = {
             '......####',
             '......####' ] },
   { id:'fwd1_r', order:9, module:'fwd', title:'Носовой пояс, верх — правая скула',
-    origin:[30,16], cells:74,
+    origin:[30,16], cells:74, seed:null,
     mask:[
             '##########',
             '..########',
@@ -137,7 +141,7 @@ window.RONIN_PARTS = {
             '####......',
             '####......' ] },
   { id:'fwd2_cl', order:10, module:'fwd', title:'Носовой пояс, низ — левее киля',
-    origin:[12,22], cells:68,
+    origin:[12,22], cells:68, seed:null,
     mask:[
             '......####',
             '......####',
@@ -150,7 +154,7 @@ window.RONIN_PARTS = {
             '..########',
             '..########' ] },
   { id:'fwd2_cr', order:11, module:'fwd', title:'Носовой пояс, низ — правее киля',
-    origin:[22,22], cells:68,
+    origin:[22,22], cells:68, seed:null,
     mask:[
             '####......',
             '####......',
@@ -163,7 +167,7 @@ window.RONIN_PARTS = {
             '########..',
             '########..' ] },
   { id:'fwd2_l', order:12, module:'fwd', title:'Носовой пояс, низ — левая скула',
-    origin:[4,22], cells:74,
+    origin:[4,22], cells:74, seed:null,
     mask:[
             '###.......',
             '###.......',
@@ -176,7 +180,7 @@ window.RONIN_PARTS = {
             '##########',
             '##########' ] },
   { id:'fwd2_r', order:13, module:'fwd', title:'Носовой пояс, низ — правая скула',
-    origin:[30,22], cells:74,
+    origin:[30,22], cells:74, seed:null,
     mask:[
             '.......###',
             '.......###',
