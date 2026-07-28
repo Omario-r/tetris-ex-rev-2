@@ -42,9 +42,9 @@ void main() {
           reason: 'поле должно рисоваться PackingPainter (ядро укладки)');
     });
 
-    testWidgets('топбар-чип «ДЕТАЛЬ 1/7» на уровне 0', (tester) async {
+    testWidgets('топбар-чип «ДЕТАЛЬ 1/13» на уровне 0', (tester) async {
       await pumpGame(tester);
-      expect(find.text('ДЕТАЛЬ 1/7'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1/13'), findsOneWidget);
     });
 
     testWidgets('лоток: подпись «ЛОТОК · ПОЛНЫЙ НАБОР» + кусочки в ряду',

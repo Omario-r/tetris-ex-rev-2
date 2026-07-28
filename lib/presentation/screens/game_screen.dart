@@ -108,14 +108,18 @@ class _GameScreenState extends State<GameScreen>
     )..repeat(reverse: true);
   }
 
-  /// Загружает силуэт уровня и материал детали из [LevelMap] (единый источник
-  /// «уровень i ↔ деталь i»), затем режет силуэт на кусочки.
+  /// Загружает силуэт уровня из [LevelMap] (единый источник «уровень i ↔
+  /// деталь i»), затем режет силуэт на кусочки.
   void _loadLevel() {
     final level = LevelMap.levelAt(widget.levelIndex);
     _silhouette = level.targetMask;
     _fragmentIndex = level.fragmentIndex;
-    _partMaterial =
-        ShipMaterials.defaultMaterials.materialForPart(_fragmentIndex);
+    // Временно: клетка станет куском рисунка в Стори 03 эпика Ронин-1. Один
+    // материал на все 13 деталей — `ShipMaterials` (7 записей, дев-детали) не
+    // покрывает их (Ронин-1/01 T3, было T4 п. 3, перенесено решением
+    // Постановщика по эскалации T3: без этого смоук `win_flow_test.dart`
+    // падал `RangeError`ом на 8-й детали).
+    _partMaterial = BlockMaterial.graphite;
     _rebuild();
   }
 

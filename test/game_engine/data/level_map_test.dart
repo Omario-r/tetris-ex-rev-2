@@ -1,84 +1,70 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/data/level_map.dart';
-import 'package:explosive_tetris/game_engine/data/ship_parts.dart';
+import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 
 void main() {
-  group('LevelMap — уровни = детали корабля (единый источник формы)', () {
-    for (int i = 0; i < ShipParts.parts.length; i++) {
-      test('levelAt($i).targetMask == ShipParts.parts[$i].mask', () {
-        final target = LevelMap.levelAt(i).targetMask;
-        final part = ShipParts.parts[i].mask;
-        expect(target.width, equals(part.width));
-        expect(target.height, equals(part.height));
-        expect(target.rows, equals(part.rows));
-      });
-    }
+  group('LevelMap — уровни = детали «Ронина» на фиксированном поле 10×14', () {
+    test('поле фиксировано 10×14 (LevelMap.fieldWidth/fieldHeight)', () {
+      expect(LevelMap.fieldWidth, 10);
+      expect(LevelMap.fieldHeight, 14);
+    });
 
-    test('число уровней == ShipParts.parts.length', () {
-      for (int i = 0; i < ShipParts.parts.length; i++) {
+    test('число уровней == RoninParts.parts.length', () {
+      for (int i = 0; i < RoninParts.parts.length; i++) {
         expect(() => LevelMap.levelAt(i), returnsNormally);
       }
     });
-  });
 
-  group('Размещение мишени: floor-anchored + центрирование по X', () {
-    for (int i = 0; i < ShipParts.parts.length; i++) {
-      test('уровень $i: мишень стоит вплотную к дну поля', () {
+    for (int i = 0; i < RoninParts.parts.length; i++) {
+      final part = RoninParts.parts[i];
+
+      test('уровень $i: поле уровня — 10×14, деталь order ${part.order}', () {
         final level = LevelMap.levelAt(i);
-        expect(
-          level.targetY + level.targetMask.height,
-          equals(level.boardHeight),
-          reason: 'мишень $i не касается дна — падающая фигура не найдёт опору',
-        );
+        expect(level.boardWidth, LevelMap.fieldWidth);
+        expect(level.boardHeight, LevelMap.fieldHeight);
+        expect(level.fragmentIndex, i);
       });
 
-      test('уровень $i: мишень целиком в границах поля по X', () {
+      test('уровень $i: мишень отцентрована в поле по обеим осям', () {
+        final level = LevelMap.levelAt(i);
+        final expectedX = (LevelMap.fieldWidth - part.mask.width) ~/ 2;
+        final expectedY = (LevelMap.fieldHeight - part.mask.height) ~/ 2;
+        expect(level.targetX, expectedX);
+        expect(level.targetY, expectedY);
+      });
+
+      test('уровень $i: targetMask — размера поля, деталь вложена по padTo',
+          () {
+        final level = LevelMap.levelAt(i);
+        expect(level.targetMask.width, LevelMap.fieldWidth);
+        expect(level.targetMask.height, LevelMap.fieldHeight);
+
+        final expectedMask = part.mask.padTo(
+          width: LevelMap.fieldWidth,
+          height: LevelMap.fieldHeight,
+          dx: level.targetX,
+          dy: level.targetY,
+        );
+        expect(level.targetMask.rows, equals(expectedMask.rows));
+      });
+
+      test('уровень $i: число клеток мишени совпадает с part.cells', () {
+        final level = LevelMap.levelAt(i);
+        expect(level.targetMask.cells.length, part.cells);
+      });
+
+      test('уровень $i: мишень целиком внутри поля', () {
         final level = LevelMap.levelAt(i);
         expect(level.targetX, greaterThanOrEqualTo(0));
-        expect(
-          level.targetX + level.targetMask.width,
-          lessThanOrEqualTo(level.boardWidth),
-        );
-      });
-    }
-  });
-
-  group('Структурные проверки «уровень проходим» (T2, ⚠ хрупкое)', () {
-    for (int i = 0; i < ShipParts.parts.length; i++) {
-      final level = LevelMap.levelAt(i);
-      final cells = level.targetMask.cells;
-
-      test('уровень $i: мишень непуста', () {
-        expect(cells, isNotEmpty);
-      });
-
-      test('уровень $i: площадь мишени ≥ 4 (минимум одного тетромино)', () {
-        expect(cells.length, greaterThanOrEqualTo(4));
-      });
-
-      test('уровень $i: мишень достижима сверху (targetY в границах поля)', () {
-        // Мишень не «висит» выше верхней границы и не выходит за нижнюю —
-        // падающей фигуре есть куда падать от спавна (y=0) до цели.
         expect(level.targetY, greaterThanOrEqualTo(0));
         expect(
-          level.targetY + level.targetMask.height,
+          level.targetX + part.mask.width,
+          lessThanOrEqualTo(level.boardWidth),
+        );
+        expect(
+          level.targetY + part.mask.height,
           lessThanOrEqualTo(level.boardHeight),
         );
-      });
-
-      test('уровень $i: клетки мишени образуют один связный кусок (4-связность)', () {
-        final set = cells.map((c) => (c.x, c.y)).toSet();
-        final start = set.first;
-        final seen = <(int, int)>{start};
-        final stack = [start];
-        while (stack.isNotEmpty) {
-          final (x, y) = stack.removeLast();
-          for (final n in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]) {
-            if (set.contains(n) && seen.add(n)) stack.add(n);
-          }
-        }
-        expect(seen.length, equals(set.length),
-            reason: 'мишень $i распадается на несвязные части');
       });
     }
   });

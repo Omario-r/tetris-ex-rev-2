@@ -111,7 +111,7 @@ void main() {
 
     final game = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(game.levelIndex, 2);
-    expect(find.text('ДЕТАЛЬ 3/7'), findsOneWidget);
+    expect(find.text('ДЕТАЛЬ 3/13'), findsOneWidget);
   });
 
   testWidgets(

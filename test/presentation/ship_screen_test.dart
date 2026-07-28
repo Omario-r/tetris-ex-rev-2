@@ -23,11 +23,15 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
-  group('ShipScreen — число деталей = min(current_level, 7)', () {
-    // ProgressService клампит персист к 0..6 на чтении (hotfix 2026-07-11: единый
-    // источник истины ShipParts.parts.length) — «сырые» 7/15 в SharedPreferences
-    // теперь читаются как 6 (последний валидный уровень), не проходят насквозь.
-    for (final entry in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 15: 6}.entries) {
+  group('ShipScreen — число деталей = min(current_level, 13)', () {
+    // ProgressService клампит персист к 0..12 на чтении (единый источник истины
+    // RoninParts.parts.length, Ронин-1/01 T3, было ShipParts.parts.length) —
+    // «сырые» значения ≥13 в SharedPreferences теперь читаются как 12
+    // (последний валидный уровень), не проходят насквозь. 7 и 12 отдельно —
+    // регресс на находку T3 (RangeError за пределами 7-элементной карты
+    // материалов дев-деталей; теперь один материал на все 13 деталей).
+    for (final entry
+        in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 7: 7, 12: 12, 30: 12}.entries) {
       final level = entry.key;
       final expected = entry.value;
       testWidgets('current_level=$level → собрано $expected', (tester) async {
@@ -37,7 +41,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(_shipPainter(tester).collectedCount, expected);
-        expect(find.text('Собрано $expected из 7'), findsOneWidget);
+        expect(find.text('Собрано $expected из 13'), findsOneWidget);
       });
     }
   });

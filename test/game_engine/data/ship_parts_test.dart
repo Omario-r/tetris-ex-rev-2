@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/data/ship_parts.dart';
-import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
 /// Абсолютные клетки детали в сетке корабля (с учётом якоря).
 Set<(int, int)> _shipCells(int i) {
@@ -13,9 +12,11 @@ void main() {
     expect(ShipParts.parts.length, equals(7));
   });
 
-  test('kShipPartCount выводится из parts.length (единый источник)', () {
-    expect(kShipPartCount, equals(ShipParts.parts.length));
-  });
+  // «kShipPartCount выводится из parts.length» убран (Ронин-1/01 T3): с этой
+  // задачи `kShipPartCount` (`ship.dart`) — из `RoninParts.parts.length`, а
+  // `ShipParts` — осиротевший дев-контент (выпил в Стори 06); единый источник
+  // «N деталей ↔ N уровней» больше НЕ совпадает с `ShipParts.parts.length` —
+  // это ожидаемо, не регрессия.
 
   test('площадь каждой детали ≥ 4 (правило «кратно 4» снято — VISION)', () {
     for (int i = 0; i < ShipParts.parts.length; i++) {

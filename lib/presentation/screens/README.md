@@ -12,9 +12,12 @@
 ## Публичный интерфейс
 
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
-  Стори 02 T2). Силуэт уровня — `LevelMap.levelAt(levelIndex).targetMask`, материал детали —
-  `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)` (единый источник «уровень i
-  ↔ деталь i»). Нарезка `slicePolyomino(silhouette, seed:_seed)` → `PackController`/`PackState`
+  Стори 02 T2). Силуэт уровня — `LevelMap.levelAt(levelIndex).targetMask`; материал уложенных
+  клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все 13 деталей (Ронин-1/01
+  T3, было `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)`: 7-элементная карта
+  не покрывала 13 деталей «Ронина» — `RangeError` на 8-м уровне; `ShipMaterials` из экрана
+  больше не читается для этого поля). Нарезка `slicePolyomino(silhouette, seed:_seed)` →
+  `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
   (`PackState.isComplete`) → **деталь собрана** → прежний мета-поток
   (`ProgressService.advanceOnWin` → `ShipScreen.reveal`). Ни гравитации, ни таймера, ни

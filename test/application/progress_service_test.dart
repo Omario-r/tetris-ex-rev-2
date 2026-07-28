@@ -1,12 +1,13 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:explosive_tetris/application/progress_service.dart';
-import 'package:explosive_tetris/game_engine/data/ship_parts.dart';
+import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 
 /// Последний валидный индекс уровня — тот же единый источник истины, что и в
-/// `ProgressService._max` (`ShipParts.parts.length - 1`), чтобы тест не разошёлся
-/// с реальным контентом при его росте/сокращении (см. hotfix 2026-07-11).
-final _maxLevel = ShipParts.parts.length - 1;
+/// `ProgressService._max` (`RoninParts.parts.length - 1`, Ронин-1/01 T3, было
+/// `ShipParts.parts.length - 1`), чтобы тест не разошёлся с реальным контентом
+/// при его росте/сокращении (см. hotfix 2026-07-11).
+final _maxLevel = RoninParts.parts.length - 1;
 
 void main() {
   setUp(() {
@@ -31,7 +32,7 @@ void main() {
     expect(await s.getCurrentLevel(), 1);
   });
 
-  test('advanceOnWin clamps at _maxLevel (== ShipParts.parts.length - 1)', () async {
+  test('advanceOnWin clamps at _maxLevel (== RoninParts.parts.length - 1)', () async {
     final s = ProgressService();
     await s.setCurrentLevel(_maxLevel);
     expect(await s.advanceOnWin(), _maxLevel);

@@ -14,13 +14,13 @@
 |--------|------|----------------------|------------|
 | models | `lib/game_engine/models/` | Структуры данных ядра (маска мишени, шаблон уровня) | — |
 | packing | `lib/game_engine/packing/` | Ядро укладки — основной движок игры: полиомино-кусок, состояние (силуэт+размещённые+лоток), валидация/завершение, нарезка силуэта | models |
-| data | `lib/game_engine/data/` | Контент: `ShipParts` (дев-детали) + `LevelMap` (`ShipParts.parts.length` уровней, v1=7) | models |
+| data | `lib/game_engine/data/` | Контент: разметка «Ронина» (`RoninParts` — 13 деталей на сетке 44×108, маска = след детали на корабле) + `LevelMap` (уровень i ↔ деталь с order i+1, поле 10×14); `ShipParts` — осиротевшие дев-детали, выпил в Стори 06 | models |
 | application | `lib/application/` | Персист прогресса (`ProgressService`) | data ¹ |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
 | widgets | `lib/presentation/widgets/` | Пейнтеры укладки и корабля | packing, data, theme |
 | screens | `lib/presentation/screens/` | Экраны + композиционный корень партии укладки | packing, models, data, application, theme, widgets |
 
-¹ **application → game_engine/data:** `ProgressService._max` берёт `ShipParts.parts.length - 1`
+¹ **application → game_engine/data:** `ProgressService._max` берёт `RoninParts.parts.length - 1`
 (единый источник истины числа уровней) вместо хардкода — импорт строго вниз по слоям, разрешён
 (hotfix 2026-07-11: хардкод `15` разошёлся с реальным числом уровней после эпика «Контент» и
 ронял приложение на холодном старте с устаревшим persist-значением).
@@ -38,7 +38,7 @@ lib/main.dart (вход)
         ▼                                    │
    application  ◄────────────────────────────┘ (screens → ProgressService)
         │
-        ▼  (ProgressService._max ← ShipParts.parts.length, см. ¹)
+        ▼  (ProgressService._max ← RoninParts.parts.length, см. ¹)
    game_engine:  packing ──► models ◄── data
                                         ▲
                                         application
@@ -52,8 +52,8 @@ lib/main.dart (вход)
 - `screens` — единственный композиционный корень: тянет ядро укладки, данные и виджеты.
 - `application` тонкий: только персист прогресса (`ProgressService`); игрового цикла в слое
   нет — пульс-`AnimationController` живёт в `screens/game_screen`.
-- `widgets → data`: `ShipPainter` берёт форму деталей из `ShipParts` — тот же источник, что
-  и мишени дев-уровней (`LevelMap`), поэтому «собранное на уровне» = «деталь корабля».
+- `widgets → data`: `ShipPainter` берёт форму деталей из `RoninParts` (тот же источник, что и
+  мишени уровней), поэтому «собранное на уровне» = «деталь корабля».
 
 ## Сквозные соглашения
 

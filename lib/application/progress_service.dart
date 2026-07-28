@@ -1,17 +1,17 @@
 import 'dart:math' as math;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import '../game_engine/data/ship_parts.dart';
+import '../game_engine/data/ronin_parts.dart';
 
 class ProgressService {
   static const String _key = 'current_level';
   static const int _min = 0;
 
-  /// Последний валидный индекс уровня. Единый источник истины — `ShipParts.parts`
-  /// (эпик «Контент»): уровней ровно `ShipParts.parts.length`, индексы 0..`_max`.
-  /// Не хардкодить отдельным числом — расхождение с `LevelMap` даёт
-  /// `LevelMap.levelAt` assertion-краш при холодном старте (см. hotfix 2026-07-11).
-  static int get _max => ShipParts.parts.length - 1;
+  /// Последний валидный индекс уровня. Единый источник истины — `RoninParts.parts`
+  /// (Ронин-1/01 T3, было `ShipParts.parts`): уровней ровно `RoninParts.parts.length`,
+  /// индексы 0..`_max`. Не хардкодить отдельным числом — расхождение с `LevelMap`
+  /// даёт `LevelMap.levelAt` assertion-краш при холодном старте (см. hotfix 2026-07-11).
+  static int get _max => RoninParts.parts.length - 1;
 
   /// Возвращает текущий уровень (0.._max). Если ключ не задан — возвращает 0.
   Future<int> getCurrentLevel() async {

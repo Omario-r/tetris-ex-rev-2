@@ -16,16 +16,22 @@
 
 ## Публичный интерфейс
 
-- `ShipPainter({collectedCount, revealPartIndex, revealProgress, materials})` — единый корабль из
-  `kShipPartCount` деталей: первые `collectedCount` установлены (залиты материалом из `materials`),
-  остальные — контуром; `collectedCount` клампится 0..`kShipPartCount`. Каждая деталь — маска
-  `ShipParts.parts[i].mask` (та же, что мишень уровня → совпадают). `materials` — `ShipMaterials`
-  (по умолчанию `defaultMaterials`). Деталь `revealPartIndex` рисуется масштабом `revealProgress`
-  (0..1) от центра — эффект появления (Стори 03); по умолчанию все статичны. Центрирование/масштаб —
-  по `ShipParts.gridSize` (пейнтер не зависит от числа деталей).
-- `kShipPartCount` (`ship.dart`) — **`final`, выводится из `ShipParts.parts.length`** (v1 = 7).
-  Единый источник «N деталей ↔ N уровней». Не `const` — только рантайм. Форма деталей живёт в
-  `game_engine/data/ship_parts`.
+- `ShipPainter({collectedCount, revealPartIndex, revealProgress})` — единый корабль из
+  `kShipPartCount` деталей: первые `collectedCount` установлены, остальные — контуром;
+  `collectedCount` клампится 0..`kShipPartCount`. Каждая деталь — маска `RoninParts.parts[i].mask`
+  (та же, что мишень уровня → совпадают), якорь — `RoninParts.parts[i].originCol`/`originRow`.
+  Деталь `revealPartIndex` рисуется масштабом `revealProgress` (0..1) от центра — эффект появления
+  (Стори 03); по умолчанию все статичны. Центрирование/масштаб — по сетке `RoninGrid.cols ×
+  RoninGrid.rows` (44×108, не квадратная — вписывается по меньшей стороне без растяжения
+  пропорций; пейнтер не зависит от числа деталей). **Отрисовка временная (Ронин-1/01 T3):**
+  плоская заливка одним материалом `BlockMaterial.graphite` на ВСЕ собранные детали (без
+  `ShipMaterials` — параметр `materials` убран вместе с зависимостью от `theme`; решение
+  Постановщика по эскалации T3, 2026-07-29: 7-элементная карта `ShipMaterials.defaultMaterials`
+  не покрывает 13 деталей «Ронина», расширять её под заведомо неканоничный временный пейнтер не
+  стали). Заменяется композитом из рисунка «Ронина» в Стори 02 эпика Ронин-1.
+- `kShipPartCount` (`ship.dart`) — **`final`, выводится из `RoninParts.parts.length`** (= 13,
+  было `ShipParts.parts.length` = 7 до Ронин-1/01 T3). Единый источник «N деталей ↔ N уровней».
+  Не `const` — только рантайм. Форма деталей живёт в `game_engine/data/ronin_parts`.
 - `PackingPainter({state, cellSize, shipMaterials, excludePieceId, partMaterial, dragPreview})` —
   `CustomPainter` укладки (эпик «Укладка», Стори 01 T3, канон утверждён эпик «Укладка» Стори 02
   T1): фон `boardBg` (`#16191D`) + ghost незаполненных клеток силуэта (`BlockTheme.ghostTarget`,
@@ -63,12 +69,15 @@
 
 ## Зависит от
 
-- `game_engine/data` — `ShipParts` (форма деталей = мишеней; `ship.dart`).
+- `game_engine/data` — `RoninParts` (форма деталей = мишеней; `ship.dart`, Ронин-1/01 T3, было
+  `ShipParts`).
 - `game_engine/packing` (`PackPiece`, `PackState`) — `packing_painter`.
-- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`, `ShipMaterials`,
-  оверлей `GhostTargetOverlay`. `game_engine/game`, `game_engine/models`, `ScrapBlockSkin`,
-  `CanisterChargePainter`/`ChargeIconState`, `HaloHighlightOverlay` больше не зависимости
-  `widgets` — их тянул только `BoardPainter`/`GameHud`, удалённые эпик «Укладка» Стори 02 T3.
+- `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`, оверлей
+  `GhostTargetOverlay`; `ShipMaterials` — только `packing_painter` (`shipMaterials`/циклический
+  fallback), `ship.dart` от неё больше не зависит (Ронин-1/01 T3). `game_engine/game`,
+  `game_engine/models`, `ScrapBlockSkin`, `CanisterChargePainter`/`ChargeIconState`,
+  `HaloHighlightOverlay` больше не зависимости `widgets` — их тянул только
+  `BoardPainter`/`GameHud`, удалённые эпик «Укладка» Стори 02 T3.
 
 ## От него зависят
 
@@ -80,10 +89,11 @@
 - Только вид: пейнтеры не содержат игровой логики.
 - `shouldRepaint` завязан на `state`/анимацию; мутабельное состояние в пейнтере не хранить.
 - `ShipPainter.collectedCount` всегда клампится 0..`kShipPartCount`. Форма деталей — из
-  `ShipParts` (data), та же, что мишень уровня → совпадают. `revealProgress` масштабирует
-  лишь деталь `revealPartIndex`.
+  `RoninParts` (data), та же, что мишень уровня → совпадают. `revealProgress` масштабирует
+  лишь деталь `revealPartIndex`. Материал собранных деталей — единый временный
+  `BlockMaterial.graphite` (не по индексу/карте — см. «Публичный интерфейс»).
 
 ## Как проверить
 
-`flutter test test/presentation/ship_screen_test.dart test/game_engine/data/ship_parts_test.dart
+`flutter test test/presentation/ship_screen_test.dart test/game_engine/data/ronin_parts_test.dart
 test/presentation/packing_painter_test.dart`.
