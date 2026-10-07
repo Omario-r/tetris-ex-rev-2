@@ -28,6 +28,16 @@
   клеток (полный бэктрекинг-DFS, порядок размеров [4,5,3]). `PackSlice` =
   `pieces` (id 0..N-1, cells нормализованы) + `solution` (`pieceId → origin` в
   силуэте; эталонная раскладка, доказывающая существование решения).
+- `slice_config.dart` — dev-калибровка нарезки (Ронин-1/07; после КТ-1 лишние
+  конфигурации удаляются): `enum SliceConfig { bigPieces, halfPart, coarseCell }`
+  (порядок = порядок кнопок чит-меню); `prepareLevel(partMask, config, {seed})` →
+  `PreparedLevel` (`fieldWidth/fieldHeight`, `silhouette` размера поля, `targetX/
+  targetY`, `cellScale` 1|2, `slice`). `bigPieces` — поле 10×14, нарезка 3..5 +
+  слияние соседних (5..12 клеток, 7–10 кусков); `halfPart` — связная половина
+  детали (`ceil(n/2)`, BFS), поле 10×14, куски 3..5, ≤ 11 кусков; `coarseCell` —
+  огрубление 2×2, поле 5×7, куски 3..5, ≤ 7 кусков. `mergeAdjacentPieces(
+  silhouette, base)` — публичное детерминированное слияние (два прохода: пары
+  нетронутых ≤ 10, затем остатки в любого соседа ≤ 12).
 
 ## Зависит от
 
