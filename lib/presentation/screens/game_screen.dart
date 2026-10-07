@@ -504,7 +504,10 @@ class _GameScreenState extends State<GameScreen>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            _PartTitle(fragmentIndex: _fragmentIndex),
+            // `.title { flex:1; min-width:0 }`: заголовок берёт остаток строки и
+            // ужимается, кнопки справа — натуральным размером (зазор 8).
+            Expanded(child: _PartTitle(fragmentIndex: _fragmentIndex)),
+            const SizedBox(width: 8.0),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -810,12 +813,20 @@ class _PartTitle extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 1.0),
-        Text(
-          title,
-          style: const TextStyle(
-            color: _nameColor,
-            fontSize: 13.0,
-            letterSpacing: 0.78, // .06em @ 13px
+        // Название не переносится и не обрезается: на узком экране ужимается
+        // целиком (`scaleDown` шрифт 13 не увеличивает).
+        FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(
+            title,
+            maxLines: 1,
+            softWrap: false,
+            style: const TextStyle(
+              color: _nameColor,
+              fontSize: 13.0,
+              letterSpacing: 0.78, // .06em @ 13px
+            ),
           ),
         ),
       ],

@@ -53,7 +53,9 @@
   (`RoninParts.parts[fragmentIndex].title.toUpperCase()`, напр. «НОС, ЛЕВЫЙ БОРТ»); свотча
   материала в топбаре больше нет (был у прежнего чипа, Стори 02 T3). Справа dev-кнопки
   (`Key('cheat_button')` под `kDebugMode`, `Key('ship_button')`). Виджеты `_PartTitle`
-  (заменил `_PartChip`/`_Swatch`) / `_DevButton`.
+  (заменил `_PartChip`/`_Swatch`) / `_DevButton`. Заголовок — `Expanded` (зазор 8 до кнопок),
+  строка `.name` в `FittedBox(scaleDown, centerLeft)`: длинное название ужимается, не
+  переносится и не переполняет топбар от 360 dp (Ронин-1/01 T5).
 - Drag-and-drop — сырые pointer-события `Listener` (`onPointerDown/Move/Up/Cancel`, НЕ
   `GestureDetector.onPan*` — фикс возврата Гейта 2 Стори 01: лоток
   `SingleChildScrollView(Axis.horizontal)` выигрывал `onPan*` в gesture arena, кусок не

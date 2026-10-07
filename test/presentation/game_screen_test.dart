@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:explosive_tetris/application/progress_service.dart';
+import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
@@ -49,6 +50,38 @@ void main() {
       expect(find.text('ДЕТАЛЬ 1 / 13'), findsOneWidget);
       // Уровень 0 ↔ деталь order 1 (`RoninParts.parts[0]`) — «Нос, левый борт».
       expect(find.text('НОС, ЛЕВЫЙ БОРТ'), findsOneWidget);
+    });
+
+    testWidgets(
+        'топбар на 360×640: название любой из 13 деталей помещается, '
+        'кнопки справа целиком в экране', (tester) async {
+      const screen = Rect.fromLTWH(0, 0, 360, 640);
+      for (var i = 0; i < RoninParts.parts.length; i++) {
+        tester.view.physicalSize = const Size(360, 640);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        // key по индексу — иначе State прошлой детали переиспользуется.
+        await tester.pumpWidget(MaterialApp(
+          home: GameScreen(key: ValueKey(i), levelIndex: i),
+        ));
+        await tester.pump();
+
+        final title = RoninParts.parts[i].title.toUpperCase();
+        expect(tester.takeException(), isNull, reason: 'деталь ${i + 1}');
+        expect(find.text(title), findsOneWidget, reason: 'деталь ${i + 1}');
+        for (final key in const ['ship_button', 'cheat_button']) {
+          final rect = tester.getRect(find.byKey(Key(key)));
+          expect(
+              screen.contains(rect.topLeft) && screen.contains(rect.bottomRight),
+              isTrue,
+              reason: '$key вне экрана на детали ${i + 1}: $rect');
+        }
+        // Название не заезжает на кнопки.
+        final nameRect = tester.getRect(find.text(title));
+        final cheatRect = tester.getRect(find.byKey(const Key('cheat_button')));
+        expect(nameRect.right, lessThanOrEqualTo(cheatRect.left),
+            reason: 'название налезает на кнопки, деталь ${i + 1}');
+      }
     });
 
     testWidgets('лоток: подпись «ЛОТОК · ПОЛНЫЙ НАБОР» + кусочки в ряду',
