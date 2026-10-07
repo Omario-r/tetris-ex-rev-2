@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:explosive_tetris/application/progress_service.dart';
+import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/presentation/screens/cheat_menu.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
@@ -30,7 +31,10 @@ int _trayPieceCount() => find
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() => SharedPreferences.setMockInitialValues({}));
+  tearDown(() {
+    SharedPreferences.setMockInitialValues({});
+    GameScreen.sliceConfig = SliceConfig.bigPieces;
+  });
 
   Future<void> pumpGame(WidgetTester tester, {int level = 0}) async {
     tester.view.physicalSize = const Size(1200, 1600);
@@ -190,5 +194,80 @@ void main() {
     expect(find.byType(ShipScreen), findsOneWidget);
     expect(find.byKey(const Key('ship_next_button')), findsOneWidget);
     expect(await ProgressService().getCurrentLevel(), 1);
+  });
+
+  group('Секция «Нарезка: калибровка»', () {
+    Future<void> pumpMenu(
+      WidgetTester tester, {
+      required SliceConfig current,
+      required ValueChanged<SliceConfig> onSet,
+    }) async {
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CheatMenu(
+              onSelectLevel: (_) {},
+              onInstantWin: () {},
+              onSetShipParts: (_) {},
+              feedMode: FeedMode.fullSet,
+              onSetFeedMode: (_) {},
+              onReshuffle: () {},
+              onSolve: () {},
+              sliceConfig: current,
+              onSetSliceConfig: onSet,
+            ),
+          ),
+        ),
+      );
+    }
+
+    const labels = {
+      SliceConfig.bigPieces: 'Крупные куски',
+      SliceConfig.halfPart: 'Полдетали',
+      SliceConfig.coarseCell: 'Крупная клетка',
+    };
+
+    testWidgets(
+      'три кнопки в порядке SliceConfig.values, текущая отмечена «✓ »',
+      (tester) async {
+        for (final current in SliceConfig.values) {
+          await pumpMenu(tester, current: current, onSet: (_) {});
+          expect(find.text('Нарезка: калибровка'), findsOneWidget);
+          for (final config in SliceConfig.values) {
+            final button = find.byKey(Key('slice_config_${config.name}'));
+            expect(button, findsOneWidget);
+            final label = labels[config]!;
+            expect(
+              find.descendant(
+                of: button,
+                matching: find.text(config == current ? '✓ $label' : label),
+              ),
+              findsOneWidget,
+              reason: '$config при текущей $current',
+            );
+          }
+        }
+        // Порядок кнопок слева направо — как у SliceConfig.values.
+        final xs = [
+          for (final c in SliceConfig.values)
+            tester.getTopLeft(find.byKey(Key('slice_config_${c.name}'))).dx,
+        ];
+        expect(xs, orderedEquals([...xs]..sort()));
+      },
+    );
+
+    testWidgets('тап по кнопке отдаёт в колбэк выбранную конфигурацию', (
+      tester,
+    ) async {
+      final picked = <SliceConfig>[];
+      await pumpMenu(tester, current: SliceConfig.bigPieces, onSet: picked.add);
+      for (final config in SliceConfig.values) {
+        await tester.tap(find.byKey(Key('slice_config_${config.name}')));
+      }
+      expect(picked, SliceConfig.values);
+    });
   });
 }

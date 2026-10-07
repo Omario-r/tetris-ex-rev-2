@@ -9,7 +9,7 @@ import '../../game_engine/data/ronin_parts.dart';
 import '../../game_engine/models/target_mask.dart';
 import '../../game_engine/packing/pack_controller.dart';
 import '../../game_engine/packing/pack_piece.dart';
-import '../../game_engine/packing/pack_slicer.dart';
+import '../../game_engine/packing/slice_config.dart';
 import '../../game_engine/packing/pack_state.dart';
 import '../theme/block_material.dart';
 import '../theme/ship_materials.dart';
@@ -40,6 +40,11 @@ class GameScreen extends StatefulWidget {
   /// Creates a [GameScreen] with the given [levelIndex].
   const GameScreen({super.key, this.levelIndex = 0});
 
+  /// Выбранная конфигурация нарезки (dev-калибровка Ронин-1/07). Живёт вне
+  /// `State` (экран пересоздаётся на каждом уровне) до перезапуска приложения;
+  /// по умолчанию `bigPieces` — в том числе в release.
+  static SliceConfig sliceConfig = SliceConfig.bigPieces;
+
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -52,8 +57,11 @@ class _GameScreenState extends State<GameScreen>
   static const double _progZoneHeight = 34.0;
   static const double _trayZoneHeight = 132.0;
 
-  /// Размер клетки кусочка в лотке (`el-piece-tray`, уменьшенный масштаб).
-  static const double _trayCellSize = 32.0;
+  /// Канонический размер клетки кусочка в лотке (`el-piece-tray`, уменьшенный
+  /// масштаб) и высота ряда лотка: клетка ужимается, чтобы самый высокий кусок
+  /// уровня не превышал [_trayRowMaxHeight] (см. [_trayCellSize]).
+  static const double _trayCellCanon = 32.0;
+  static const double _trayRowMaxHeight = 160.0;
 
   /// Офсет кусочка над пальцем при drag (`el-piece-drag`, риск drag-UX эпика):
   /// кусок рисуется на столько пикселей выше точки касания.
@@ -68,6 +76,13 @@ class _GameScreenState extends State<GameScreen>
   // --- Силуэт уровня и нарезка ---
   late TargetMask _silhouette;
   late int _fragmentIndex;
+
+  /// Масштаб клетки поля уровня: 1 — канон 34 px, 2 — 68 px (`coarseCell`).
+  late int _cellScale;
+
+  /// Клетка лотка (и ширина клетки): `min(32, 160 / h)`, `h` — наибольшая
+  /// высота куска уровня в клетках; считается один раз при (пере)сборке уровня.
+  late double _trayCellSize;
   late BlockMaterial _partMaterial;
 
   /// Сид нарезки (0 → детерминированная стартовая нарезка); «Пересобрать
@@ -109,12 +124,11 @@ class _GameScreenState extends State<GameScreen>
     )..repeat(reverse: true);
   }
 
-  /// Загружает силуэт уровня из [LevelMap] (единый источник «уровень i ↔
-  /// деталь i»), затем режет силуэт на кусочки.
+  /// Запоминает деталь уровня ([LevelMap] — единый источник «уровень i ↔
+  /// деталь i») и материал, затем собирает уровень в выбранной конфигурации
+  /// нарезки ([_rebuild]).
   void _loadLevel() {
-    final level = LevelMap.levelAt(widget.levelIndex);
-    _silhouette = level.targetMask;
-    _fragmentIndex = level.fragmentIndex;
+    _fragmentIndex = LevelMap.levelAt(widget.levelIndex).fragmentIndex;
     // Временно: клетка станет куском рисунка в Стори 03 эпика Ронин-1. Один
     // материал на все 13 деталей — `ShipMaterials` (7 записей, дев-детали) не
     // покрывает их (Ронин-1/01 T3, было T4 п. 3, перенесено решением
@@ -124,8 +138,24 @@ class _GameScreenState extends State<GameScreen>
     _rebuild();
   }
 
+  /// Строит уровень через [prepareLevel]: силуэт в поле, масштаб клетки и
+  /// нарезка — в конфигурации [GameScreen.sliceConfig] с текущим `_seed`.
   void _rebuild() {
-    final slice = slicePolyomino(_silhouette, seed: _seed);
+    final prepared = prepareLevel(
+      RoninParts.parts[_fragmentIndex].mask,
+      GameScreen.sliceConfig,
+      seed: _seed,
+    );
+    _silhouette = prepared.silhouette;
+    _cellScale = prepared.cellScale;
+    final slice = prepared.slice;
+    var maxHeight = 1;
+    for (final p in slice.pieces) {
+      for (final c in p.cells) {
+        if (c.y + 1 > maxHeight) maxHeight = c.y + 1;
+      }
+    }
+    _trayCellSize = math.min(_trayCellCanon, _trayRowMaxHeight / maxHeight);
     _solution = slice.solution;
     _controller = PackController(
       PackState(
@@ -220,6 +250,8 @@ class _GameScreenState extends State<GameScreen>
       onSetFeedMode: _cheatSetFeedMode,
       onReshuffle: _cheatReshuffle,
       onSolve: _cheatSolve,
+      sliceConfig: GameScreen.sliceConfig,
+      onSetSliceConfig: _cheatSetSliceConfig,
     );
   }
 
@@ -254,6 +286,14 @@ class _GameScreenState extends State<GameScreen>
     setState(() => _feedMode = mode);
   }
 
+  /// Чит «Нарезка: калибровка»: запоминает конфигурацию (на все уровни до
+  /// перезапуска приложения) и перезапускает текущий уровень с тем же `_seed`.
+  void _cheatSetSliceConfig(SliceConfig config) {
+    Navigator.of(context).pop();
+    GameScreen.sliceConfig = config;
+    _restartLevel();
+  }
+
   /// Дев-чит «Пересобрать нарезку»: новый `seed` → новая нарезка той же детали.
   void _cheatReshuffle() {
     Navigator.of(context).pop();
@@ -267,8 +307,13 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _reshuffle() {
+    _seed++;
+    _restartLevel();
+  }
+
+  /// Пересобирает текущий уровень с текущим `_seed` и сбрасывает драг.
+  void _restartLevel() {
     setState(() {
-      _seed++;
       _dragPieceId = null;
       _dragGlobalPos = null;
       _dragFromTray = false;
@@ -442,7 +487,10 @@ class _GameScreenState extends State<GameScreen>
     final availableWidth = constraints.maxWidth - 2 * _boardPadding;
     final fitByHeight = availableHeight / boardHeight;
     final fitByWidth = availableWidth / boardWidth;
-    final size = math.min(_canonicalCellSize, math.min(fitByHeight, fitByWidth));
+    final size = math.min(
+      _canonicalCellSize * _cellScale,
+      math.min(fitByHeight, fitByWidth),
+    );
     return math.max(size, 8.0);
   }
 

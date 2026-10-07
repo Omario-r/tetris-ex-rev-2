@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../game_engine/packing/slice_config.dart';
 import '../widgets/ship.dart';
 import 'game_screen.dart' show FeedMode;
 
@@ -30,6 +31,12 @@ class CheatMenu extends StatelessWidget {
   /// Solve-хук: доложить деталь по эталонной раскладке (дев-инструмент).
   final VoidCallback onSolve;
 
+  /// Текущая конфигурация нарезки (отмечается в секции «Нарезка: калибровка»).
+  final SliceConfig sliceConfig;
+
+  /// Выбрать конфигурацию нарезки (калибровка Ронин-1/07).
+  final ValueChanged<SliceConfig> onSetSliceConfig;
+
   /// Сколько дев-уровней предлагать в «выборе уровня». `null` (по умолчанию) —
   /// все детали корабля [kShipPartCount] (не можем задать дефолтом: `kShipPartCount`
   /// не `const`). Единый источник истины «N уровней ↔ N деталей».
@@ -44,6 +51,8 @@ class CheatMenu extends StatelessWidget {
     required this.onSetFeedMode,
     required this.onReshuffle,
     required this.onSolve,
+    required this.sliceConfig,
+    required this.onSetSliceConfig,
     this.levelCount,
   });
 
@@ -97,6 +106,16 @@ class CheatMenu extends StatelessWidget {
                   child: const Text('Лоток-3'),
                 ),
               ]),
+              _section(context, 'Нарезка: калибровка', [
+                for (final config in SliceConfig.values)
+                  ElevatedButton(
+                    key: Key('slice_config_${config.name}'),
+                    onPressed: () => onSetSliceConfig(config),
+                    child: Text(
+                      '${config == sliceConfig ? '✓ ' : ''}${_sliceConfigLabel(config)}',
+                    ),
+                  ),
+              ]),
               _section(context, 'Нарезка (dev)', [
                 ElevatedButton(
                   key: const Key('cheat_reshuffle'),
@@ -114,6 +133,17 @@ class CheatMenu extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _sliceConfigLabel(SliceConfig config) {
+    switch (config) {
+      case SliceConfig.bigPieces:
+        return 'Крупные куски';
+      case SliceConfig.halfPart:
+        return 'Полдетали';
+      case SliceConfig.coarseCell:
+        return 'Крупная клетка';
+    }
   }
 
   Widget _section(BuildContext context, String title, List<Widget> buttons) {
@@ -141,6 +171,8 @@ Future<void> showCheatMenu(
   required ValueChanged<FeedMode> onSetFeedMode,
   required VoidCallback onReshuffle,
   required VoidCallback onSolve,
+  required SliceConfig sliceConfig,
+  required ValueChanged<SliceConfig> onSetSliceConfig,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -153,6 +185,8 @@ Future<void> showCheatMenu(
       onSetFeedMode: onSetFeedMode,
       onReshuffle: onReshuffle,
       onSolve: onSolve,
+      sliceConfig: sliceConfig,
+      onSetSliceConfig: onSetSliceConfig,
     ),
   );
 }

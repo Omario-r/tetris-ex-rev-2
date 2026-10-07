@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
+import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
@@ -18,7 +19,10 @@ Future<void> _pumpFrames(WidgetTester tester,
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() => SharedPreferences.setMockInitialValues({}));
+  tearDown(() {
+    SharedPreferences.setMockInitialValues({});
+    GameScreen.sliceConfig = SliceConfig.bigPieces;
+  });
 
   Future<void> pumpGame(WidgetTester tester, {int level = 0}) async {
     tester.view.physicalSize = const Size(1200, 1600);
@@ -26,6 +30,19 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     await tester.pumpWidget(MaterialApp(home: GameScreen(levelIndex: level)));
     await tester.pump();
+  }
+
+  PackingPainter packingPainter(WidgetTester tester) => tester
+      .widgetList<CustomPaint>(find.byType(CustomPaint))
+      .map((cp) => cp.painter)
+      .whereType<PackingPainter>()
+      .single;
+
+  Future<void> pickSliceConfig(WidgetTester tester, SliceConfig config) async {
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+    await tester.tap(find.byKey(Key('slice_config_${config.name}')));
+    await _pumpFrames(tester);
   }
 
   group('GameScreen — ядро укладки', () {
@@ -175,6 +192,129 @@ void main() {
 
         expect(tester.takeException(), isNull);
         expect(find.byType(GameScreen), findsOneWidget);
+      },
+    );
+  });
+
+  group('GameScreen — конфигурации нарезки (Ронин-1/07)', () {
+    testWidgets('по умолчанию bigPieces: поле 10×14, клетка 34, число кусков '
+        'из prepareLevel', (tester) async {
+      await pumpGame(tester);
+      final painter = packingPainter(tester);
+      expect(GameScreen.sliceConfig, SliceConfig.bigPieces);
+      expect(painter.state.silhouette.width, 10);
+      expect(painter.state.silhouette.height, 14);
+      expect(painter.cellSize, 34.0);
+
+      final expected = prepareLevel(
+        RoninParts.parts[0].mask,
+        SliceConfig.bigPieces,
+        seed: 0,
+      ).slice.pieces.length;
+      expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
+    });
+
+    testWidgets('переключение на coarseCell: поле 5×7, клетка 68, ≤ 7 кусков, '
+        'конфигурация переживает переход на другой уровень', (tester) async {
+      await pumpGame(tester);
+      await pickSliceConfig(tester, SliceConfig.coarseCell);
+
+      expect(GameScreen.sliceConfig, SliceConfig.coarseCell);
+      var painter = packingPainter(tester);
+      expect(painter.state.silhouette.width, 5);
+      expect(painter.state.silhouette.height, 7);
+      expect(painter.cellSize, 68.0);
+      expect(
+        tester.getSize(
+          find.byWidgetPredicate(
+            (w) => w is CustomPaint && w.painter is PackingPainter,
+          ),
+        ),
+        const Size(5 * 68.0, 7 * 68.0),
+      );
+
+      final expected = prepareLevel(
+        RoninParts.parts[0].mask,
+        SliceConfig.coarseCell,
+        seed: 0,
+      ).slice.pieces.length;
+      expect(expected, lessThanOrEqualTo(7));
+      expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
+
+      // Выбор уровня читом создаёт новый GameScreen — конфигурация та же.
+      await tester.tap(find.byKey(const Key('cheat_button')));
+      await _pumpFrames(tester);
+      await tester.tap(find.byKey(const Key('cheat_level_1')));
+      await _pumpFrames(tester);
+
+      expect(find.text('ДЕТАЛЬ 2 / 13'), findsOneWidget);
+      painter = packingPainter(tester);
+      expect(painter.state.silhouette.width, 5);
+      expect(painter.state.silhouette.height, 7);
+      expect(painter.cellSize, 68.0);
+    });
+
+    testWidgets('выбор конфигурации сохраняет seed; «Пересобрать» его меняет', (
+      tester,
+    ) async {
+      await pumpGame(tester);
+      List<String> sig(int seed) => [
+        for (final p in prepareLevel(
+          RoninParts.parts[0].mask,
+          SliceConfig.halfPart,
+          seed: seed,
+        ).slice.pieces)
+          p.cells.map((c) => '${c.x},${c.y}').join(';'),
+      ];
+      final seed0 = sig(0);
+      final seed1 = sig(1);
+      expect(seed1, isNot(seed0));
+
+      await tester.tap(find.byKey(const Key('cheat_button')));
+      await _pumpFrames(tester);
+      await tester.tap(find.byKey(const Key('cheat_reshuffle')));
+      await _pumpFrames(tester);
+      await pickSliceConfig(tester, SliceConfig.halfPart);
+      // seed остался 1 (reshuffle) — выбор конфигурации его не сбросил.
+      expect([
+        for (final p in packingPainter(tester).state.pieces)
+          p.cells.map((c) => '${c.x},${c.y}').join(';'),
+      ], seed1);
+    });
+
+    testWidgets(
+      'лоток не выше 160 px на всех 13 деталях во всех конфигурациях',
+      (tester) async {
+        tester.view.physicalSize = const Size(1200, 1600);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(tester.view.resetPhysicalSize);
+        for (final config in SliceConfig.values) {
+          GameScreen.sliceConfig = config;
+          for (var i = 0; i < RoninParts.parts.length; i++) {
+            await tester.pumpWidget(
+              MaterialApp(
+                home: GameScreen(key: ValueKey('$config$i'), levelIndex: i),
+              ),
+            );
+            await tester.pump();
+            final pieces = find.byWidgetPredicate(
+              (w) =>
+                  w.key is ValueKey<String> &&
+                  (w.key as ValueKey<String>).value.startsWith('tray_piece_'),
+            );
+            expect(pieces, findsWidgets);
+            for (final e in pieces.evaluate()) {
+              final size = tester.getSize(
+                find.byElementPredicate((x) => x == e),
+              );
+              expect(
+                size.height,
+                lessThanOrEqualTo(160.0 + 0.001),
+                reason: '$config деталь ${i + 1}',
+              );
+            }
+          }
+        }
       },
     );
   });

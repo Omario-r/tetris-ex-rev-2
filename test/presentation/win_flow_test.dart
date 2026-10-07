@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:explosive_tetris/application/progress_service.dart';
+import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/widgets/ship.dart';
@@ -35,7 +36,10 @@ Future<void> _solveWin(WidgetTester t) async {
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() => SharedPreferences.setMockInitialValues({}));
+  tearDown(() {
+    SharedPreferences.setMockInitialValues({});
+    GameScreen.sliceConfig = SliceConfig.bigPieces;
+  });
 
   Future<void> pumpGame(WidgetTester t, int level) async {
     t.view.physicalSize = const Size(1200, 1600);
@@ -89,4 +93,37 @@ void main() {
       expect(await ProgressService().getCurrentLevel(), 0);
     },
   );
+
+  // Калибровка нарезки (Ронин-1/07): уровни 1–2 проходятся solve-хуком и в
+  // конфигурациях `halfPart` / `coarseCell` (по умолчанию — полный прогон выше).
+  for (final config in [SliceConfig.halfPart, SliceConfig.coarseCell]) {
+    testWidgets(
+      'уровни 1–2 в конфигурации ${config.name}: solve → корабль → «Далее»',
+      (t) async {
+        GameScreen.sliceConfig = config;
+        SharedPreferences.setMockInitialValues({'current_level': 0});
+        await pumpGame(t, 0);
+
+        for (var level = 0; level < 2; level++) {
+          final game = t.widget<GameScreen>(find.byType(GameScreen));
+          expect(game.levelIndex, level);
+
+          await _solveWin(t);
+
+          expect(find.byType(ShipScreen), findsOneWidget);
+          expect(
+            find.text('Собрано ${level + 1} из $kShipPartCount'),
+            findsOneWidget,
+          );
+          expect(await ProgressService().getCurrentLevel(), level + 1);
+
+          await t.tap(find.byKey(const Key('ship_next_button')));
+          await _pump(t);
+        }
+
+        final game = t.widget<GameScreen>(find.byType(GameScreen));
+        expect(game.levelIndex, 2);
+      },
+    );
+  }
 }

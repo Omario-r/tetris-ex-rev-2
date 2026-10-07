@@ -12,14 +12,15 @@
 ## Публичный интерфейс
 
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
-  Стори 02 T2). Силуэт уровня — `LevelMap.levelAt(levelIndex).targetMask`, **поле фиксировано
-  10×14** для всех 13 уровней (Ронин-1/01 T3: `LevelMap.fieldWidth/Height`, деталь центрирована
-  в поле, `targetMask` уже размера поля) — экран геометрию поля из мишени не выводит, только
-  читает её размер. Материал уложенных
+  Стори 02 T2). **Уровень строит `prepareLevel`**
+  (Ронин-1/07 T2): `_rebuild()` зовёт `prepareLevel(RoninParts.parts[levelIndex].mask,
+  GameScreen.sliceConfig, seed: _seed)` и берёт `silhouette`, `cellScale`, `slice`. Поле —
+  10×14 (`bigPieces`/`halfPart`) или 5×7 (`coarseCell`); экран геометрию поля не выводит,
+  читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Материал уложенных
   клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все 13 деталей (Ронин-1/01
   T3, было `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)`: 7-элементная карта
   не покрывала 13 деталей «Ронина» — `RangeError` на 8-м уровне; `ShipMaterials` из экрана
-  больше не читается для этого поля). Нарезка `slicePolyomino(silhouette, seed:_seed)` →
+  больше не читается для этого поля). Нарезка (`prepared.slice`) →
   `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
   (`PackState.isComplete`) → **деталь собрана** → прежний мета-поток
@@ -35,7 +36,8 @@
 - Размер клетки поля — **адаптивный**: `_computeCellSize(constraints, boardWidth, boardHeight)`
   = `max(8, min(34.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток - 16 паддинг
   поля)/boardHeight, (maxWidth - 16 паддинг поля)/boardWidth))` (внутри
-  `LayoutBuilder`+`SafeArea`); канон 34px — поле 10×14 при клетке 34 (Ронин-1/01 T4, было 40px
+  `LayoutBuilder`+`SafeArea`); канон 34px × `cellScale` (Ронин-1/07 T2: 68px у `coarseCell`, поле 5×7 — те же физические
+  размеры; `_cellScale` — из `PreparedLevel`) — поле 10×14 при клетке 34 (Ронин-1/01 T4, было 40px
   под мелкие дев-силуэты ≤4×3), на коротких экранах клетка ужимается (нижний порог 8px).
   Клетка хранится в поле `_cellSize` (обновляется в `build`) — нужна pointer-обработчикам.
 - Панель поля — канон `.board` мокапа (`ukladka-field.html:85-86`, возврат Гейта 3 T2):
@@ -46,7 +48,15 @@
   автоматически добавили бы к паддингу ещё толщину рамки и сжали холст `CustomPaint`, см.
   инварианты) → `ClipRRect` (скругление 10 для содержимого) → `Padding(_boardPadding)` →
   `Listener`/`CustomPaint` (`_boardKey` без изменений).
-  Клетка лотка `_trayCellSize=32.0` (~0.8 полевой, канон мокапа/прототипа Стори 01).
+  Клетка лотка `_trayCellSize = min(32, 160 / h)` (32 — канон мокапа/прототипа Стори 01, ~0.8
+  полевой), `h` — наибольшая высота куска уровня (`max(cell.y)+1`); считается один раз в
+  `_rebuild()`, та же величина и по ширине — ряд лотка не выше 160 px при любом куске
+  (Ронин-1/07 T2).
+- **Конфигурация нарезки** (dev-калибровка Ронин-1/07, после КТ-1 лишние удаляются):
+  `static SliceConfig GameScreen.sliceConfig` (по умолчанию `bigPieces`, в т.ч. в release)
+  живёт вне `State` до перезапуска приложения и действует на все уровни. Смена в чит-меню
+  (`_cheatSetSliceConfig`) → запись в поле + `_restartLevel()` (пересборка текущего уровня с
+  ТЕКУЩИМ `_seed`, сброс драга); «Пересобрать нарезку» = `_seed++` + тот же `_restartLevel()`.
 - Топбар (канон `.topbar`/`.title`/`.pausebtn` мокапа `ukladka-field.html`, высота 44,
   Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / 13»
   (N=`fragmentIndex+1`, 13=`kShipPartCount`) и `.name` название детали заглавными
@@ -78,17 +88,19 @@
   победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
   (или «Начать заново», если `isComplete`), без «Назад».
 - `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, feedMode, onSetFeedMode,
-  onReshuffle, onSolve, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
+  onReshuffle, onSolve, sliceConfig, onSetSliceConfig, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
   Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
   `kDebugMode`. Секции: выбор уровня, мгновенная победа (мета-уровень, `_handleWin`),
   состояние корабля (N=0..`kShipPartCount`), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
-  — тумблер `FeedMode`), **нарезка** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
+  — тумблер `FeedMode`), **нарезка: калибровка** (Ронин-1/07; три `ElevatedButton`
+  `Key('slice_config_<bigPieces|halfPart|coarseCell>')` в порядке `SliceConfig.values`, текущая —
+  префикс «✓ »; перед секцией «Нарезка (dev)»), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
   — solve-хук). Зарядов взрыва и «Прототипа укладки» больше нет (выпил в Стори 02).
   `levelCount` по умолчанию `null` → `kShipPartCount` уровней.
 
 ## Зависит от
 
-- `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`slicePolyomino`),
+- `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`SliceConfig`/`prepareLevel`),
   `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`, `RoninParts` — только
   чтение, название детали для топбара, Ронин-1/01 T4),
   `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`/`ShipMaterials`),
