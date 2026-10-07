@@ -310,7 +310,7 @@ release: прежняя нарезка неиграбельна, а чит-ме�
 
 ### T3 — Сборка под iOS-симулятор
 
-- **Статус:** к выполнению (независима от T1/T2)
+- **Статус:** выполнена
 - **Рекомендованный агент:** Исполнитель (тяжёлая) · Claude (Opus,
   `ispolnitel-heavy`) — диагностика без готового ответа.
 - **Цель:** debug-сборка игры ставится и запускается на симуляторе iPhone.
@@ -350,3 +350,28 @@ release: прежняя нарезка неиграбельна, а чит-ме�
   команды сборки, установки, запуска; причина поломки одной строкой. Не
   коммитить.
 - **Заметки по выполнению:**
+  - **2026-10-07, Исполнитель (heavy).** Причина: в схеме
+    `ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme` у
+    `LaunchAction` стоял `buildConfiguration = "Release"` (в шаблоне Flutter —
+    `Debug`; приехало в коммите `3efb46a` вместе с переходом на SPM — похоже,
+    Run переключали на Release в Xcode для установки на телефон). xcodebuild
+    сверяет `-destination` с конфигурацией Run-действия схемы, а не только с
+    `-configuration`: в Release проекта `SUPPORTED_PLATFORMS = iphoneos`, поэтому
+    симуляторы отбрасываются. `-showdestinations` их видит (не фильтрует по
+    конфигурации), `-destination "generic/platform=iOS Simulator"` — нет; от
+    SPM/разрешения пакетов не зависит (воспроизводится на `-project` и при
+    `-showBuildSettings`). `SUPPORTED_PLATFORMS = iphoneos` в Profile/Release —
+    штатное значение шаблона Flutter 3.44 (`ios.tmpl/…/project.pbxproj.tmpl`),
+    не трогал. Изменено: `LaunchAction buildConfiguration` → `Debug` (одна
+    строка); `docs/RUNBOOK-devices.md` — раздел «Симулятор iOS» (команды +
+    грабля). Проверки: `flutter build ios --simulator --debug` → `✓ Built
+    build/ios/iphonesimulator/Runner.app`; `xcrun simctl install` — ок,
+    `xcrun simctl launch … com.example.explosiveTetris` →
+    `com.example.explosiveTetris: 88011`, процесс жив через 4 с
+    (`launchctl list`); `flutter build ios --release --no-codesign` →
+    `✓ Built build/ios/iphoneos/Runner.app (14.9MB)`; `flutter analyze` — No
+    issues; `flutter test` — 507, All tests passed. Ничего не удалялось.
+    Неблокирующее: Flutter предупреждает об остатках CocoaPods (Podfile,
+    `#include?` Pods в `ios/Flutter/*.xcconfig`, `Pods/` в workspace) — сборке
+    не мешают, чистка вне скоупа T3 (запрет ТЗ на удаления); раздел «iOS»
+    ранбука (шаг 1 про workspace/CocoaPods) устарел — не правил, вне ТЗ.

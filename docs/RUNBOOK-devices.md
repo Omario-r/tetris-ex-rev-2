@@ -64,6 +64,35 @@ flutter devices
 
 ---
 
+## Симулятор iOS
+
+Debug-сборка игры на симуляторе iPhone (без подписи и устройства). Пример —
+iPhone 17, UDID `1E445928-A8E2-44B1-B205-F93CFCF4AA45`; свой UDID смотри в
+`xcrun simctl list devices`.
+
+```
+xcrun simctl boot 1E445928-A8E2-44B1-B205-F93CFCF4AA45   # если ещё не загружен
+open -a Simulator
+flutter build ios --simulator --debug                     # → build/ios/iphonesimulator/Runner.app
+xcrun simctl install 1E445928-A8E2-44B1-B205-F93CFCF4AA45 build/ios/iphonesimulator/Runner.app
+xcrun simctl launch 1E445928-A8E2-44B1-B205-F93CFCF4AA45 com.example.explosiveTetris
+```
+
+Интерактивно (hot reload) — `flutter run -d <UDID>`.
+
+**Грабли:** сборка падает с «Unable to find a destination matching …
+{ generic:1, platform:iOS Simulator }» (в списке только My Mac / Any iOS
+Device) — значит, в схеме Runner действие **Run** переключено на Release
+(`LaunchAction buildConfiguration` в
+`ios/Runner.xcodeproj/xcshareddata/xcschemes/Runner.xcscheme`), а в Release по
+шаблону Flutter `SUPPORTED_PLATFORMS = iphoneos` — Xcode отбрасывает
+симуляторы. Верни Run → Debug (Xcode: Product → Scheme → Edit Scheme… → Run →
+Build Configuration). Release-сборку на телефон делай через
+`flutter run --release -d <device-id>`, схему под это не переключай (а если
+переключил в Xcode — не коммить).
+
+---
+
 ## Android
 
 1. На телефоне включи **Параметры разработчика** (Настройки → О телефоне →
