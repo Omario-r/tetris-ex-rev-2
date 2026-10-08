@@ -139,6 +139,8 @@ class CheatMenu extends StatelessWidget {
     switch (config) {
       case SliceConfig.bigPieces:
         return 'Крупные куски';
+      case SliceConfig.spikyPieces:
+        return 'Колючие куски';
     }
   }
 

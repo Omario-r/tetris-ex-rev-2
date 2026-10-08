@@ -226,6 +226,7 @@ void main() {
 
     const labels = {
       SliceConfig.bigPieces: 'Крупные куски',
+      SliceConfig.spikyPieces: 'Колючие куски',
     };
 
     testWidgets(
@@ -256,6 +257,14 @@ void main() {
         expect(xs, orderedEquals([...xs]..sort()));
       },
     );
+
+    testWidgets('две кнопки нарезки, подпись «Колючие куски»', (tester) async {
+      await pumpMenu(tester, current: SliceConfig.bigPieces, onSet: (_) {});
+      expect(SliceConfig.values.length, 2);
+      expect(find.byKey(const Key('slice_config_bigPieces')), findsOneWidget);
+      expect(find.byKey(const Key('slice_config_spikyPieces')), findsOneWidget);
+      expect(find.text('Колючие куски'), findsOneWidget);
+    });
 
     testWidgets('тап по кнопке отдаёт в колбэк выбранную конфигурацию', (
       tester,

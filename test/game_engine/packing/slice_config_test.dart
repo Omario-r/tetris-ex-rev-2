@@ -1,7 +1,10 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/game_engine/models/target_mask.dart';
+import 'package:explosive_tetris/game_engine/packing/pack_controller.dart';
+import 'package:explosive_tetris/game_engine/packing/pack_piece.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_slicer.dart';
+import 'package:explosive_tetris/game_engine/packing/pack_state.dart';
 import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 
 typedef _Cell = ({int x, int y});
@@ -54,6 +57,59 @@ void _expectExactCover(TargetMask silhouette, PackSlice slice) {
 
 List<int> _sizes(PackSlice slice) => [for (final p in slice.pieces) p.size];
 
+/// Страж `bigPieces` (Ронин-1/04 T3): результат `prepareLevel(bigPieces)` на
+/// канонном seed каждой из 15 деталей, снятый ДО добавления `spikyPieces`.
+/// `id` детали → куски; кусок — отсортированные абсолютные клетки силуэта в поле
+/// 10×14 (`y*10 + x`). Менять — только осознанно, вместе с пересмотром seed.
+const _bigPiecesReference = <String, List<List<int>>>{
+  'prow': [[40, 41, 42, 43, 44, 51, 52, 53], [45, 46, 47, 55, 56, 57, 65, 66], [48, 49, 58, 59, 68, 69, 78, 79], [50, 60, 61, 62, 70, 71, 72, 82], [54, 63, 64, 67, 73, 74, 75, 76, 77, 83, 92, 93]],
+  'sensor': [[24, 34, 43, 44, 53, 54, 62, 63], [45, 55, 64, 65, 66, 73, 74, 75], [71, 72, 81, 82, 83, 84, 91, 101], [76, 77, 86, 87, 96, 97, 106, 107], [85, 92, 93, 94, 95, 102, 103, 104, 105]],
+  'bridge_c': [[44, 45, 46, 47, 48, 56, 57, 67], [54, 55, 64, 65, 66, 74, 75, 76], [60, 70, 71, 72, 73, 82, 83, 93], [77, 78, 79, 84, 85, 86, 87, 88, 94, 95, 96, 97]],
+  'bridge_l': [[41, 42, 43, 44, 45, 52, 53, 54], [46, 55, 56, 64, 65, 73, 74, 83], [51, 61, 62, 63, 71, 72, 81, 91], [75, 85, 86, 87, 95, 96, 97, 98], [82, 84, 92, 93, 94]],
+  'bridge_r': [[42, 43, 44, 45, 53, 54, 55, 65], [46, 47, 48, 56, 57, 58, 67, 68], [51, 52, 61, 62, 63, 64, 74, 75], [66, 76, 77, 78, 86, 87, 88, 98], [73, 82, 83, 84, 85, 91, 92, 93, 94, 95, 96, 97]],
+  'fwd1_cl': [[30, 31, 32, 33, 40, 41, 42, 43], [34, 35, 36, 37, 38, 45, 48, 55], [44, 52, 53, 54, 62, 63, 64, 72], [46, 47, 49, 57, 58, 59, 67, 68], [51, 61, 71, 80, 81, 82, 90, 91, 92], [56, 65, 66, 74, 75, 76, 84, 86], [73, 83, 85, 87, 93, 94, 95, 96, 97], [77, 78, 88, 98, 99, 107, 108, 109]],
+  'fwd1_cr': [[30, 31, 32, 33, 34, 43, 44, 45], [35, 36, 37, 38, 39, 46, 47, 49], [41, 42, 51, 52, 53, 61, 62, 63], [48, 54, 55, 56, 57, 58, 64, 65], [60, 70, 71, 72, 73, 74, 80, 84], [66, 67, 68, 75, 76, 85, 86, 95], [77, 78, 87, 88, 89, 96, 97, 98, 99], [81, 82, 83, 91, 92, 93, 94]],
+  'fwd1_r': [[21, 22, 23, 24, 25, 31, 32, 42], [26, 27, 28, 34, 35, 36, 38, 48], [33, 43, 44, 52, 53, 54, 64, 74], [37, 45, 46, 47, 55, 56, 57, 66], [40, 41, 50, 51, 60, 61, 62, 71], [58, 65, 67, 68, 75, 76, 77, 78, 85, 86, 87, 88], [63, 72, 73, 81, 82, 83, 84, 92], [91, 93, 94, 100, 101, 102, 103, 104]],
+  'rcs_fr': [[22, 23, 24, 32, 33, 34, 42, 44], [41, 43, 51, 52, 53, 54, 61, 63], [45, 55, 56, 57, 65, 66, 67, 77], [62, 71, 72, 81, 82, 92, 102], [64, 73, 74, 75, 76, 83, 84, 85, 93, 94, 103, 104]],
+  'fwd2_r': [[25, 26, 27, 28, 35, 36, 37, 46], [38, 47, 48, 57, 58, 66, 67, 68], [40, 41, 42, 43, 44, 45, 52, 54], [50, 51, 53, 61, 62, 63, 72, 73], [55, 56, 64, 65, 74, 75, 84, 85], [70, 71, 80, 81, 82, 83, 92, 93], [76, 77, 78, 86, 88, 95, 96, 106], [87, 97, 98, 107, 108], [90, 91, 94, 100, 101, 102, 103, 104, 105]],
+  'fwd1_l': [[30, 31, 32, 40, 41, 42, 51, 52], [33, 34, 35, 36, 37, 44, 45, 46], [38, 47, 48, 57, 58, 59, 67, 68, 69, 77, 78, 79], [43, 53, 54, 55, 56, 63, 64, 65], [50, 60, 61, 70, 71, 80, 81, 82], [62, 72, 73, 74, 75, 83, 84, 94], [66, 76, 85, 86, 87, 88, 96, 97, 98, 106, 107, 108], [90, 91, 92, 93, 95, 103, 104, 105]],
+  'rcs_fl': [[24, 25, 26, 34, 35, 36, 45, 46], [43, 44, 52, 53, 54, 62, 64, 65], [47, 55, 56, 57, 66, 67, 76, 77], [51, 61, 63, 71, 72, 73, 74, 75], [83, 84, 85, 86, 87, 94, 95, 96, 104, 105, 106]],
+  'fwd2_l': [[20, 21, 22, 30, 31, 32, 33, 43], [34, 35, 36, 37, 45, 46, 47, 57], [38, 48, 49, 58, 67, 68, 77, 78], [40, 41, 50, 51, 60, 61, 70, 71], [42, 44, 52, 53, 54, 62, 64, 72], [55, 56, 65, 66, 74, 75, 76, 86], [63, 73, 80, 81, 82, 83, 84, 92], [85, 87, 88, 95, 96, 97, 98, 104, 105, 106, 107, 108], [90, 91, 93, 94, 100, 101, 102, 103]],
+  'fwd2_cl': [[20, 21, 22, 23, 30, 31, 33, 34], [24, 25, 26, 35, 36, 45, 55, 65], [32, 41, 42, 51, 52, 61, 62, 71], [37, 38, 39, 46, 47, 56, 66, 76], [43, 44, 53, 54, 63, 64, 73, 74], [48, 57, 58, 67, 68, 77, 78, 79], [50, 60, 70, 80, 90, 100, 101], [72, 75, 82, 83, 84, 85, 95, 105], [81, 91, 92, 93, 94, 102, 103, 104], [86, 87, 88, 96, 97, 98, 106, 107, 108]],
+  'fwd2_cr': [[21, 22, 23, 24, 25, 31, 32, 33], [26, 27, 35, 36, 37, 45, 47, 57], [28, 29, 38, 48, 58, 68, 69, 78], [34, 41, 42, 43, 44, 51, 52, 53], [40, 50, 60, 61, 62, 63, 71, 72], [46, 55, 56, 65, 66, 67, 75, 85], [54, 64, 73, 74, 82, 83, 93, 103], [76, 77, 84, 86, 94, 95, 96, 104], [80, 81, 90, 91, 92, 100, 101, 102], [87, 88, 97, 98, 105, 106, 107, 108]],
+};
+
+List<List<int>> _absPieces(PackSlice slice) => [
+  for (final piece in slice.pieces)
+    [
+      for (final c in piece.cells)
+        (slice.solution[piece.id]!.y + c.y) * 10 +
+            slice.solution[piece.id]!.x +
+            c.x,
+    ]..sort(),
+];
+
+/// Кусок компактен, если заполняет свою рамку на ≥ 80 %.
+bool _isCompact(PackPiece piece) {
+  final w = piece.cells.map((c) => c.x).reduce((a, b) => a > b ? a : b) + 1;
+  final h = piece.cells.map((c) => c.y).reduce((a, b) => a > b ? a : b) + 1;
+  return piece.cells.length >= 0.8 * w * h;
+}
+
+/// Доля компактных кусков по всем 15 деталям на их канонных seed.
+double _compactShare(SliceConfig config) {
+  var compact = 0;
+  var total = 0;
+  for (final part in RoninParts.parts) {
+    final slice = prepareLevel(part.mask, config, seed: part.seed).slice;
+    for (final piece in slice.pieces) {
+      total++;
+      if (_isCompact(piece)) compact++;
+    }
+  }
+  return compact / total;
+}
+
 void main() {
   const seeds = [0, 1, 2, 3, 4];
 
@@ -91,7 +147,9 @@ void main() {
             final isCanonicalSeed = seed == part.seed;
             expect(sizes.every((s) => s <= 12), isTrue,
                 reason: 'размеры $sizes');
-            if (isCanonicalSeed) {
+            // Для spikyPieces нижняя граница 5 не гарантируется (Ронин-1/04 T3:
+            // вариант выбирает партнёра по рамке, а не по размеру) — только ≤ 12.
+            if (isCanonicalSeed && config == SliceConfig.bigPieces) {
               expect(sizes.every((s) => s >= 5), isTrue,
                   reason: 'размеры $sizes');
               expect(sizes.length, lessThanOrEqualTo(10),
@@ -140,6 +198,49 @@ void main() {
         }
       });
     }
+  });
+
+  group('bigPieces — канонные нарезки 15 деталей не меняются', () {
+    for (final part in RoninParts.parts) {
+      test('${part.id} seed ${part.seed}: совпадает с эталоном', () {
+        final slice =
+            prepareLevel(part.mask, SliceConfig.bigPieces, seed: part.seed)
+                .slice;
+        expect(_absPieces(slice), _bigPiecesReference[part.id]);
+      });
+    }
+  });
+
+  group('spikyPieces (Колючие куски)', () {
+    for (final part in RoninParts.parts) {
+      test('${part.id} seed ${part.seed}: покрытие, укладка до isComplete, ≤ 12',
+          () {
+        final level =
+            prepareLevel(part.mask, SliceConfig.spikyPieces, seed: part.seed);
+        _expectExactCover(level.silhouette, level.slice);
+        expect(level.slice.pieces.every((p) => p.size <= 12), isTrue,
+            reason: 'размеры ${_sizes(level.slice)}');
+
+        // Эталонная укладка: все куски по solution -> силуэт покрыт.
+        final controller = PackController(PackState(
+          silhouette: level.silhouette,
+          placements: const {},
+          pieces: level.slice.pieces,
+          trayOrder: level.trayOrder,
+        ));
+        for (final piece in level.slice.pieces) {
+          final o = level.slice.solution[piece.id]!;
+          controller.place(piece.id, o.x, o.y);
+        }
+        expect(controller.state.isComplete, isTrue);
+      });
+    }
+
+    test('доля компактных кусков у spikyPieces ниже, чем у bigPieces', () {
+      final big = _compactShare(SliceConfig.bigPieces);
+      final spiky = _compactShare(SliceConfig.spikyPieces);
+      expect(spiky, lessThan(big), reason: 'spiky $spiky, big $big');
+    });
   });
 
   group('mergeAdjacentPieces', () {

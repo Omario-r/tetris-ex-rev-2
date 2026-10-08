@@ -31,8 +31,8 @@
   `pieces` (id 0..N-1, cells нормализованы) + `solution` (`pieceId → origin` в
   силуэте; эталонная раскладка, доказывающая существование решения).
 - `slice_config.dart` — построение уровня из маски детали (Ронин-1/07, 08):
-  `enum SliceConfig { bigPieces }` (dev-переключатель вариантов слияния, порядок =
-  порядок кнопок чит-меню; стори 04 добавит второе значение);
+  `enum SliceConfig { bigPieces, spikyPieces }` (dev-переключатель вариантов слияния,
+  A/B на устройстве, порядок = порядок кнопок чит-меню; по умолчанию `bigPieces`);
   `prepareLevel(partMask, config, {seed})` → `PreparedLevel` (`fieldWidth/
   fieldHeight` = 10×14, `silhouette` размера поля, `targetX/targetY`, `slice`,
   `trayOrder`). `bigPieces` — нарезка 3..5 + слияние соседних (5..12 клеток,
@@ -41,6 +41,14 @@
   (порядок id = порядок решения; при `N >= 2` совпадение лечится сдвигом на 1).
   `mergeAdjacentPieces(silhouette, base)` — публичное детерминированное слияние
   (два прохода: пары нетронутых ≤ 10, затем остатки в любого соседа ≤ 12).
+  `spikyPieces` (Ронин-1/04 T3, «Колючие куски») — та же базовая нарезка и те же
+  лимиты, но `mergeAdjacentPieces(..., spiky: true)` выбирает партнёра по
+  заполненности рамки результата `fill = (|A|+|B|)/(w×h)` (наименьший; при
+  равенстве прежний ключ: размер, затем id). Доля компактных кусков (≥ 80 % рамки)
+  по 15 деталям на канонных seed: 26 % у `bigPieces`, 12 % у `spikyPieces`.
+  Нижняя граница размера куска 5 у `spikyPieces` не гарантируется (≤ 12 — да).
+  `spiky: false` (умолчание) — поведение побитово прежнее, держит эталон
+  `_bigPiecesReference` в `slice_config_test`.
 
 - `startMetric(silhouette, slice)` → `StartMetric(placesPerPiece, minPlaces)`
   (`start_metric.dart`) — метрика старта (DESIGN.md § «Сложность старта»): на
