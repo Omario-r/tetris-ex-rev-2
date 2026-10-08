@@ -39,8 +39,12 @@ class PackSlice {
 ///    размера 3, 4 и 5 в порядке размеров [4, 5, 3] (антивырождение: размер 3 —
 ///    крайняя мера). Внутри одного размера кандидаты перемешиваются единым
 ///    `Random(seed)`.
-/// 4. Для каждого кандидата: пометить покрытым, записать кусок, рекурсивно решить
-///    остаток; успех — вернуть, неудача — откатить и пробовать следующего.
+/// 4. Для каждого кандидата: пометить покрытым, записать кусок; если в остатке
+///    есть связная компонента < 3 клеток — ветка заведомо тупиковая, откат без
+///    рекурсии (отсечение: разрезаемость сохраняется, но общий `Random(seed)`
+///    в тупиках больше не тратится — нарезка при данном seed может отличаться от
+///    версии без отсечения); иначе рекурсивно решить остаток;
+///    успех — вернуть, неудача — откатить и пробовать следующего.
 ///
 /// Куски нормализуются: `origin = (minX, minY)` абсолютных клеток куска,
 /// `PackPiece.cells = абсолютные − origin`, `solution[id] = origin`. id — счётчик
@@ -132,13 +136,47 @@ class _Slicer {
         covered.add(c);
       }
       result.add(_normalize(cand));
-      if (_run()) return true;
+      // Отсечение: остаток с островком < 3 клеток нечем покрыть — ветка
+      // заведомо неудачна, рекурсию не запускаем (разрезаемость сохраняется).
+      if (_remainderHasNoTinyIslands() && _run()) return true;
       result.removeLast();
       for (final c in cand) {
         covered.remove(c);
       }
     }
     return false;
+  }
+
+  /// true, если каждая связная (4-соседство) компонента непокрытых клеток
+  /// содержит ≥ 3 клеток (меньше — кусок 3..5 в неё не поместится).
+  bool _remainderHasNoTinyIslands() {
+    for (final size in _uncoveredComponentSizes()) {
+      if (size < 3) return false;
+    }
+    return true;
+  }
+
+  /// Размеры связных (4-соседство) компонент непокрытых клеток (BFS).
+  List<int> _uncoveredComponentSizes() {
+    final seen = <int>{};
+    final sizes = <int>[];
+    for (final start in all) {
+      if (covered.contains(start) || seen.contains(start)) continue;
+      var count = 0;
+      final stack = <int>[start];
+      seen.add(start);
+      while (stack.isNotEmpty) {
+        final c = stack.removeLast();
+        count++;
+        for (final n in _neighbors(c)) {
+          if (!covered.contains(n) && all.contains(n) && seen.add(n)) {
+            stack.add(n);
+          }
+        }
+      }
+      sizes.add(count);
+    }
+    return sizes;
   }
 
   /// Непокрытая клетка с минимальным линейным индексом.

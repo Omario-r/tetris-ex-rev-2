@@ -121,6 +121,27 @@ void main() {
     });
   }
 
+  group('prepareLevel · бюджет времени', () {
+    // Отсечение тупиковых веток (Ронин-1/04 T2): нарезка любой детали на любом
+    // seed 0..15 быстрая. Бюджет не ослаблять — выход за него это вопрос к
+    // генератору или разметке (эскалация).
+    const budget = Duration(milliseconds: 500);
+    // Прогрев JIT одним вызовом.
+    prepareLevel(RoninParts.parts[0].mask, SliceConfig.bigPieces, seed: 0);
+
+    for (final part in RoninParts.parts) {
+      test('${part.id} × seed 0..15 ≤ ${budget.inMilliseconds} мс', () {
+        for (var seed = 0; seed <= 15; seed++) {
+          final sw = Stopwatch()..start();
+          prepareLevel(part.mask, SliceConfig.bigPieces, seed: seed);
+          sw.stop();
+          expect(sw.elapsed, lessThan(budget),
+              reason: '${part.id} seed $seed: ${sw.elapsedMilliseconds} мс');
+        }
+      });
+    }
+  });
+
   group('mergeAdjacentPieces', () {
     const rect = TargetMask(rows: ['####', '####', '####']);
 
