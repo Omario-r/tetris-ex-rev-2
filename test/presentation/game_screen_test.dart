@@ -7,6 +7,7 @@ import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
+import 'package:explosive_tetris/presentation/theme/block_material.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
 
 /// Прокачивает кадры без `pumpAndSettle` — `GameScreen` держит пульс-контроллер
@@ -194,6 +195,194 @@ void main() {
         expect(find.byType(GameScreen), findsOneWidget);
       },
     );
+  });
+
+  group('GameScreen — лоток и очистка поля (Ронин-1/08 T2)', () {
+    PreparedLevel level0() => prepareLevel(
+      RoninParts.parts[0].mask,
+      SliceConfig.bigPieces,
+      seed: 0,
+    );
+
+    Finder trayPieces() => find.byWidgetPredicate(
+      (w) =>
+          w.key is ValueKey<String> &&
+          (w.key as ValueKey<String>).value.startsWith('tray_piece_'),
+    );
+
+    /// Id кусков лотка слева направо (по положению на экране).
+    List<int> trayIdsOnScreen(WidgetTester tester) {
+      final entries = [
+        for (final e in trayPieces().evaluate())
+          (
+            id: int.parse(
+              (e.widget.key as ValueKey<String>).value.substring(
+                'tray_piece_'.length,
+              ),
+            ),
+            x: tester.getTopLeft(find.byElementPredicate((x) => x == e)).dx,
+          ),
+      ]..sort((a, b) => a.x.compareTo(b.x));
+      return [for (final e in entries) e.id];
+    }
+
+    /// Кладёт кусок жестом в эталонную клетку: тянет вверх, затем ищет точку
+    /// пальца, при которой снап-превью показывает ровно эталонные клетки и
+    /// валидно (не зависит от величины подъёма куска над пальцем).
+    Future<void> dragPieceToSolution(
+      WidgetTester tester,
+      PreparedLevel level,
+      int id,
+    ) async {
+      final piece = level.slice.pieces.firstWhere((p) => p.id == id);
+      final target = level.slice.solution[id]!;
+      final want = {
+        for (final c in piece.cells) '${target.x + c.x},${target.y + c.y}',
+      };
+      final boardFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PackingPainter,
+      );
+      final boardOrigin = tester.getTopLeft(boardFinder);
+      final cell = packingPainter(tester).cellSize;
+      var w = 0;
+      var h = 0;
+      for (final c in piece.cells) {
+        if (c.x + 1 > w) w = c.x + 1;
+        if (c.y + 1 > h) h = c.y + 1;
+      }
+
+      // Скан по полю с зажатым пальцем может подвинуть прокрутку лотка —
+      // вернуть её в начало, чтобы кусок лежал под пальцем.
+      tester
+          .state<ScrollableState>(
+            find.descendant(
+              of: find.byKey(const Key('packing_tray')),
+              matching: find.byType(Scrollable),
+            ),
+          )
+          .position
+          .jumpTo(0);
+      await tester.pump();
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_$id'))),
+      );
+      await gesture.moveBy(const Offset(0, -40));
+      await tester.pump();
+
+      var found = false;
+      for (
+        var y = boardOrigin.dy + target.y * cell;
+        y <= boardOrigin.dy + (target.y + h) * cell + 100 && !found;
+        y += cell / 4
+      ) {
+        for (
+          var x = boardOrigin.dx + target.x * cell;
+          x <= boardOrigin.dx + (target.x + w) * cell && !found;
+          x += cell / 4
+        ) {
+          await gesture.moveTo(Offset(x, y));
+          await tester.pump();
+          final pv = packingPainter(tester).dragPreview;
+          if (pv != null &&
+              pv.valid &&
+              {for (final c in pv.cells) '${c.x},${c.y}'}.containsAll(want) &&
+              pv.cells.length == want.length) {
+            found = true;
+          }
+        }
+      }
+      expect(found, isTrue, reason: 'не нашли точку укладки куска $id');
+      await gesture.up();
+      await tester.pump();
+    }
+
+    testWidgets('лоток на старте идёт в порядке prepared.trayOrder, не по id',
+        (tester) async {
+      await pumpGame(tester);
+      final order = level0().trayOrder;
+      final byId = [for (final p in level0().slice.pieces) p.id]..sort();
+
+      expect(order, isNot(byId));
+      expect(trayIdsOnScreen(tester), order);
+    });
+
+    testWidgets('«Очистить поле»: неактивна на старте, после укладки '
+        'активна, нажатие возвращает всё в лоток', (tester) async {
+      await pumpGame(tester);
+      final level = level0();
+      final total = level.slice.pieces.length;
+      final orderBefore = trayIdsOnScreen(tester);
+
+      Color labelColor() => tester
+          .widget<Text>(
+            find.descendant(
+              of: find.byKey(const Key('clear_field')),
+              matching: find.byType(Text),
+            ),
+          )
+          .style!
+          .color!;
+      GestureDetector button() =>
+          tester.widget<GestureDetector>(find.byKey(const Key('clear_field')));
+
+      expect(find.text('ОЧИСТИТЬ ПОЛЕ'), findsOneWidget);
+      expect(button().onTap, isNull);
+      expect(labelColor(), const Color(0xFF7C848D));
+
+      await dragPieceToSolution(tester, level, level.trayOrder[0]);
+      await dragPieceToSolution(tester, level, level.trayOrder[1]);
+      expect(find.text('уложено 2 / $total кусков'), findsOneWidget);
+      expect(trayPieces(), findsNWidgets(total - 2));
+      expect(button().onTap, isNotNull);
+      expect(labelColor(), BlockMaterial.hazardOrange.color);
+
+      await tester.tap(find.byKey(const Key('clear_field')));
+      await tester.pump();
+
+      expect(find.text('уложено 0 / $total кусков'), findsOneWidget);
+      expect(trayPieces(), findsNWidgets(total));
+      expect(trayIdsOnScreen(tester), orderBefore);
+      expect(button().onTap, isNull);
+    });
+
+    testWidgets('«Очистить поле»: зона нажатия не меньше 40×32 и лежит '
+        'внутри строки прогресса высотой 34', (tester) async {
+      await pumpGame(tester);
+      final button = tester.getRect(find.byKey(const Key('clear_field')));
+      expect(button.width, greaterThanOrEqualTo(40.0));
+      expect(button.height, greaterThanOrEqualTo(32.0));
+
+      final progressTop = tester.getTopLeft(find.byType(LayoutBuilder).first);
+      // Строка прогресса идёт сразу под топбаром (44) и занимает 34.
+      expect(button.top, greaterThanOrEqualTo(progressTop.dy + 44.0));
+      expect(button.bottom, lessThanOrEqualTo(progressTop.dy + 44.0 + 34.0));
+    });
+
+    testWidgets('поле и лоток не прыгают, когда лоток опустел',
+        (tester) async {
+      await pumpGame(tester);
+      final boardFinder = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PackingPainter,
+      );
+      final trayFinder = find.byKey(const Key('packing_tray'));
+      final boardBefore = tester.getRect(boardFinder);
+      final trayBefore = tester.getRect(trayFinder);
+      // Лоток 160 (ряд) + рамка/паддинги/подпись = 206.
+      expect(trayBefore.height, 206.0);
+
+      await tester.tap(find.byKey(const Key('cheat_button')));
+      await _pumpFrames(tester);
+      await tester.tap(find.byKey(const Key('cheat_solve')));
+      await _pumpFrames(tester);
+
+      expect(trayPieces(), findsNothing, reason: 'лоток должен опустеть');
+      expect(tester.getRect(boardFinder), boardBefore);
+      expect(tester.getRect(trayFinder), trayBefore);
+
+      // Дать отработать отложенному мета-потоку победы.
+      await tester.pump(const Duration(milliseconds: 1000));
+      await _pumpFrames(tester);
+    });
   });
 
   group('GameScreen — конфигурации нарезки (Ронин-1/07)', () {

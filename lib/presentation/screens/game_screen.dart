@@ -55,7 +55,28 @@ class _GameScreenState extends State<GameScreen>
   static const double _canonicalCellSize = 34.0;
   static const double _topbarHeight = 44.0;
   static const double _progZoneHeight = 34.0;
-  static const double _trayZoneHeight = 132.0;
+
+  /// Габариты лотка (фиксированные — поле не прыгает, когда лоток пустеет):
+  /// внешний контейнер = рамка 1+1, вертикальный паддинг 12+12, ряд кусков
+  /// [_trayRowMaxHeight], зазор 6, подпись [_trayLabelHeight].
+  static const double _trayBorderWidth = 1.0;
+  static const double _trayPaddingV = 12.0;
+  static const double _trayLabelGap = 6.0;
+  static const double _trayLabelHeight = 14.0;
+
+  /// Высота зоны лотка: 2·1 + 2·12 + 160 + 6 + 14 = 206. Её же вычитает расчёт
+  /// клетки поля ([_computeCellSize]).
+  static const double _trayZoneHeight =
+      2 * _trayBorderWidth +
+      2 * _trayPaddingV +
+      _trayRowMaxHeight +
+      _trayLabelGap +
+      _trayLabelHeight;
+
+  /// Зона нажатия «ОЧИСТИТЬ ПОЛЕ» (не меньше 40×32); живёт поверх строки
+  /// прогресса и строку не раздвигает.
+  static const double _clearHitWidthPad = 8.0;
+  static const double _clearHitHeight = 32.0;
 
   /// Канонический размер клетки кусочка в лотке (`el-piece-tray`, уменьшенный
   /// масштаб) и высота ряда лотка: клетка ужимается, чтобы самый высокий кусок
@@ -158,7 +179,7 @@ class _GameScreenState extends State<GameScreen>
         silhouette: _silhouette,
         placements: const {},
         pieces: slice.pieces,
-        trayOrder: [for (final p in slice.pieces) p.id],
+        trayOrder: prepared.trayOrder,
       ),
     );
     _winHandled = false;
@@ -585,7 +606,7 @@ class _GameScreenState extends State<GameScreen>
     final total = state.silhouette.cells.length;
     final filled = state.occupiedCells.length;
     final ratio = total == 0 ? 0.0 : (filled / total).clamp(0.0, 1.0);
-    return Column(
+    final content = Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
@@ -622,17 +643,68 @@ class _GameScreenState extends State<GameScreen>
             alignment: Alignment.centerLeft,
             child: Text(
               'уложено ${state.placements.length} / ${state.pieces.length} кусков',
-              style: const TextStyle(
-                color: Color(0xFF7C848D),
-                fontSize: 10.5,
-                letterSpacing: 0.63, // .06em @ 10.5px
-              ),
+              style: _progressLabelStyle,
             ),
           ),
         ),
       ],
     );
+
+    final canClear = state.placements.isNotEmpty;
+    // Строка прогресса держит бюджетную высоту [_progZoneHeight] (её же
+    // вычитает расчёт клетки поля); кнопка «Очистить поле» — оверлей с зоной
+    // нажатия 32 px высотой и не раздвигает строку.
+    return SizedBox(
+      height: _progZoneHeight,
+      child: Stack(
+        children: [
+          content,
+          Positioned(
+            right: 14.0 - _clearHitWidthPad,
+            top: _progZoneHeight - _clearHitHeight,
+            height: _clearHitHeight,
+            child: GestureDetector(
+              key: const Key('clear_field'),
+              behavior: HitTestBehavior.opaque,
+              onTap: canClear ? _onClearField : null,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  _clearHitWidthPad,
+                  0.0,
+                  _clearHitWidthPad,
+                  3.0,
+                ),
+                child: Align(
+                  alignment: Alignment.bottomRight,
+                  child: Text(
+                    'ОЧИСТИТЬ ПОЛЕ',
+                    style: canClear
+                        ? _progressLabelStyle.copyWith(
+                            color: BlockMaterial.hazardOrange.color,
+                          )
+                        : _progressLabelStyle,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
+
+  /// «Очистить поле»: отменяет идущий драг и возвращает все куски в лоток
+  /// (`PackController.clear`).
+  void _onClearField() {
+    _cancelDrag();
+    setState(() => _controller.clear());
+  }
+
+  static const TextStyle _progressLabelStyle = TextStyle(
+    color: Color(0xFF7C848D),
+    fontSize: 10.5,
+    letterSpacing: 0.63, // .06em @ 10.5px
+  );
 
   Widget _buildBoard(
     PackState state,
@@ -709,67 +781,84 @@ class _GameScreenState extends State<GameScreen>
         ? 'ЛОТОК · ПОРЦИЯ-3'
         : 'ЛОТОК · ПОЛНЫЙ НАБОР';
 
+    // Контейнер лотка фиксирован по размеру ([_trayZoneHeight], во всю ширину):
+    // по мере опустения лоток не сжимается, поле над ним не прыгает.
     return Container(
+      key: const Key('packing_tray'),
+      width: double.infinity,
+      height: _trayZoneHeight,
       margin: const EdgeInsets.symmetric(horizontal: 12.0),
-      padding: const EdgeInsets.symmetric(vertical: 12.0, horizontal: 6.0),
+      padding: const EdgeInsets.symmetric(
+        vertical: _trayPaddingV,
+        horizontal: 6.0,
+      ),
       decoration: BoxDecoration(
         color: PackingPainter.trayBg,
-        border: Border.all(color: BlockMaterial.gunmetal.color, width: 1.0),
+        border: Border.all(
+          color: BlockMaterial.gunmetal.color,
+          width: _trayBorderWidth,
+        ),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(14.0)),
       ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                for (final id in visible)
-                  if (!(id == _dragPieceId && _dragFromTray))
-                    Padding(
-                      padding: const EdgeInsets.only(right: 12.0),
-                      child: Listener(
-                        key: Key('tray_piece_$id'),
-                        onPointerDown: (event) => _startDrag(
-                          id,
-                          fromTray: true,
-                          globalPos: event.position,
-                        ),
-                        onPointerMove: (event) => _onDragUpdate(event.position),
-                        onPointerUp: (_) => _endDrag(),
-                        onPointerCancel: (_) => _cancelDrag(),
-                        child: CustomPaint(
-                          size: _pieceBoundsPx(_pieceById(id), _trayCellSize),
-                          painter: _PieceCellsPainter(
-                            piece: _pieceById(id),
-                            cellSize: _trayCellSize,
-                            material: BlockMaterial.graphite,
+          SizedBox(
+            height: _trayRowMaxHeight,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  for (final id in visible)
+                    if (!(id == _dragPieceId && _dragFromTray))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 12.0),
+                        child: Listener(
+                          key: Key('tray_piece_$id'),
+                          onPointerDown: (event) => _startDrag(
+                            id,
+                            fromTray: true,
+                            globalPos: event.position,
+                          ),
+                          onPointerMove: (event) =>
+                              _onDragUpdate(event.position),
+                          onPointerUp: (_) => _endDrag(),
+                          onPointerCancel: (_) => _cancelDrag(),
+                          child: CustomPaint(
+                            size: _pieceBoundsPx(_pieceById(id), _trayCellSize),
+                            painter: _PieceCellsPainter(
+                              piece: _pieceById(id),
+                              cellSize: _trayCellSize,
+                              material: BlockMaterial.graphite,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                if (rest > 0)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4.0),
-                    child: Text(
-                      '+$rest',
-                      style: const TextStyle(
-                        color: Color(0xFF8B949E),
-                        fontSize: 11.0,
+                  if (rest > 0)
+                    Padding(
+                      padding: const EdgeInsets.only(left: 4.0),
+                      child: Text(
+                        '+$rest',
+                        style: const TextStyle(
+                          color: Color(0xFF8B949E),
+                          fontSize: 11.0,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-          const SizedBox(height: 6.0),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Color(0xFF6C747D),
-              fontSize: 10.0,
-              letterSpacing: 1.0, // .1em @ 10px
+          const SizedBox(height: _trayLabelGap),
+          SizedBox(
+            height: _trayLabelHeight,
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: Color(0xFF6C747D),
+                fontSize: 10.0,
+                letterSpacing: 1.0, // .1em @ 10px
+              ),
             ),
           ),
         ],
