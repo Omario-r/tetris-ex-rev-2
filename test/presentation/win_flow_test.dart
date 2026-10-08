@@ -4,7 +4,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
-import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/main.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
@@ -35,10 +34,7 @@ void main() {
   final total = RoninParts.parts.length;
 
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() {
-    SharedPreferences.setMockInitialValues({});
-    GameScreen.sliceConfig = SliceConfig.bigPieces;
-  });
+  tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   void bigView(WidgetTester t) {
     t.view.physicalSize = const Size(1200, 1600);

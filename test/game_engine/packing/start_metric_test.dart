@@ -39,11 +39,7 @@ void main() {
   group('рамп сложности старта (разметка v2, канонные seed)', () {
     for (final part in RoninParts.parts) {
       test('${part.id} (seed ${part.seed}) в полосе своей группы', () {
-        final level = prepareLevel(
-          part.mask,
-          SliceConfig.bigPieces,
-          seed: part.seed,
-        );
+        final level = prepareLevel(part.mask, seed: part.seed);
         final metric = startMetric(level.silhouette, level.slice);
         final reason =
             'places/piece ${metric.placesPerPiece}, min ${metric.minPlaces}';

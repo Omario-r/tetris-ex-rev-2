@@ -14,13 +14,14 @@
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
   Стори 02 T2). **Уровень строит `prepareLevel`**
   (Ронин-1/07 T2): `_rebuild()` зовёт `prepareLevel(RoninParts.parts[levelIndex].mask,
-  GameScreen.sliceConfig, seed: part.seed + _seedOffset)` и берёт `silhouette`, `slice`. Поле —
+  seed: part.seed + _seedOffset)` и берёт `silhouette`, `slice`. Нарезка одна — «Крупные
+  куски» (вариант «Колючие куски» и переключатель конфигураций сняты, Ронин-1/06 T1). Поле —
   10×14; экран геометрию поля не выводит,
   читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Уложенные
   клетки — куски рисунка (Ронин-1/03): `_rebuild` запоминает `_targetX/_targetY`
   (`prepared.targetX/targetY`, сдвиг маски в поле), `PackingPainter` получает
   `art: RoninArt.shared`, `part: RoninParts.parts[_fragmentIndex]`, `targetX/targetY`;
-  материала детали (`_partMaterial`, `ShipMaterials`) у экрана нет. Нарезка (`prepared.slice`) →
+  материала детали у экрана нет. Нарезка (`prepared.slice`) →
   `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
   (`PackState.isComplete`) → **деталь собрана** → пауза с выбором маршрута (Ронин-1/05 T1,
@@ -63,11 +64,9 @@
   полевой), `h` — наибольшая высота куска уровня (`max(cell.y)+1`); считается один раз в
   `_rebuild()`, та же величина и по ширине — ряд лотка не выше 160 px при любом куске
   (Ронин-1/07 T2).
-- **Конфигурация нарезки** (dev-переключатель Ронин-1/07; значения `bigPieces` — «Крупные куски» и `spikyPieces` — «Колючие куски», Ронин-1/04 T3):
-  `static SliceConfig GameScreen.sliceConfig` (по умолчанию `bigPieces`, в т.ч. в release)
-  живёт вне `State` до перезапуска приложения и действует на все уровни. Смена в чит-меню
-  (`_cheatSetSliceConfig`) → запись в поле + `_restartLevel()` (пересборка текущего уровня с
-  ТЕКУЩИМ `_seedOffset`, сброс драга); `_seedOffset` — сдвиг от канонного `RoninPartDef.seed` детали (стартует с 0); «Пересобрать нарезку» = `_seedOffset++` + тот же `_restartLevel()`.
+- **Пересборка нарезки**: `_seedOffset` — сдвиг от канонного `RoninPartDef.seed` детали
+  (стартует с 0); «Пересобрать нарезку» = `_seedOffset++` + `_restartLevel()` (пересборка
+  текущего уровня, сброс драга).
 - Топбар (канон `.topbar`/`.title`/`.pausebtn` мокапа `ukladka-field.html`, высота 44,
   Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / M»
   (N=`fragmentIndex+1`, M=`RoninParts.parts.length`=15) и `.name` название детали заглавными
@@ -139,28 +138,24 @@
   только в `kDebugMode` под ней `TextButton` `Key('ship_dev_reset')` «Сброс прогресса (dev)» →
   `ProgressService.reset()` → `pushReplacement(GameScreen(0))`. Прогресс финал не трогает.
 - `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, feedMode, onSetFeedMode,
-  onReshuffle, onSolve, sliceConfig, onSetSliceConfig, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
+  onReshuffle, onSolve, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
   Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
   `kDebugMode`. Секции: выбор уровня (прогресс не меняет), мгновенная победа (пауза
-  «деталь собрана», `_markDone`), состояние корабля (N=0..`kShipPartCount`, пишет
+  «деталь собрана», `_markDone`), состояние корабля (N=0..`RoninParts.parts.length`, пишет
   `setCollectedCount(N)` — «15» даёт 15 / 15), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
-  — тумблер `FeedMode`), **нарезка: калибровка** (Ронин-1/07; по кнопке на значение
-  `Key('slice_config_<имя>')` (две — `bigPieces` «Крупные куски», `spikyPieces` «Колючие куски») в порядке `SliceConfig.values`, текущая —
-  префикс «✓ »; перед секцией «Нарезка (dev)»), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
+  — тумблер `FeedMode`), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
   — solve-хук). Зарядов взрыва и «Прототипа укладки» больше нет (выпил в Стори 02).
-  `levelCount` по умолчанию `null` → `kShipPartCount` уровней.
+  `levelCount` по умолчанию `null` → `RoninParts.parts.length` уровней.
 
 ## Зависит от
 
-- `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`SliceConfig`/`prepareLevel`),
+- `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`prepareLevel`),
   `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`, `RoninParts` — только
   чтение, название детали для топбара, Ронин-1/01 T4),
-  `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`; `ShipMaterials` — нет,
-  Ронин-1/03), `presentation/widgets` (`PackingPainter`; `kShipPartCount` из `ship.dart` —
-  только `cheat_menu`, `game_screen` с Ронин-1/05 T1 берёт `RoninParts.parts.length`),
+  `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`),
+  `presentation/widgets` (`PackingPainter`),
   `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`,
-  `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03; Ронин-1/02
-  T2 — `ShipPainter` экраном больше не используется). `GameScreen` больше НЕ зависит от
+  `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
   `theme/level_skin` (пересадка на укладку, Стори 02 T2).
 - `cheat_menu.dart` импортирует `FeedMode` из `game_screen.dart` (взаимный импорт —

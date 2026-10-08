@@ -42,11 +42,6 @@ class GameScreen extends StatefulWidget {
   /// Creates a [GameScreen] with the given [levelIndex].
   const GameScreen({super.key, this.levelIndex = 0});
 
-  /// Выбранная конфигурация нарезки (dev-калибровка Ронин-1/07). Живёт вне
-  /// `State` (экран пересоздаётся на каждом уровне) до перезапуска приложения;
-  /// по умолчанию `bigPieces` — в том числе в release.
-  static SliceConfig sliceConfig = SliceConfig.bigPieces;
-
   @override
   State<GameScreen> createState() => _GameScreenState();
 }
@@ -171,21 +166,18 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Запоминает деталь уровня ([LevelMap] — единый источник «уровень i ↔
-  /// деталь i»), затем собирает уровень в выбранной конфигурации нарезки
-  /// ([_rebuild]).
+  /// деталь i»), затем собирает уровень ([_rebuild]).
   void _loadLevel() {
     _fragmentIndex = LevelMap.levelAt(widget.levelIndex).fragmentIndex;
     _rebuild();
   }
 
   /// Строит уровень через [prepareLevel]: силуэт в поле, масштаб клетки и
-  /// нарезка — в конфигурации [GameScreen.sliceConfig] с seed детали
-  /// плюс текущий `_seedOffset`.
+  /// нарезка («Крупные куски») с seed детали плюс текущий `_seedOffset`.
   void _rebuild() {
     final part = RoninParts.parts[_fragmentIndex];
     final prepared = prepareLevel(
       part.mask,
-      GameScreen.sliceConfig,
       seed: part.seed + _seedOffset,
     );
     _silhouette = prepared.silhouette;
@@ -286,8 +278,6 @@ class _GameScreenState extends State<GameScreen>
       onSetFeedMode: _cheatSetFeedMode,
       onReshuffle: _cheatReshuffle,
       onSolve: _cheatSolve,
-      sliceConfig: GameScreen.sliceConfig,
-      onSetSliceConfig: _cheatSetSliceConfig,
     );
   }
 
@@ -321,14 +311,6 @@ class _GameScreenState extends State<GameScreen>
   /// закрываем — PO может переключать без перезахода.
   void _cheatSetFeedMode(FeedMode mode) {
     setState(() => _feedMode = mode);
-  }
-
-  /// Чит «Нарезка: калибровка»: запоминает конфигурацию (на все уровни до
-  /// перезапуска приложения) и перезапускает текущий уровень с тем же `_seedOffset`.
-  void _cheatSetSliceConfig(SliceConfig config) {
-    Navigator.of(context).pop();
-    GameScreen.sliceConfig = config;
-    _restartLevel();
   }
 
   /// Дев-чит «Пересобрать нарезку»: новый сдвиг seed → новая нарезка той же детали.

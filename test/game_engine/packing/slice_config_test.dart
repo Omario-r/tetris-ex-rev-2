@@ -1,10 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/game_engine/models/target_mask.dart';
-import 'package:explosive_tetris/game_engine/packing/pack_controller.dart';
-import 'package:explosive_tetris/game_engine/packing/pack_piece.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_slicer.dart';
-import 'package:explosive_tetris/game_engine/packing/pack_state.dart';
 import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 
 typedef _Cell = ({int x, int y});
@@ -57,8 +54,9 @@ void _expectExactCover(TargetMask silhouette, PackSlice slice) {
 
 List<int> _sizes(PackSlice slice) => [for (final p in slice.pieces) p.size];
 
-/// Страж `bigPieces` (Ронин-1/04 T3): результат `prepareLevel(bigPieces)` на
-/// канонном seed каждой из 15 деталей, снятый ДО добавления `spikyPieces`.
+/// Страж «Крупных кусков» (Ронин-1/04 T3): результат `prepareLevel` на
+/// канонном seed каждой из 15 деталей, снятый ДО добавления «Колючих кусков»
+/// (снятых в Ронин-1/06 T1; нарезка осталась побитово прежней).
 /// `id` детали → куски; кусок — отсортированные абсолютные клетки силуэта в поле
 /// 10×14 (`y*10 + x`). Менять — только осознанно, вместе с пересмотром seed.
 const _bigPiecesReference = <String, List<List<int>>>{
@@ -89,95 +87,70 @@ List<List<int>> _absPieces(PackSlice slice) => [
     ]..sort(),
 ];
 
-/// Кусок компактен, если заполняет свою рамку на ≥ 80 %.
-bool _isCompact(PackPiece piece) {
-  final w = piece.cells.map((c) => c.x).reduce((a, b) => a > b ? a : b) + 1;
-  final h = piece.cells.map((c) => c.y).reduce((a, b) => a > b ? a : b) + 1;
-  return piece.cells.length >= 0.8 * w * h;
-}
-
-/// Доля компактных кусков по всем 15 деталям на их канонных seed.
-double _compactShare(SliceConfig config) {
-  var compact = 0;
-  var total = 0;
-  for (final part in RoninParts.parts) {
-    final slice = prepareLevel(part.mask, config, seed: part.seed).slice;
-    for (final piece in slice.pieces) {
-      total++;
-      if (_isCompact(piece)) compact++;
-    }
-  }
-  return compact / total;
-}
-
 void main() {
   const seeds = [0, 1, 2, 3, 4];
 
-  for (final config in SliceConfig.values) {
-    group('prepareLevel · ${config.name}', () {
-      for (final part in RoninParts.parts) {
-        for (final seed in {...seeds, part.seed}) {
-          test('${part.id} seed $seed', () {
-            final level = prepareLevel(part.mask, config, seed: seed);
-            final again = prepareLevel(part.mask, config, seed: seed);
-            final sil = level.silhouette;
+  group('prepareLevel', () {
+    for (final part in RoninParts.parts) {
+      for (final seed in {...seeds, part.seed}) {
+        test('${part.id} seed $seed', () {
+          final level = prepareLevel(part.mask, seed: seed);
+          final again = prepareLevel(part.mask, seed: seed);
+          final sil = level.silhouette;
 
-            // Поле.
-            expect((level.fieldWidth, level.fieldHeight), (10, 14));
-            expect(sil.width, level.fieldWidth);
-            expect(sil.height, level.fieldHeight);
-            expect(sil.isWellFormed, isTrue);
+          // Поле.
+          expect((level.fieldWidth, level.fieldHeight), (10, 14));
+          expect(sil.width, level.fieldWidth);
+          expect(sil.height, level.fieldHeight);
+          expect(sil.isWellFormed, isTrue);
 
-            // Силуэт связен и центрирован по bbox.
-            final silCells = {for (final c in sil.cells) c};
-            expect(_isConnected(silCells), isTrue);
-            final minX = silCells.map((c) => c.x).reduce((a, b) => a < b ? a : b);
-            final minY = silCells.map((c) => c.y).reduce((a, b) => a < b ? a : b);
-            expect(minX, level.targetX);
-            expect(minY, level.targetY);
+          // Силуэт связен и центрирован по bbox.
+          final silCells = {for (final c in sil.cells) c};
+          expect(_isConnected(silCells), isTrue);
+          final minX = silCells.map((c) => c.x).reduce((a, b) => a < b ? a : b);
+          final minY = silCells.map((c) => c.y).reduce((a, b) => a < b ? a : b);
+          expect(minX, level.targetX);
+          expect(minY, level.targetY);
 
-            // Покрытие кусками ровное.
-            _expectExactCover(sil, level.slice);
+          // Покрытие кусками ровное.
+          _expectExactCover(sil, level.slice);
 
-            final sizes = _sizes(level.slice);
-            expect(silCells.length, part.mask.cells.length);
-            // Нижняя граница 5 и число кусков — гарантия только для канонного
-            // seed детали (то, что видит игрок); на других seed слияние может
-            // оставить кусок 3–4 клетки (Ронин-1/04 T1, находка в BACKLOG).
-            final isCanonicalSeed = seed == part.seed;
-            expect(sizes.every((s) => s <= 12), isTrue,
+          final sizes = _sizes(level.slice);
+          expect(silCells.length, part.mask.cells.length);
+          // Нижняя граница 5 и число кусков — гарантия только для канонного
+          // seed детали (то, что видит игрок); на других seed слияние может
+          // оставить кусок 3–4 клетки (Ронин-1/04 T1, находка в BACKLOG).
+          final isCanonicalSeed = seed == part.seed;
+          expect(sizes.every((s) => s <= 12), isTrue,
+              reason: 'размеры $sizes');
+          if (isCanonicalSeed) {
+            expect(sizes.every((s) => s >= 5), isTrue,
                 reason: 'размеры $sizes');
-            // Для spikyPieces нижняя граница 5 не гарантируется (Ронин-1/04 T3:
-            // вариант выбирает партнёра по рамке, а не по размеру) — только ≤ 12.
-            if (isCanonicalSeed && config == SliceConfig.bigPieces) {
-              expect(sizes.every((s) => s >= 5), isTrue,
-                  reason: 'размеры $sizes');
-              expect(sizes.length, lessThanOrEqualTo(10),
-                  reason: 'размеры $sizes');
-            }
+            expect(sizes.length, lessThanOrEqualTo(10),
+                reason: 'размеры $sizes');
+          }
 
-            // Лоток: перестановка id, не порядок решения, детерминирован.
-            final n = level.slice.pieces.length;
-            final ids = [for (final p in level.slice.pieces) p.id];
-            expect([...level.trayOrder]..sort(), ids);
-            if (n >= 2) {
-              expect(level.trayOrder, isNot([for (var i = 0; i < n; i++) i]),
-                  reason: 'лоток совпал с порядком решения');
-            }
-            expect(again.trayOrder, level.trayOrder);
+          // Лоток: перестановка id, не порядок решения, детерминирован.
+          final n = level.slice.pieces.length;
+          final ids = [for (final p in level.slice.pieces) p.id];
+          expect([...level.trayOrder]..sort(), ids);
+          if (n >= 2) {
+            expect(level.trayOrder, isNot([for (var i = 0; i < n; i++) i]),
+                reason: 'лоток совпал с порядком решения');
+          }
+          expect(again.trayOrder, level.trayOrder);
 
-            // Детерминизм.
-            expect(again.silhouette.rows, sil.rows);
-            expect(again.targetX, level.targetX);
-            expect(again.targetY, level.targetY);
-            expect(again.slice.solution, level.slice.solution);
-            expect([for (final p in again.slice.pieces) p.cells],
-                [for (final p in level.slice.pieces) p.cells]);
-          });
-        }
+          // Детерминизм.
+          expect(again.silhouette.rows, sil.rows);
+          expect(again.targetX, level.targetX);
+          expect(again.targetY, level.targetY);
+          expect(again.slice.solution, level.slice.solution);
+          expect([for (final p in again.slice.pieces) p.cells],
+              [for (final p in level.slice.pieces) p.cells]);
+        });
       }
-    });
-  }
+    }
+  });
 
   group('prepareLevel · бюджет времени', () {
     // Отсечение тупиковых веток (Ронин-1/04 T2): нарезка любой детали на любом
@@ -185,13 +158,13 @@ void main() {
     // генератору или разметке (эскалация).
     const budget = Duration(milliseconds: 500);
     // Прогрев JIT одним вызовом.
-    prepareLevel(RoninParts.parts[0].mask, SliceConfig.bigPieces, seed: 0);
+    prepareLevel(RoninParts.parts[0].mask, seed: 0);
 
     for (final part in RoninParts.parts) {
       test('${part.id} × seed 0..15 ≤ ${budget.inMilliseconds} мс', () {
         for (var seed = 0; seed <= 15; seed++) {
           final sw = Stopwatch()..start();
-          prepareLevel(part.mask, SliceConfig.bigPieces, seed: seed);
+          prepareLevel(part.mask, seed: seed);
           sw.stop();
           expect(sw.elapsed, lessThan(budget),
               reason: '${part.id} seed $seed: ${sw.elapsedMilliseconds} мс');
@@ -200,47 +173,13 @@ void main() {
     }
   });
 
-  group('bigPieces — канонные нарезки 15 деталей не меняются', () {
+  group('«Крупные куски» — канонные нарезки 15 деталей не меняются', () {
     for (final part in RoninParts.parts) {
       test('${part.id} seed ${part.seed}: совпадает с эталоном', () {
-        final slice =
-            prepareLevel(part.mask, SliceConfig.bigPieces, seed: part.seed)
-                .slice;
+        final slice = prepareLevel(part.mask, seed: part.seed).slice;
         expect(_absPieces(slice), _bigPiecesReference[part.id]);
       });
     }
-  });
-
-  group('spikyPieces (Колючие куски)', () {
-    for (final part in RoninParts.parts) {
-      test('${part.id} seed ${part.seed}: покрытие, укладка до isComplete, ≤ 12',
-          () {
-        final level =
-            prepareLevel(part.mask, SliceConfig.spikyPieces, seed: part.seed);
-        _expectExactCover(level.silhouette, level.slice);
-        expect(level.slice.pieces.every((p) => p.size <= 12), isTrue,
-            reason: 'размеры ${_sizes(level.slice)}');
-
-        // Эталонная укладка: все куски по solution -> силуэт покрыт.
-        final controller = PackController(PackState(
-          silhouette: level.silhouette,
-          placements: const {},
-          pieces: level.slice.pieces,
-          trayOrder: level.trayOrder,
-        ));
-        for (final piece in level.slice.pieces) {
-          final o = level.slice.solution[piece.id]!;
-          controller.place(piece.id, o.x, o.y);
-        }
-        expect(controller.state.isComplete, isTrue);
-      });
-    }
-
-    test('доля компактных кусков у spikyPieces ниже, чем у bigPieces', () {
-      final big = _compactShare(SliceConfig.bigPieces);
-      final spiky = _compactShare(SliceConfig.spikyPieces);
-      expect(spiky, lessThan(big), reason: 'spiky $spiky, big $big');
-    });
   });
 
   group('mergeAdjacentPieces', () {

@@ -14,11 +14,11 @@
 |--------|------|----------------------|------------|
 | models | `lib/game_engine/models/` | Структуры данных ядра (маска мишени, шаблон уровня) | — |
 | packing | `lib/game_engine/packing/` | Ядро укладки — основной движок игры: полиомино-кусок, состояние (силуэт+размещённые+лоток), валидация/завершение, нарезка силуэта | models |
-| data | `lib/game_engine/data/` | Контент: разметка «Ронина» v2 (`RoninParts` — 15 деталей: плиты обшивки по секциям в своём масштабе и предметы поверх, D-010…D-012) + `LevelMap` (уровень i ↔ деталь с order i+1, поле 10×14); `ShipParts` — осиротевшие дев-детали, выпил в Стори 06 | models |
+| data | `lib/game_engine/data/` | Контент: разметка «Ронина» v2 (`RoninParts` — 15 деталей: плиты обшивки по секциям в своём масштабе и предметы поверх, D-010…D-012) + `LevelMap` (уровень i ↔ деталь с order i+1, поле 10×14) | models |
 | application | `lib/application/` | Персист прогресса (`ProgressService`) | data ¹ |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
 | ship_render | `lib/presentation/ship_render/` | Рисунок корабля в Dart (`ShipArt`, `RoninArt` — порт `ship-render.js`): слой корпуса, слой предметов, контур борта, формы предметов; экран корабля-композит (`ShipCompositePainter`), `paintPartCell` (сэмплинг клетки детали) и `paintPartCells` (поле укладки) | game_engine/data |
-| widgets | `lib/presentation/widgets/` | Пейнтеры укладки и корабля | packing, data, theme (без `ship_materials`), ship_render |
+| widgets | `lib/presentation/widgets/` | Пейнтер укладки (`PackingPainter`) | packing, data, theme, ship_render |
 | screens | `lib/presentation/screens/` | Экраны + композиционный корень партии укладки | packing, models, data, application, theme, widgets, ship_render |
 
 ¹ **application → game_engine/data:** `ProgressService._max` берёт `RoninParts.parts.length - 1`
@@ -52,8 +52,8 @@ lib/main.dart (вход)
   `models`-падающая фигура — **удалено** (эпик «Укладка», Стори 02 T4).
   `slice_config.dart` — построение уровня из маски детали
   (`prepareLevel`): нарезка «Крупные куски» (D-006) и перемешанный порядок
-  лотка (D-007); `SliceConfig` — dev-переключатель вариантов слияния
-  (стори 04). `start_metric.dart` — метрика старта уровня (мест на кусок;
+  лотка (D-007); вариант «Колючие куски» (D-013) отклонён и снят в Ронин-1/06.
+  `start_metric.dart` — метрика старта уровня (мест на кусок;
   DESIGN.md § «Сложность старта»), держит рамп сложности тестом.
 
 - `screens` — единственный композиционный корень: тянет ядро укладки, данные и виджеты.
@@ -66,11 +66,11 @@ lib/main.dart (вход)
 - `main → screens/ship_screen`: при собраны все N деталей вход открывает финал.
 - `application` тонкий: только персист прогресса (`ProgressService`); игрового цикла в слое
   нет — пульс-`AnimationController` живёт в `screens/game_screen`.
-- `widgets → data`: `ShipPainter` берёт форму деталей из `RoninParts` (тот же источник, что и
-  мишени уровней), поэтому «собранное на уровне» = «деталь корабля».
 - `widgets → ship_render`, `widgets → data` (Ронин-1/03): `PackingPainter` заливает уложенные
-  клетки кусками рисунка детали (`paintPartCells`, деталь — `RoninPartDef`); связь
-  `widgets → theme/ship_materials` снята (файл ждёт сноса в Стори 06).
+  клетки кусками рисунка детали (`paintPartCells`, деталь — `RoninPartDef` из `RoninParts`, тот
+  же источник, что и мишени уровней), поэтому «собранное на уровне» = «деталь корабля».
+  Карты «деталь → материал» нет (`ship_materials` и прежний плоский пейнтер корабля
+  выпилены в Ронин-1/06).
 
 ## Сквозные соглашения
 

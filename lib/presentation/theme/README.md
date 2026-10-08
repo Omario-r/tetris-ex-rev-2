@@ -40,8 +40,8 @@
   отдельное продуктовое решение при появлении ассетов).
 - `LevelSkin` удалён (Стори 02 T3) — единственный потребитель `materialForLevelIndex`/
   `materialForLevel`/`materialForObjectFragment` был `GameScreen`/`BoardPainter` старого ядра.
-- `ShipMaterials` — карта деталь→материал для корабля (новый модуль в T2). Дефолт: 7 материалов
-  по секциям корабля (нос/мостик/крылья/двигатель/хвост) из референса «Ронин» v4.
+- Карты «деталь → материал» больше нет: выпилена в Ронин-1/06 T1 (вытеснена
+  рисунком корабля `presentation/ship_render`, Ронин-1/02–03).
 - Оверлеи: `GhostTargetOverlay` (контур мишени — hazard-оранжевый пунктир по токену
   `ghostTarget`, inset+скругление по мокапу `game-field.html`, Стори 01 T4; потребитель —
   `PackingPainter`). `HaloHighlightOverlay` (канон `el-halo`, пульс dirty-halo) удалён
@@ -72,7 +72,8 @@
 ## От него зависят
 
 - `presentation/widgets` — `packing_painter` (`BlockMaterial`, `BlockTheme`,
-  `BlockPaintUtils`, `ShipMaterials`, `GhostTargetOverlay`), `ship` (карта материалов).
+  `BlockPaintUtils`, `GhostTargetOverlay`). Материалы напрямую берёт и `screens/game_screen`
+  (`BlockMaterial.<имя>.color` для HUD).
 - `tool/generate_app_icon.dart` — `CanisterChargePainter`/`ChargeIconState`
   (Стори 02 T3, см. выше).
 
@@ -85,13 +86,11 @@
   «Ронин» v4 (`/Users/omarior/Development/Home/Ideas/Tetris-ex-ideas/ship_ronin_v4.html`,
   константа `M`): графит/графит-тёмный/тёмные ниши/оранжевые hazard-панели/ржавчина/gunmetal/
   матовый чёрный — без осветления сверх диапазона, уже заданного самим референсом (edge-bevel
-  ±12 lightness, plate-jitter ±3.5). Один источник палитры для поля и (T2) корабля.
-- `ShipMaterials` — единый источник цвета для `ShipPainter` и (T3) перекраски клетки. Не хардкодит
-  единственный корабль (адресуемость под #6).
+  ±12 lightness, plate-jitter ±3.5).
 - `GhostTargetOverlay` — цвета строго из токенов DESIGN.md `ghostTarget` (пунктир,
   `hsl(23 62% 55% / 55%)` = `#D37C45`) и `hazardOrange` (лёгкая заливка 5%,
   `#BE642D`) — не своя палитра, Стори 01 T4.
 
 ## Как проверить
 
-`flutter test test/presentation/theme/` (block_theme, ship_materials).
+`flutter test test/presentation/theme/` (block_theme).

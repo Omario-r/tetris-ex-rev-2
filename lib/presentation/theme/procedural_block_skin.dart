@@ -6,9 +6,8 @@ import 'block_skin.dart';
 
 /// Canonical `el-block` skin (`docs/design/game-field.html`, каталог
 /// элементов поля) — one render for every [BlockMaterial]: flat material
-/// fill + inset bevel + corner rivets. Used for placed blocks inside the
-/// target mask, painted with the material of the ship part they belong to
-/// (`ShipMaterials`).
+/// fill + inset bevel + corner rivets. Used for blocks painted with a single
+/// material chosen by the caller.
 ///
 /// Возврат Гейта 2 2026-07-18: прежние пер-материальные процедурные текстуры
 /// (инсет-грид/hazard-полосы/питтинг) отменены — канон один для всех

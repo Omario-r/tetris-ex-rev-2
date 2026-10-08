@@ -7,9 +7,7 @@
 
 Контент: разметка «Ронина» v2 (`RoninParts` — 15 деталей: плиты обшивки по секциям в своём масштабе и предметы поверх, D-010…D-012; канон Дизайнера) и
 карта уровней (`LevelMap`, поле укладки 10×14, по одному уровню на деталь). Данные, не логика.
-`ShipParts` (7 дев-деталей v1) — **осиротевший**: вытеснен `RoninParts` (Ронин-1/01 T2), а с T3
-`LevelMap` тоже строится из `RoninParts` — `ShipParts` больше никем в `lib/` не читается (кроме
-самого `ship_parts.dart`). Физический выпил файла и его теста — Стори 06 (решение PO 2026-07-29).
+Дев-детали v1 (7 штук) выпилены в Ронин-1/06 T1: единственный источник контента — `RoninParts`.
 
 ## Публичный интерфейс
 
@@ -29,8 +27,6 @@
   `static const`, 15 деталей, отсортированы по `order` (индекс == `order - 1`). Источник —
   `docs/design/ronin-parts.js` v2 (канон Дизайнера), перенесён 1:1 вместе с seed.
   `sectionById(id)` / `partAtOrder(order)` / `byId(id)` (неизвестный `id` → `ArgumentError`).
-- `ShipParts.parts` — 7 дев-деталей, `gridSize=12`. **Осиротевший**: работающий код на него не
-  ссылается (кроме `ship_parts.dart`/его теста), держится зелёным до выпила в Стори 06.
 - `LevelMap` (Ронин-1/01 T3): `fieldWidth=10`/`fieldHeight=14` — поле укладки фиксировано для
   ВСЕХ уровней (не зависит от размера детали). `levelAt(levelIndex)` (0..`RoninParts.parts.length-1`)
   → `LevelTemplate`, деталь `i` ↔ `RoninParts.parts[i]` (order `i+1`): `targetMask` —
@@ -46,8 +42,9 @@
 ## От него зависят
 
 - `presentation/screens` — `game_screen` (`levelAt`).
-- `presentation/widgets` — `ship.dart`/`ShipPainter` (форма деталей — `RoninParts`, тот же
-  источник, что и мишени уровней).
+- `presentation/ship_render` — `RoninParts` (форма и позиции деталей корабля, тот же источник,
+  что и мишени уровней).
+- `presentation/widgets` — `PackingPainter` (`RoninPartDef` — деталь уровня).
 - `application` — `ProgressService._max` (`RoninParts.parts.length - 1`).
 
 ## Инварианты
@@ -61,11 +58,8 @@
   Проходимость (нарезка + эталонная укладка на канонном `seed`, все 15) — `ronin_packing_test.dart`.
 - Уровни = детали «Ронина»: `levelAt(i).targetMask` — поле 10×14 с деталью `RoninParts.parts[i]`,
   вложенной через `padTo` со сдвигом `targetX`/`targetY`; число уровней = `RoninParts.parts.length`
-  (= `kShipPartCount`). Мишень **центрирована**, НЕ floor-anchored (`level_map_test.dart`).
-- `LevelMap` — `static final`, НЕ `const`. `ShipParts`/`RoninParts` — `const`.
-- Дев-контент масок — прототипный (не относится к `RoninParts`: канон Дизайнера, 1:1 перенос).
-  Проходимость дев-деталей: структурно + содержательно (`content_packing_test.dart`, оставлен
-  зелёным на осиротевших данных до Стори 06).
+  («N деталей ↔ N уровней»). Мишень **центрирована**, НЕ floor-anchored (`level_map_test.dart`).
+- `LevelMap` — `static final`, НЕ `const`. `RoninParts` — `const`.
 
 ## Как проверить
 

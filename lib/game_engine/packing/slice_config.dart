@@ -4,21 +4,6 @@ import '../models/target_mask.dart';
 import 'pack_piece.dart';
 import 'pack_slicer.dart';
 
-/// Конфигурация нарезки детали на кусочки (dev-переключатель вариантов
-/// слияния, A/B на устройстве: Ронин-1/04).
-///
-/// Порядок значений — порядок кнопок в чит-меню.
-enum SliceConfig {
-  /// «Крупные куски» (D-006): деталь целиком, поле 10×14, клетка 34; нарезка
-  /// 3..5, затем слияние соседних кусков в 5..12 клеток; ожидаемо 7–10 кусков.
-  bigPieces,
-
-  /// «Колючие куски» (Ронин-1/04, D-008): та же базовая нарезка и те же лимиты
-  /// слияния, но партнёра выбирает по заполненности рамки результата (меньше —
-  /// «колючее»), см. [mergeAdjacentPieces].
-  spikyPieces,
-}
-
 /// Готовый к игре уровень: поле, силуэт в поле, масштаб клетки, нарезка.
 class PreparedLevel {
   /// Размер поля в клетках.
@@ -57,14 +42,11 @@ class PreparedLevel {
 const int _fullFieldWidth = 10;
 const int _fullFieldHeight = 14;
 
-/// Из маски детали [partMask] (bbox-маска `RoninPartDef.mask`), конфигурации
-/// [config] и [seed] строит готовый уровень. Детерминирован: одни и те же
-/// аргументы дают побитово одинаковый результат.
-PreparedLevel prepareLevel(
-  TargetMask partMask,
-  SliceConfig config, {
-  required int seed,
-}) {
+/// Из маски детали [partMask] (bbox-маска `RoninPartDef.mask`) и [seed] строит
+/// готовый уровень: нарезка 3..5, затем слияние соседних кусков в 5..12 клеток
+/// («Крупные куски», D-006; поле 10×14, клетка 34; ожидаемо 7–10 кусков).
+/// Детерминирован: одни и те же аргументы дают побитово одинаковый результат.
+PreparedLevel prepareLevel(TargetMask partMask, {required int seed}) {
   const fieldWidth = _fullFieldWidth;
   const fieldHeight = _fullFieldHeight;
 
@@ -76,13 +58,10 @@ PreparedLevel prepareLevel(
     dx: targetX,
     dy: targetY,
   );
-  var slice = slicePolyomino(silhouette, seed: seed);
-  switch (config) {
-    case SliceConfig.bigPieces:
-      slice = mergeAdjacentPieces(silhouette, slice);
-    case SliceConfig.spikyPieces:
-      slice = mergeAdjacentPieces(silhouette, slice, spiky: true);
-  }
+  final slice = mergeAdjacentPieces(
+    silhouette,
+    slicePolyomino(silhouette, seed: seed),
+  );
   return PreparedLevel(
     fieldWidth: fieldWidth,
     fieldHeight: fieldHeight,
@@ -118,18 +97,10 @@ List<int> _shuffledTrayOrder(PackSlice slice, int seed) {
 /// сохраняется по построению. Детерминирован (без случайности).
 ///
 /// Выбор партнёра: наименьший по размеру, при равенстве — наименьший id.
-/// При [spiky] (вариант `spikyPieces`) партнёр выбирается по заполненности рамки
-/// результата слияния: `fill = (|A| + |B|) / (w × h)` по bbox объединения;
-/// наименьший `fill`, при равенстве — прежний ключ (размер, затем id). Лимиты
-/// сумм и остальное не меняются; при `spiky: false` поведение прежнее.
 /// Участвовавшими считаются обе стороны слияния (в обоих проходах). Результат:
 /// id 0..N-1 в порядке возрастания минимального линейного индекса клетки
 /// (`y*width + x`) группы; `cells` нормализованы, `solution[id] = (minX, minY)`.
-PackSlice mergeAdjacentPieces(
-  TargetMask silhouette,
-  PackSlice base, {
-  bool spiky = false,
-}) {
+PackSlice mergeAdjacentPieces(TargetMask silhouette, PackSlice base) {
   final width = silhouette.width;
 
   // Группа = множество абсолютных клеток (линейные индексы).
@@ -155,25 +126,6 @@ PackSlice mergeAdjacentPieces(
     return false;
   }
 
-  /// Заполненность bbox объединения групп [a] и [b] (доля клеток в рамке).
-  double mergedFill(Set<int> a, Set<int> b) {
-    var minX = width;
-    var maxX = 0;
-    var minY = silhouette.height;
-    var maxY = 0;
-    for (final set in [a, b]) {
-      for (final i in set) {
-        final x = i % width;
-        final y = i ~/ width;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-    return (a.length + b.length) / ((maxX - minX + 1) * (maxY - minY + 1));
-  }
-
   /// Партнёр для [id] среди живых групп: подходит [accept], сумма размеров ≤
   /// [limit]; наименьший по размеру, при равенстве — наименьший id.
   int? pickPartner(int id, int limit, bool Function(int other) accept) {
@@ -185,14 +137,6 @@ PackSlice mergeAdjacentPieces(
       if (best == null) {
         best = other;
         continue;
-      }
-      if (spiky) {
-        final fillOther = mergedFill(groups[id]!, groups[other]!);
-        final fillBest = mergedFill(groups[id]!, groups[best]!);
-        if (fillOther != fillBest) {
-          if (fillOther < fillBest) best = other;
-          continue;
-        }
       }
       if (groups[other]!.length < groups[best]!.length ||
           (groups[other]!.length == groups[best]!.length && other < best)) {

@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
-import 'package:explosive_tetris/game_engine/data/ship_parts.dart';
 import 'package:explosive_tetris/game_engine/models/target_mask.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_piece.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_slicer.dart';
@@ -8,10 +7,15 @@ import 'package:explosive_tetris/game_engine/packing/pack_slicer.dart';
 /// Обязательный набор масок для проверки нарезки (все 4).
 final _masks = <(String, TargetMask)>[
   ('крест 6×6 (defaultTargetMask)', defaultTargetMask),
-  ('верхний корпус 4×3 (parts[1])', ShipParts.parts[1].mask),
-  ('нос 4×2 (parts[0])', ShipParts.parts[0].mask),
-  ('двигатель 4×2 (parts[5])', ShipParts.parts[5].mask),
+  ('корпус 4×3', _hull4x3),
+  ('нос 4×2', _nose4x2),
+  ('двигатель 4×2', _engine4x2),
 ];
+
+// Маски-фикстуры (бывшие дев-детали корабля v1; клетки те же).
+const _hull4x3 = TargetMask(rows: ['####', '####', '####']);
+const _nose4x2 = TargetMask(rows: ['.##.', '####']);
+const _engine4x2 = TargetMask(rows: ['####', '.##.']);
 
 /// Абсолютные клетки куска = нормализованные cells + origin из solution.
 Set<({int x, int y})> _absCells(PackPiece piece, ({int x, int y}) origin) => {

@@ -31,24 +31,17 @@
   `pieces` (id 0..N-1, cells нормализованы) + `solution` (`pieceId → origin` в
   силуэте; эталонная раскладка, доказывающая существование решения).
 - `slice_config.dart` — построение уровня из маски детали (Ронин-1/07, 08):
-  `enum SliceConfig { bigPieces, spikyPieces }` (dev-переключатель вариантов слияния,
-  A/B на устройстве, порядок = порядок кнопок чит-меню; по умолчанию `bigPieces`);
-  `prepareLevel(partMask, config, {seed})` → `PreparedLevel` (`fieldWidth/
-  fieldHeight` = 10×14, `silhouette` размера поля, `targetX/targetY`, `slice`,
-  `trayOrder`). `bigPieces` — нарезка 3..5 + слияние соседних (5..12 клеток,
-  7–10 кусков). `trayOrder` (D-007) — перестановка id кусков от seed
-  (`shuffle(Random(seed*7919+17))`), никогда не равна порядку по возрастанию id
-  (порядок id = порядок решения; при `N >= 2` совпадение лечится сдвигом на 1).
-  `mergeAdjacentPieces(silhouette, base)` — публичное детерминированное слияние
-  (два прохода: пары нетронутых ≤ 10, затем остатки в любого соседа ≤ 12).
-  `spikyPieces` (Ронин-1/04 T3, «Колючие куски») — та же базовая нарезка и те же
-  лимиты, но `mergeAdjacentPieces(..., spiky: true)` выбирает партнёра по
-  заполненности рамки результата `fill = (|A|+|B|)/(w×h)` (наименьший; при
-  равенстве прежний ключ: размер, затем id). Доля компактных кусков (≥ 80 % рамки)
-  по 15 деталям на канонных seed: 26 % у `bigPieces`, 12 % у `spikyPieces`.
-  Нижняя граница размера куска 5 у `spikyPieces` не гарантируется (≤ 12 — да).
-  `spiky: false` (умолчание) — поведение побитово прежнее, держит эталон
-  `_bigPiecesReference` в `slice_config_test`.
+  `prepareLevel(partMask, {seed})` → `PreparedLevel` (`fieldWidth/fieldHeight` =
+  10×14, `silhouette` размера поля, `targetX/targetY`, `slice`, `trayOrder`).
+  Нарезка одна — «Крупные куски» (D-006): `slicePolyomino` 3..5 + слияние соседних
+  (5..12 клеток, 7–10 кусков). Вариант «Колючие куски» (D-013) отклонён PO на A/B и
+  снят в Ронин-1/06 T1 вместе с переключателем конфигураций. `trayOrder` (D-007) —
+  перестановка id кусков от seed (`shuffle(Random(seed*7919+17))`), никогда не равна
+  порядку по возрастанию id (порядок id = порядок решения; при `N >= 2` совпадение
+  лечится сдвигом на 1). `mergeAdjacentPieces(silhouette, base)` — публичное
+  детерминированное слияние (два прохода: пары нетронутых ≤ 10, затем остатки в любого
+  соседа ≤ 12; партнёр — наименьший по размеру, затем по id). Побитовую неизменность
+  нарезки 15 деталей держит эталон `_bigPiecesReference` в `slice_config_test`.
 
 - `startMetric(silhouette, slice)` → `StartMetric(placesPerPiece, minPlaces)`
   (`start_metric.dart`) — метрика старта (DESIGN.md § «Сложность старта»): на

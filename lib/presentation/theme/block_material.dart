@@ -5,8 +5,8 @@ import 'dart:ui';
 /// reference (`ship_ronin_v4.html`) so board blocks, oversleeve materials
 /// and (later stories) the ship read as one consistent language.
 ///
-/// Материалы используются в `BlockTheme` и (через `ShipMaterials`) в
-/// `ShipPainter` для рисования корабля. Цвет материала — через `color`.
+/// Материалы используются в `BlockTheme` и в HUD/кусках экрана укладки
+/// (`GameScreen`). Цвет материала — через `color`.
 enum BlockMaterial {
   /// Base graphite hull plating (mid-tone cool grey).
   graphite,
@@ -30,7 +30,7 @@ enum BlockMaterial {
   matteBlack,
 }
 
-/// Цвет материала для рисования (например, в `ShipPainter`).
+/// Цвет материала для рисования (например, в HUD `GameScreen`).
 /// Используется `ProceduralBlockSkin.paint` (канон `el-block`, Стори 01 T5) —
 /// заливка блока цветом материала.
 extension BlockMaterialColor on BlockMaterial {

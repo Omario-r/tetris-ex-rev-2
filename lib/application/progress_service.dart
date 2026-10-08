@@ -14,7 +14,7 @@ class ProgressService {
   static const int _min = 0;
 
   /// Число деталей (= уровней). Единый источник истины — `RoninParts.parts`
-  /// (Ронин-1/01 T3, было `ShipParts.parts`). Не хардкодить отдельным числом —
+  /// (Ронин-1/01 T3). Не хардкодить отдельным числом —
   /// расхождение с `LevelMap` даёт `LevelMap.levelAt` assertion-краш при
   /// холодном старте (см. hotfix 2026-07-11).
   static int get _parts => RoninParts.parts.length;

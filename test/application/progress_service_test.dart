@@ -4,8 +4,8 @@ import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 
 /// Число деталей N и последний валидный индекс уровня — тот же единый источник
-/// истины, что и в `ProgressService` (`RoninParts.parts.length`, Ронин-1/01 T3,
-/// было `ShipParts.parts.length`), чтобы тест не разошёлся с реальным контентом
+/// истины, что и в `ProgressService` (`RoninParts.parts.length`, Ронин-1/01 T3),
+/// чтобы тест не разошёлся с реальным контентом
 /// при его росте/сокращении (см. hotfix 2026-07-11).
 final _parts = RoninParts.parts.length;
 final _maxLevel = _parts - 1;

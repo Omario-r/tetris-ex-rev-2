@@ -99,11 +99,7 @@ void main() {
       const cs = 34.0;
       const fieldW = 340, fieldH = 476;
       final part = RoninParts.byId('bridge_c');
-      final prepared = prepareLevel(
-        part.mask,
-        SliceConfig.bigPieces,
-        seed: part.seed,
-      );
+      final prepared = prepareLevel(part.mask, seed: part.seed);
       final placedId = prepared.slice.solution.keys.first;
       final state = PackState(
         silhouette: prepared.silhouette,

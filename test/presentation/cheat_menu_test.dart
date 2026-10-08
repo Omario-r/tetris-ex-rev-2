@@ -3,12 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:explosive_tetris/application/progress_service.dart';
-import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
+import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/presentation/screens/cheat_menu.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/ship_render/ship_composite_painter.dart';
-import 'package:explosive_tetris/presentation/widgets/ship.dart';
+
+/// Число деталей корабля = число уровней (единый источник — `RoninParts`).
+final int _partCount = RoninParts.parts.length;
 
 ShipCompositePainter _shipPainter(WidgetTester tester) => tester
     .widgetList<CustomPaint>(find.byType(CustomPaint))
@@ -32,10 +34,7 @@ int _trayPieceCount() => find
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() {
-    SharedPreferences.setMockInitialValues({});
-    GameScreen.sliceConfig = SliceConfig.bigPieces;
-  });
+  tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   Future<void> pumpGame(WidgetTester tester, {int level = 0}) async {
     tester.view.physicalSize = const Size(1200, 1600);
@@ -54,7 +53,7 @@ void main() {
     await _pumpFrames(tester);
 
     expect(find.byType(CheatMenu), findsOneWidget);
-    for (int n = 0; n <= kShipPartCount; n++) {
+    for (int n = 0; n <= _partCount; n++) {
       expect(find.byKey(Key('cheat_ship_parts_$n')), findsOneWidget);
     }
   });
@@ -73,17 +72,17 @@ void main() {
     expect(find.byKey(const Key('cheat_open_prototype')), findsNothing);
   });
 
-  testWidgets('Чит «выбор уровня» предлагает ровно kShipPartCount уровней',
+  testWidgets('Чит «выбор уровня» предлагает ровно по числу деталей уровней',
       (tester) async {
     await pumpGame(tester);
 
     await tester.tap(find.byKey(const Key('cheat_button')));
     await _pumpFrames(tester);
 
-    for (int i = 0; i < kShipPartCount; i++) {
+    for (int i = 0; i < _partCount; i++) {
       expect(find.byKey(Key('cheat_level_$i')), findsOneWidget);
     }
-    expect(find.byKey(Key('cheat_level_$kShipPartCount')), findsNothing);
+    expect(find.byKey(Key('cheat_level_$_partCount')), findsNothing);
   });
 
   testWidgets('Чит «состояние корабля»: N=2 → прогресс=2 → корабль 2/N',
@@ -111,7 +110,7 @@ void main() {
     await tester.tap(find.byKey(const Key('cheat_button')));
     await _pumpFrames(tester);
 
-    final last = Key('cheat_ship_parts_$kShipPartCount');
+    final last = Key('cheat_ship_parts_$_partCount');
     await tester.scrollUntilVisible(
       find.byKey(last),
       200.0,
@@ -120,12 +119,12 @@ void main() {
     await tester.tap(find.byKey(last));
     await _pumpFrames(tester, const Duration(seconds: 2));
 
-    expect(await ProgressService().getCollectedCount(), kShipPartCount);
+    expect(await ProgressService().getCollectedCount(), _partCount);
 
     await tester.tap(find.byKey(const Key('ship_button')));
     await _pumpFrames(tester);
-    expect(_shipPainter(tester).collectedCount, kShipPartCount);
-    expect(find.text('$kShipPartCount / $kShipPartCount'), findsOneWidget);
+    expect(_shipPainter(tester).collectedCount, _partCount);
+    expect(find.text('$_partCount / $_partCount'), findsOneWidget);
   });
 
   testWidgets('Чит «выбор уровня» прогресс не меняет', (tester) async {
@@ -153,7 +152,7 @@ void main() {
 
     final game = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(game.levelIndex, 2);
-    expect(find.text('ДЕТАЛЬ 3 / $kShipPartCount'), findsOneWidget);
+    expect(find.text('ДЕТАЛЬ 3 / $_partCount'), findsOneWidget);
   });
 
   testWidgets(
@@ -236,87 +235,5 @@ void main() {
     expect(find.byKey(const Key('done_next_button')), findsOneWidget);
     expect(find.byKey(const Key('done_to_ship_button')), findsOneWidget);
     expect(await ProgressService().getCollectedCount(), 1);
-  });
-
-  group('Секция «Нарезка: калибровка»', () {
-    Future<void> pumpMenu(
-      WidgetTester tester, {
-      required SliceConfig current,
-      required ValueChanged<SliceConfig> onSet,
-    }) async {
-      tester.view.physicalSize = const Size(1200, 1600);
-      tester.view.devicePixelRatio = 1.0;
-      addTearDown(tester.view.resetPhysicalSize);
-      await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            body: CheatMenu(
-              onSelectLevel: (_) {},
-              onInstantWin: () {},
-              onSetShipParts: (_) {},
-              feedMode: FeedMode.fullSet,
-              onSetFeedMode: (_) {},
-              onReshuffle: () {},
-              onSolve: () {},
-              sliceConfig: current,
-              onSetSliceConfig: onSet,
-            ),
-          ),
-        ),
-      );
-    }
-
-    const labels = {
-      SliceConfig.bigPieces: 'Крупные куски',
-      SliceConfig.spikyPieces: 'Колючие куски',
-    };
-
-    testWidgets(
-      'кнопки в порядке SliceConfig.values, текущая отмечена «✓ »',
-      (tester) async {
-        for (final current in SliceConfig.values) {
-          await pumpMenu(tester, current: current, onSet: (_) {});
-          expect(find.text('Нарезка: калибровка'), findsOneWidget);
-          for (final config in SliceConfig.values) {
-            final button = find.byKey(Key('slice_config_${config.name}'));
-            expect(button, findsOneWidget);
-            final label = labels[config]!;
-            expect(
-              find.descendant(
-                of: button,
-                matching: find.text(config == current ? '✓ $label' : label),
-              ),
-              findsOneWidget,
-              reason: '$config при текущей $current',
-            );
-          }
-        }
-        // Порядок кнопок слева направо — как у SliceConfig.values.
-        final xs = [
-          for (final c in SliceConfig.values)
-            tester.getTopLeft(find.byKey(Key('slice_config_${c.name}'))).dx,
-        ];
-        expect(xs, orderedEquals([...xs]..sort()));
-      },
-    );
-
-    testWidgets('две кнопки нарезки, подпись «Колючие куски»', (tester) async {
-      await pumpMenu(tester, current: SliceConfig.bigPieces, onSet: (_) {});
-      expect(SliceConfig.values.length, 2);
-      expect(find.byKey(const Key('slice_config_bigPieces')), findsOneWidget);
-      expect(find.byKey(const Key('slice_config_spikyPieces')), findsOneWidget);
-      expect(find.text('Колючие куски'), findsOneWidget);
-    });
-
-    testWidgets('тап по кнопке отдаёт в колбэк выбранную конфигурацию', (
-      tester,
-    ) async {
-      final picked = <SliceConfig>[];
-      await pumpMenu(tester, current: SliceConfig.bigPieces, onSet: picked.add);
-      for (final config in SliceConfig.values) {
-        await tester.tap(find.byKey(Key('slice_config_${config.name}')));
-      }
-      expect(picked, SliceConfig.values);
-    });
   });
 }

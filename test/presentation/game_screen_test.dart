@@ -9,7 +9,6 @@ import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/theme/block_material.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
-import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
 /// Прокачивает кадры без `pumpAndSettle` — `GameScreen` держит пульс-контроллер
 /// (`AnimationController.repeat`), который не settle-ится.
@@ -21,10 +20,7 @@ Future<void> _pumpFrames(WidgetTester tester,
 
 void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
-  tearDown(() {
-    SharedPreferences.setMockInitialValues({});
-    GameScreen.sliceConfig = SliceConfig.bigPieces;
-  });
+  tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   Future<void> pumpGame(WidgetTester tester, {int level = 0}) async {
     tester.view.physicalSize = const Size(1200, 1600);
@@ -39,13 +35,6 @@ void main() {
       .map((cp) => cp.painter)
       .whereType<PackingPainter>()
       .single;
-
-  Future<void> pickSliceConfig(WidgetTester tester, SliceConfig config) async {
-    await tester.tap(find.byKey(const Key('cheat_button')));
-    await _pumpFrames(tester);
-    await tester.tap(find.byKey(Key('slice_config_${config.name}')));
-    await _pumpFrames(tester);
-  }
 
   group('GameScreen — ядро укладки', () {
     testWidgets('строится без ошибок, рисует укладку (PackingPainter)',
@@ -66,7 +55,7 @@ void main() {
         'топбар: «ДЕТАЛЬ 1 / N» + название детали на уровне 0',
         (tester) async {
       await pumpGame(tester);
-      expect(find.text('ДЕТАЛЬ 1 / $kShipPartCount'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1 / ${RoninParts.parts.length}'), findsOneWidget);
       // Уровень 0 ↔ деталь order 1 (`RoninParts.parts[0]`) — «Нос».
       expect(find.text('НОС'), findsOneWidget);
     });
@@ -226,7 +215,7 @@ void main() {
       await _pumpFrames(tester);
 
       expect(find.byType(ShipScreen), findsOneWidget);
-      expect(find.text('1 / $kShipPartCount'), findsOneWidget);
+      expect(find.text('1 / ${RoninParts.parts.length}'), findsOneWidget);
       expect(find.byKey(const Key('ship_back_button')), findsNothing);
 
       await tester.tap(find.byKey(const Key('ship_continue_button')));
@@ -305,7 +294,6 @@ void main() {
   group('GameScreen — лоток и очистка поля (Ронин-1/08 T2)', () {
     PreparedLevel level0() => prepareLevel(
       RoninParts.parts[0].mask,
-      SliceConfig.bigPieces,
       seed: RoninParts.parts[0].seed,
     );
 
@@ -488,7 +476,6 @@ void main() {
 
     PreparedLevel level0() => prepareLevel(
       RoninParts.parts[0].mask,
-      SliceConfig.bigPieces,
       seed: RoninParts.parts[0].seed,
     );
 
@@ -728,32 +715,30 @@ void main() {
     });
   });
 
-  group('GameScreen — конфигурации нарезки (Ронин-1/07)', () {
-    testWidgets('по умолчанию bigPieces: поле 10×14, клетка 34, число кусков '
-        'из prepareLevel', (tester) async {
+  group('GameScreen — нарезка «Крупные куски» (Ронин-1/07)', () {
+    testWidgets('поле 10×14, клетка 34, число кусков из prepareLevel', (
+      tester,
+    ) async {
       await pumpGame(tester);
       final painter = packingPainter(tester);
-      expect(GameScreen.sliceConfig, SliceConfig.bigPieces);
       expect(painter.state.silhouette.width, 10);
       expect(painter.state.silhouette.height, 14);
       expect(painter.cellSize, 34.0);
 
       final expected = prepareLevel(
         RoninParts.parts[0].mask,
-        SliceConfig.bigPieces,
         seed: RoninParts.parts[0].seed,
       ).slice.pieces.length;
       expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
     });
 
-    testWidgets('выбор конфигурации сохраняет seed; «Пересобрать» его меняет', (
+    testWidgets('«Пересобрать» сдвигает seed и меняет нарезку', (
       tester,
     ) async {
       await pumpGame(tester);
       List<String> sig(int seed) => [
         for (final p in prepareLevel(
           RoninParts.parts[0].mask,
-          SliceConfig.bigPieces,
           seed: seed,
         ).slice.pieces)
           p.cells.map((c) => '${c.x},${c.y}').join(';'),
@@ -767,8 +752,7 @@ void main() {
       await _pumpFrames(tester);
       await tester.tap(find.byKey(const Key('cheat_reshuffle')));
       await _pumpFrames(tester);
-      await pickSliceConfig(tester, SliceConfig.bigPieces);
-      // сдвиг seed остался +1 (reshuffle) — выбор конфигурации его не сбросил.
+      // сдвиг seed +1 (один reshuffle).
       expect([
         for (final p in packingPainter(tester).state.pieces)
           p.cells.map((c) => '${c.x},${c.y}').join(';'),
@@ -776,36 +760,33 @@ void main() {
     });
 
     testWidgets(
-      'лоток не выше 160 px на всех деталях во всех конфигурациях',
+      'лоток не выше 160 px на всех деталях',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 1600);
         tester.view.devicePixelRatio = 1.0;
         addTearDown(tester.view.resetPhysicalSize);
-        for (final config in SliceConfig.values) {
-          GameScreen.sliceConfig = config;
-          for (var i = 0; i < RoninParts.parts.length; i++) {
-            await tester.pumpWidget(
-              MaterialApp(
-                home: GameScreen(key: ValueKey('$config$i'), levelIndex: i),
-              ),
+        for (var i = 0; i < RoninParts.parts.length; i++) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: GameScreen(key: ValueKey('part$i'), levelIndex: i),
+            ),
+          );
+          await tester.pump();
+          final pieces = find.byWidgetPredicate(
+            (w) =>
+                w.key is ValueKey<String> &&
+                (w.key as ValueKey<String>).value.startsWith('tray_piece_'),
+          );
+          expect(pieces, findsWidgets);
+          for (final e in pieces.evaluate()) {
+            final size = tester.getSize(
+              find.byElementPredicate((x) => x == e),
             );
-            await tester.pump();
-            final pieces = find.byWidgetPredicate(
-              (w) =>
-                  w.key is ValueKey<String> &&
-                  (w.key as ValueKey<String>).value.startsWith('tray_piece_'),
+            expect(
+              size.height,
+              lessThanOrEqualTo(160.0 + 0.001),
+              reason: 'деталь ${i + 1}',
             );
-            expect(pieces, findsWidgets);
-            for (final e in pieces.evaluate()) {
-              final size = tester.getSize(
-                find.byElementPredicate((x) => x == e),
-              );
-              expect(
-                size.height,
-                lessThanOrEqualTo(160.0 + 0.001),
-                reason: '$config деталь ${i + 1}',
-              );
-            }
           }
         }
       },
