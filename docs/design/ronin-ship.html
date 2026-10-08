@@ -69,7 +69,7 @@
       <div class="safe"></div>
       <div class="dtop">
         <div class="iconbtn">≡</div>
-        <div class="t"><div class="k">РОНИН · СБОРКА</div><div class="n" id="hud">0 / 13</div></div>
+        <div class="t"><div class="k">РОНИН · СБОРКА</div><div class="n" id="hud">0 / 16</div></div>
         <div class="iconbtn">⤢</div>
       </div>
       <div class="shipstage"><canvas id="ship"></canvas></div>
@@ -81,14 +81,14 @@
   <div class="card">
     <h2>ПРОГРЕСС СБОРКИ</h2>
     <div class="ctl">
-      <input id="slider" type="range" min="0" max="13" value="3" step="1">
-      <div class="val" id="val">3 / 13</div>
+      <input id="slider" type="range" min="0" max="16" value="3" step="1">
+      <div class="val" id="val">3 / 16</div>
     </div>
     <div class="now" id="now"></div>
     <div class="note">
-      <b>Что видно первым.</b> Порядок парами сверху вниз: половинки носа, затем визор
-      мостика и его борта, затем носовой пояс — сначала у киля, потом скулы. Пара
-      идёт подряд, чтобы симметричный объект достраивался сразу и не висел половиной.<br><br>
+      <b>Что видно первым.</b> Сверху вниз: четыре детали носа, затем визор и
+      борта мостика, затем носовой пояс. Каждая деталь прирастает к уже собранному;
+      порядок внутри секции задаёт рамп сложности, а не симметрия.<br><br>
       <b>Сетку клеток на корабле не рисуем</b> — швы даёт сам рисунок. Разделители клеток
       живут только на поле укладки (решение PO 2026-07-28).
     </div>
@@ -124,6 +124,7 @@ function render(n){
     : 'ничего не собрано — виден только контур борта';
 }
 const slider = document.getElementById('slider');
+slider.max = P.parts.length;
 slider.addEventListener('input', () => render(+slider.value));
 render(+slider.value);
 })();

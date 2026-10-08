@@ -4,8 +4,26 @@
     {
       "name": "flutter-web",
       "runtimeExecutable": "flutter",
-      "runtimeArgs": ["run", "-d", "web-server", "--web-port", "5959"],
+      "runtimeArgs": [
+        "run",
+        "-d",
+        "web-server",
+        "--web-port",
+        "5959"
+      ],
       "port": 5959
+    },
+    {
+      "name": "design-mockups",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "5960",
+        "--directory",
+        "docs/design"
+      ],
+      "port": 5960
     }
   ]
 }
