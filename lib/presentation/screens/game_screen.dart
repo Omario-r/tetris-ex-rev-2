@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 
 import '../../application/progress_service.dart';
@@ -84,9 +85,10 @@ class _GameScreenState extends State<GameScreen>
   static const double _trayCellCanon = 32.0;
   static const double _trayRowMaxHeight = 160.0;
 
-  /// Офсет кусочка над пальцем при drag (`el-piece-drag`, риск drag-UX эпика):
-  /// кусок рисуется на столько пикселей выше точки касания.
-  static const double _dragLiftPx = 56.0;
+  /// Зазор между нижним краем поднятого куска и пальцем (`el-piece-drag`,
+  /// канон `DESIGN.md`: «офсет ~1 клетка вверх», по центру X; Ронин-1/08 T3).
+  /// Подбирается на устройстве. Геометрия — [_dragPieceRect].
+  static const double _dragLiftGap = 32.0;
 
   /// Паддинг панели поля (канон `.board` мокапа, `ukladka-field.html:85-86`):
   /// отступ между рамкой панели и сеткой силуэта на каждую сторону — вокруг
@@ -124,6 +126,20 @@ class _GameScreenState extends State<GameScreen>
   int? _dragPieceId;
   bool _dragFromTray = false;
   Offset? _dragGlobalPos;
+
+  // --- Кандидат захвата с лотка (Ронин-1/08 T3): касание куска лотка драг
+  // не стартует сразу — направление решает, поднять кусок или листать лоток
+  // (см. [_onTrayPointerMove]) ---
+  int? _candidateId;
+  Offset? _candidateDown;
+
+  /// Позиция прокрутки лотка в момент касания кандидата — к ней лоток
+  /// возвращается при старте драга (вертикальный жест лоток не листает).
+  double? _candidateTrayOffset;
+
+  /// Прокрутка ряда кусков лотка: нужна, чтобы на старте драга с лотка
+  /// остановить начатую прокрутку (см. [_freezeTrayScroll]).
+  final ScrollController _trayScroll = ScrollController();
 
   /// Текущий размер клетки поля — обновляется в `build` (адаптивный), нужен
   /// pointer-обработчикам (они работают вне `build`).
@@ -189,6 +205,7 @@ class _GameScreenState extends State<GameScreen>
   @override
   void dispose() {
     _pulseController.dispose();
+    _trayScroll.dispose();
     super.dispose();
   }
 
@@ -334,6 +351,7 @@ class _GameScreenState extends State<GameScreen>
       _dragPieceId = null;
       _dragGlobalPos = null;
       _dragFromTray = false;
+      _resetCandidate();
       _rebuild();
     });
   }
@@ -406,6 +424,78 @@ class _GameScreenState extends State<GameScreen>
     setState(() => _dragGlobalPos = globalPos);
   }
 
+  // --- Захват с лотка по направлению (Ронин-1/08 T3) ---
+  //
+  // `Listener` в арене жестов не участвует, поэтому горизонтальный
+  // drag-recognizer прокрутки лотка (`SingleChildScrollView`) выигрывает арену
+  // по умолчанию сразу на касании и листает лоток. Касание куска лишь
+  // запоминает кандидата; движение дальше `kTouchSlop` решает: вверх/вниз
+  // (|dy| ≥ |dx|) — драг куска, вбок — кандидат сброшен, жест остаётся
+  // прокрутке.
+
+  void _onTrayPointerDown(int id, PointerDownEvent event) {
+    if (_dragPieceId != null) return;
+    _candidateId = id;
+    _candidateDown = event.position;
+    _candidateTrayOffset =
+        _trayScroll.hasClients ? _trayScroll.position.pixels : null;
+  }
+
+  void _onTrayPointerMove(PointerMoveEvent event) {
+    if (_dragPieceId != null) {
+      _onDragUpdate(event.position);
+      return;
+    }
+    final id = _candidateId;
+    final down = _candidateDown;
+    if (id == null || down == null) return;
+    final d = event.position - down;
+    if (d.distance <= kTouchSlop) return;
+    if (d.dy.abs() >= d.dx.abs()) {
+      _freezeTrayScroll();
+      _resetCandidate();
+      _startDrag(id, fromTray: true, globalPos: event.position);
+    } else {
+      // Горизонталь — жест прокрутки лотка; в этом касании драг не стартует.
+      _resetCandidate();
+    }
+  }
+
+  void _onTrayPointerUp(PointerUpEvent event) {
+    if (_dragPieceId != null) {
+      _endDrag();
+    } else {
+      _resetCandidate();
+    }
+  }
+
+  void _onTrayPointerCancel(PointerCancelEvent event) {
+    _resetCandidate();
+    _cancelDrag();
+  }
+
+  void _resetCandidate() {
+    _candidateId = null;
+    _candidateDown = null;
+    _candidateTrayOffset = null;
+  }
+
+  /// Старт драга с лотка: лоток после этого не листается. Прокрутка уже
+  /// захватила это касание (выиграла арену на касании); `jumpTo` начинает у
+  /// позиции новую активность — текущий drag прокрутки утилизируется, и
+  /// дальнейшие движения/отпускание этого пальца лоток не двигают (и не
+  /// бросают инерцией). Позиция — та, что была на касании: сдвиг лотка в
+  /// пределах slop откатывается. `Listener` куска события не теряет — путь
+  /// hit-test закреплён на касании.
+  void _freezeTrayScroll() {
+    if (!_trayScroll.hasClients) return;
+    final position = _trayScroll.position;
+    final target = (_candidateTrayOffset ?? position.pixels)
+        .clamp(position.minScrollExtent, position.maxScrollExtent)
+        .toDouble();
+    position.jumpTo(target);
+  }
+
   void _onBoardPointerDown(PointerDownEvent event) {
     final local = _globalToLocal(_boardKey, event.position);
     if (local == null) return;
@@ -454,21 +544,36 @@ class _GameScreenState extends State<GameScreen>
     if (_controller.state.isComplete) _onPackingComplete();
   }
 
-  /// Клетка поля под верх-левым углом всплывшего куска (`pointer` минус
-  /// офсет подъёма), либо `null`, если точка вне поля.
+  /// Прямоугольник поднятого куска (глобальные координаты) при пальце в
+  /// [pointer]: размер — клетка поля × габарит куска в клетках, по центру X
+  /// относительно пальца, нижний край выше пальца на [_dragLiftGap]. Единый
+  /// расчёт для отрисовки ([_buildFeedback]) и якоря укладки/превью
+  /// ([_anchorAt]) — они не расходятся.
+  Rect _dragPieceRect(Offset pointer, PackPiece piece) {
+    final size = _pieceBoundsPx(piece, _cellSize);
+    return Rect.fromLTWH(
+      pointer.dx - size.width / 2,
+      pointer.dy - _dragLiftGap - size.height,
+      size.width,
+      size.height,
+    );
+  }
+
+  /// Якорь укладки тащимого куска: клетка поля, ближайшая к левому верхнему
+  /// углу [_dragPieceRect] (округление), либо `null`, если эта клетка вне
+  /// поля. Им пользуются и снап-превью, и `_endDrag`.
   ({int x, int y})? _anchorAt(Offset? pointer) {
-    final visual = pointer?.translate(0, -_dragLiftPx);
-    final local = visual == null ? null : _globalToLocal(_boardKey, visual);
+    final pieceId = _dragPieceId;
+    if (pointer == null || pieceId == null) return null;
+    final topLeft = _dragPieceRect(pointer, _pieceById(pieceId)).topLeft;
+    final local = _globalToLocal(_boardKey, topLeft);
     if (local == null) return null;
-    final boardWpx = _silhouette.width * _cellSize;
-    final boardHpx = _silhouette.height * _cellSize;
-    if (local.dx < 0 ||
-        local.dx >= boardWpx ||
-        local.dy < 0 ||
-        local.dy >= boardHpx) {
+    final x = (local.dx / _cellSize).round();
+    final y = (local.dy / _cellSize).round();
+    if (x < 0 || x >= _silhouette.width || y < 0 || y >= _silhouette.height) {
       return null;
     }
-    return (x: (local.dx / _cellSize).floor(), y: (local.dy / _cellSize).floor());
+    return (x: x, y: y);
   }
 
   /// Живое снап-превью: клетки поля под текущим якорем + валидность
@@ -805,6 +910,7 @@ class _GameScreenState extends State<GameScreen>
           SizedBox(
             height: _trayRowMaxHeight,
             child: SingleChildScrollView(
+              controller: _trayScroll,
               scrollDirection: Axis.horizontal,
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -815,15 +921,11 @@ class _GameScreenState extends State<GameScreen>
                         padding: const EdgeInsets.only(right: 12.0),
                         child: Listener(
                           key: Key('tray_piece_$id'),
-                          onPointerDown: (event) => _startDrag(
-                            id,
-                            fromTray: true,
-                            globalPos: event.position,
-                          ),
-                          onPointerMove: (event) =>
-                              _onDragUpdate(event.position),
-                          onPointerUp: (_) => _endDrag(),
-                          onPointerCancel: (_) => _cancelDrag(),
+                          onPointerDown: (event) =>
+                              _onTrayPointerDown(id, event),
+                          onPointerMove: _onTrayPointerMove,
+                          onPointerUp: _onTrayPointerUp,
+                          onPointerCancel: _onTrayPointerCancel,
                           child: CustomPaint(
                             size: _pieceBoundsPx(_pieceById(id), _trayCellSize),
                             painter: _PieceCellsPainter(
@@ -867,12 +969,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildFeedback(double cellSize) {
+    final piece = _pieceById(_dragPieceId!);
     final local = _globalToLocal(
       _stackKey,
-      _dragGlobalPos!.translate(0, -_dragLiftPx),
+      _dragPieceRect(_dragGlobalPos!, piece).topLeft,
     );
     if (local == null) return const SizedBox.shrink();
-    final piece = _pieceById(_dragPieceId!);
     return Positioned(
       left: local.dx,
       top: local.dy,

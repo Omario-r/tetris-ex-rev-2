@@ -251,18 +251,8 @@ void main() {
         if (c.y + 1 > h) h = c.y + 1;
       }
 
-      // Скан по полю с зажатым пальцем может подвинуть прокрутку лотка —
-      // вернуть её в начало, чтобы кусок лежал под пальцем.
-      tester
-          .state<ScrollableState>(
-            find.descendant(
-              of: find.byKey(const Key('packing_tray')),
-              matching: find.byType(Scrollable),
-            ),
-          )
-          .position
-          .jumpTo(0);
-      await tester.pump();
+      // Прокрутку лотка не сбрасываем: после старта драга лоток не листается
+      // (Ронин-1/08 T3), скан по полю с зажатым пальцем её не двигает.
       final gesture = await tester.startGesture(
         tester.getCenter(find.byKey(Key('tray_piece_$id'))),
       );
@@ -382,6 +372,252 @@ void main() {
       // Дать отработать отложенному мета-потоку победы.
       await tester.pump(const Duration(milliseconds: 1000));
       await _pumpFrames(tester);
+    });
+  });
+
+  group('GameScreen — захват с лотка и кусок над пальцем (Ронин-1/08 T3)', () {
+    /// Зазор между нижним краем поднятого куска и пальцем — `_dragLiftGap`.
+    const liftGap = 32.0;
+
+    PreparedLevel level0() => prepareLevel(
+      RoninParts.parts[0].mask,
+      SliceConfig.bigPieces,
+      seed: 0,
+    );
+
+    /// Узкий экран: ряд лотка не помещается и листается; клетка поля — 34.
+    Future<void> pumpNarrow(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pump();
+    }
+
+    ScrollPosition trayScroll(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byKey(const Key('packing_tray')),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position;
+
+    Finder feedback() => find.byKey(const Key('packing_drag_feedback'));
+
+    Offset boardOrigin(WidgetTester tester) => tester.getTopLeft(
+      find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PackingPainter,
+      ),
+    );
+
+    ({int w, int h}) dims(PreparedLevel level, int id) {
+      final piece = level.slice.pieces.firstWhere((p) => p.id == id);
+      var w = 0;
+      var h = 0;
+      for (final c in piece.cells) {
+        if (c.x + 1 > w) w = c.x + 1;
+        if (c.y + 1 > h) h = c.y + 1;
+      }
+      return (w: w, h: h);
+    }
+
+    Set<String> cellsAt(PreparedLevel level, int id, ({int x, int y}) at) => {
+      for (final c in level.slice.pieces.firstWhere((p) => p.id == id).cells)
+        '${at.x + c.x},${at.y + c.y}',
+    };
+
+    /// Точка пальца, при которой левый верхний угол поднятого куска (центр X
+    /// по пальцу, низ выше пальца на [liftGap]) лежит у клетки [at] со
+    /// сдвигом 0.3 клетки — округление якоря должно вернуть ровно [at].
+    Offset pointerFor(
+      WidgetTester tester,
+      PreparedLevel level,
+      int id,
+      ({int x, int y}) at,
+    ) {
+      final origin = boardOrigin(tester);
+      final cell = packingPainter(tester).cellSize;
+      final d = dims(level, id);
+      final left = origin.dx + at.x * cell + 0.3 * cell;
+      final top = origin.dy + at.y * cell - 0.3 * cell;
+      return Offset(left + d.w * cell / 2, top + d.h * cell + liftGap);
+    }
+
+    void expectAboveFinger(WidgetTester tester, Offset finger, String why) {
+      final rect = tester.getRect(feedback());
+      expect(rect.center.dx, closeTo(finger.dx, 0.01), reason: why);
+      expect(rect.bottom, closeTo(finger.dy - liftGap, 0.01), reason: why);
+      expect(rect.contains(finger), isFalse, reason: why);
+    }
+
+    testWidgets('горизонтальный свайп с куска листает лоток и кусок не '
+        'поднимает; вверх в том же касании — тоже нет', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final scroll = trayScroll(tester);
+      expect(scroll.maxScrollExtent, greaterThan(0.0),
+          reason: 'ряд лотка должен листаться на узком экране');
+      expect(scroll.pixels, 0.0);
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_${level.trayOrder[0]}'))),
+      );
+      for (var i = 0; i < 12; i++) {
+        await gesture.moveBy(const Offset(-10, 0));
+        await tester.pump();
+        expect(feedback(), findsNothing, reason: 'шаг $i');
+      }
+      expect(scroll.pixels, greaterThan(0.0), reason: 'лоток пролистан');
+
+      for (var i = 0; i < 4; i++) {
+        await gesture.moveBy(const Offset(0, -30));
+        await tester.pump();
+        expect(feedback(), findsNothing);
+      }
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+      expect(packingPainter(tester).state.placements, isEmpty);
+      expect(
+        find.byKey(Key('tray_piece_${level.trayOrder[0]}')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('вертикальный жест поднимает кусок: он над пальцем, превью и '
+        'укладка — по формуле; лоток во время драга не листается',
+        (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = level.trayOrder[0];
+      final target = level.slice.solution[id]!;
+      final scroll = trayScroll(tester);
+      final scrollBefore = scroll.pixels;
+
+      final start = tester.getCenter(find.byKey(Key('tray_piece_$id')));
+      final gesture = await tester.startGesture(start);
+      await gesture.moveBy(const Offset(-6, -24));
+      await tester.pump();
+      expect(feedback(), findsOneWidget, reason: 'драг начался');
+      expectAboveFinger(tester, start + const Offset(-6, -24), 'после подъёма');
+
+      // Горизонталь зажатым пальцем — лоток стоит.
+      await gesture.moveBy(const Offset(-90, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(150, 0));
+      await tester.pump();
+      expect(scroll.pixels, scrollBefore);
+
+      final finger = pointerFor(tester, level, id, target);
+      await gesture.moveTo(finger);
+      await tester.pump();
+      expectAboveFinger(tester, finger, 'над полем');
+      final pv = packingPainter(tester).dragPreview!;
+      expect(pv.valid, isTrue);
+      expect({for (final c in pv.cells) '${c.x},${c.y}'},
+          cellsAt(level, id, target));
+
+      await gesture.up();
+      await tester.pump();
+      expect(feedback(), findsNothing);
+      expect(packingPainter(tester).state.placements[id], target);
+      expect(scroll.pixels, scrollBefore);
+    });
+
+    testWidgets('регрессия «непрерывный жест»: кусок идёт за каждым шагом '
+        'пальца и укладывается одним касанием', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = level.trayOrder[0];
+      final target = level.slice.solution[id]!;
+
+      var finger = tester.getCenter(find.byKey(Key('tray_piece_$id')));
+      final gesture = await tester.startGesture(finger);
+      Future<void> step(Offset by) async {
+        finger += by;
+        await gesture.moveBy(by);
+        await tester.pump();
+      }
+
+      // До slop — кандидат, куска над пальцем ещё нет.
+      await step(const Offset(2, -6));
+      expect(feedback(), findsNothing);
+      await step(const Offset(-3, -8));
+      expect(feedback(), findsNothing);
+      // Дальше — драг; вверх и вбок вперемешку.
+      const path = [
+        Offset(4, -12),
+        Offset(-15, -20),
+        Offset(25, -18),
+        Offset(-40, -10),
+        Offset(30, -25),
+        Offset(-12, -30),
+        Offset(18, 5),
+        Offset(-22, -16),
+      ];
+      for (var i = 0; i < path.length; i++) {
+        await step(path[i]);
+        expect(feedback(), findsOneWidget, reason: 'шаг $i');
+        expectAboveFinger(tester, finger, 'шаг $i');
+      }
+      final to = pointerFor(tester, level, id, target);
+      final from = finger;
+      for (var i = 1; i <= 10; i++) {
+        await step(Offset.lerp(from, to, i / 10)! - finger);
+        expectAboveFinger(tester, finger, 'подход $i');
+      }
+      await gesture.up();
+      await tester.pump();
+      expect(packingPainter(tester).state.placements[id], target);
+      expect(find.textContaining('уложено 1 / '), findsOneWidget);
+    });
+
+    testWidgets('кусок, перекладываемый с поля, — та же геометрия',
+        (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = level.trayOrder[0];
+      final target = level.slice.solution[id]!;
+
+      // Уложить кусок в эталонную клетку.
+      final lift = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_$id'))),
+      );
+      await lift.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await lift.moveTo(pointerFor(tester, level, id, target));
+      await tester.pump();
+      await lift.up();
+      await tester.pump();
+      expect(packingPainter(tester).state.placements[id], target);
+
+      // Взять его с поля за одну из клеток: захват сразу, кусок над пальцем.
+      final piece = level.slice.pieces.firstWhere((p) => p.id == id);
+      final cell = packingPainter(tester).cellSize;
+      final origin = boardOrigin(tester);
+      final c0 = piece.cells.first;
+      final grab = origin +
+          Offset(
+            (target.x + c0.x + 0.5) * cell,
+            (target.y + c0.y + 0.5) * cell,
+          );
+      final gesture = await tester.startGesture(grab);
+      await tester.pump();
+      expect(feedback(), findsOneWidget);
+      expectAboveFinger(tester, grab, 'на захвате с поля');
+
+      final finger = pointerFor(tester, level, id, target);
+      await gesture.moveTo(finger);
+      await tester.pump();
+      expectAboveFinger(tester, finger, 'перекладка');
+      final pv = packingPainter(tester).dragPreview!;
+      expect(pv.valid, isTrue);
+      expect({for (final c in pv.cells) '${c.x},${c.y}'},
+          cellsAt(level, id, target));
+      await gesture.up();
+      await tester.pump();
+      expect(packingPainter(tester).state.placements[id], target);
     });
   });
 
