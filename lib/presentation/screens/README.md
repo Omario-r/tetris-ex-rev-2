@@ -14,8 +14,8 @@
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
   Стори 02 T2). **Уровень строит `prepareLevel`**
   (Ронин-1/07 T2): `_rebuild()` зовёт `prepareLevel(RoninParts.parts[levelIndex].mask,
-  GameScreen.sliceConfig, seed: _seed)` и берёт `silhouette`, `cellScale`, `slice`. Поле —
-  10×14 (`bigPieces`/`halfPart`) или 5×7 (`coarseCell`); экран геометрию поля не выводит,
+  GameScreen.sliceConfig, seed: _seed)` и берёт `silhouette`, `slice`. Поле —
+  10×14; экран геометрию поля не выводит,
   читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Материал уложенных
   клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все 13 деталей (Ронин-1/01
   T3, было `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)`: 7-элементная карта
@@ -36,8 +36,7 @@
 - Размер клетки поля — **адаптивный**: `_computeCellSize(constraints, boardWidth, boardHeight)`
   = `max(8, min(34.0 канон, (maxHeight - 44 топбар - 34 прогресс - 132 лоток - 16 паддинг
   поля)/boardHeight, (maxWidth - 16 паддинг поля)/boardWidth))` (внутри
-  `LayoutBuilder`+`SafeArea`); канон 34px × `cellScale` (Ронин-1/07 T2: 68px у `coarseCell`, поле 5×7 — те же физические
-  размеры; `_cellScale` — из `PreparedLevel`) — поле 10×14 при клетке 34 (Ронин-1/01 T4, было 40px
+  `LayoutBuilder`+`SafeArea`); канон 34px — поле 10×14 при клетке 34 (Ронин-1/01 T4, было 40px
   под мелкие дев-силуэты ≤4×3), на коротких экранах клетка ужимается (нижний порог 8px).
   Клетка хранится в поле `_cellSize` (обновляется в `build`) — нужна pointer-обработчикам.
 - Панель поля — канон `.board` мокапа (`ukladka-field.html:85-86`, возврат Гейта 3 T2):
@@ -92,8 +91,8 @@
   Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
   `kDebugMode`. Секции: выбор уровня, мгновенная победа (мета-уровень, `_handleWin`),
   состояние корабля (N=0..`kShipPartCount`), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
-  — тумблер `FeedMode`), **нарезка: калибровка** (Ронин-1/07; три `ElevatedButton`
-  `Key('slice_config_<bigPieces|halfPart|coarseCell>')` в порядке `SliceConfig.values`, текущая —
+  — тумблер `FeedMode`), **нарезка: калибровка** (Ронин-1/07; по кнопке на значение
+  `Key('slice_config_<имя>')` (сейчас одна — `bigPieces`, «Крупные куски») в порядке `SliceConfig.values`, текущая —
   префикс «✓ »; перед секцией «Нарезка (dev)»), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
   — solve-хук). Зарядов взрыва и «Прототипа укладки» больше нет (выпил в Стори 02).
   `levelCount` по умолчанию `null` → `kShipPartCount` уровней.

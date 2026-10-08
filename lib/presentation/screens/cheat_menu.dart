@@ -139,10 +139,6 @@ class CheatMenu extends StatelessWidget {
     switch (config) {
       case SliceConfig.bigPieces:
         return 'Крупные куски';
-      case SliceConfig.halfPart:
-        return 'Полдетали';
-      case SliceConfig.coarseCell:
-        return 'Крупная клетка';
     }
   }
 

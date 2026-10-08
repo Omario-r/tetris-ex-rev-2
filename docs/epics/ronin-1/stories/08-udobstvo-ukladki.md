@@ -84,7 +84,7 @@
 
 ### T1 — Домен: варианты калибровки, перемешанный лоток, очистка поля
 
-- **Статус:** к выполнению
+- **Статус:** выполнена
 - **Рекомендованный агент:** Исполнитель · Claude (Sonnet, `ispolnitel`)
 - **Цель:** домен отдаёт перемешанный порядок лотка и умеет очищать поле;
   непринятых вариантов калибровки больше нет.
@@ -141,6 +141,19 @@
   по арх-дельте; общий чек-лист — `system/AGENT.md` п. 5. `docs/STATUS.md` не
   трогать. Не коммитить.
 - **Заметки по выполнению:**
+  - Выполнено по ТЗ. Удалены `halfPart`/`coarseCell`, `cellScale`, `_halfOf`/
+    `_coarsen`/`_maskOf`; `PreparedLevel.trayOrder` (shuffle + сдвиг при
+    совпадении с порядком id); `PackController.clear()` (+ `_fullOrder`).
+  - Вне модулей (п. 5): `cheat_menu.dart` (подписи удалённых), `game_screen.dart`
+    (`_cellScale` убран, канон клетки 34); `trayOrder` в `_rebuild()` экрана
+    остался `[for p in slice.pieces → id]` — переход на `prepared.trayOrder` в T2.
+  - Тесты: `slice_config_test` (проверки trayOrder: перестановка, не по id,
+    детерминирована; 13 деталей × seed 0..4), `pack_controller_test` (`clear`:
+    4 кейса), `game_screen_test` (кейс coarseCell удалён, кейс seed переписан на
+    `bigPieces`), `win_flow_test` (прогоны halfPart/coarseCell удалены),
+    `cheat_menu_test` (одна кнопка). Паспорта packing и screens, ARCHITECTURE
+    (арх-дельта) обновлены.
+  - Отклонений от ТЗ нет.
 
 ### T2 — Экран: перемешанный лоток, «Очистить поле», лоток фиксированного размера
 

@@ -20,7 +20,8 @@
   снапшот: `occupiedCells` (клетки уложенных кусочков в координатах силуэта),
   `isComplete` (силуэт покрыт полностью, без дыр и пересечений), `copyWith`.
 - `PackController(initial)` — `state`; `place(pieceId, atX, atY)`,
-  `move(pieceId, atX, atY)`, `remove(pieceId)` — все no-op при невалидной
+  `move(pieceId, atX, atY)`, `remove(pieceId)`, `clear()` (все уложенные — в лоток в исходном порядке; no-op на
+  пустом поле) — все no-op при невалидной
   команде; статик `PackController.canPlace(state, pieceId, atX, atY, {ignoreId})`
   — чистая функция валидации (внутри силуэта + без пересечений).
 - `slicePolyomino(silhouette, {seed})` → `PackSlice` — детерминированный
@@ -28,16 +29,17 @@
   клеток (полный бэктрекинг-DFS, порядок размеров [4,5,3]). `PackSlice` =
   `pieces` (id 0..N-1, cells нормализованы) + `solution` (`pieceId → origin` в
   силуэте; эталонная раскладка, доказывающая существование решения).
-- `slice_config.dart` — dev-калибровка нарезки (Ронин-1/07; после КТ-1 лишние
-  конфигурации удаляются): `enum SliceConfig { bigPieces, halfPart, coarseCell }`
-  (порядок = порядок кнопок чит-меню); `prepareLevel(partMask, config, {seed})` →
-  `PreparedLevel` (`fieldWidth/fieldHeight`, `silhouette` размера поля, `targetX/
-  targetY`, `cellScale` 1|2, `slice`). `bigPieces` — поле 10×14, нарезка 3..5 +
-  слияние соседних (5..12 клеток, 7–10 кусков); `halfPart` — связная половина
-  детали (`ceil(n/2)`, BFS), поле 10×14, куски 3..5, ≤ 11 кусков; `coarseCell` —
-  огрубление 2×2, поле 5×7, куски 3..5, ≤ 7 кусков. `mergeAdjacentPieces(
-  silhouette, base)` — публичное детерминированное слияние (два прохода: пары
-  нетронутых ≤ 10, затем остатки в любого соседа ≤ 12).
+- `slice_config.dart` — построение уровня из маски детали (Ронин-1/07, 08):
+  `enum SliceConfig { bigPieces }` (dev-переключатель вариантов слияния, порядок =
+  порядок кнопок чит-меню; стори 04 добавит второе значение);
+  `prepareLevel(partMask, config, {seed})` → `PreparedLevel` (`fieldWidth/
+  fieldHeight` = 10×14, `silhouette` размера поля, `targetX/targetY`, `slice`,
+  `trayOrder`). `bigPieces` — нарезка 3..5 + слияние соседних (5..12 клеток,
+  7–10 кусков). `trayOrder` (D-007) — перестановка id кусков от seed
+  (`shuffle(Random(seed*7919+17))`), никогда не равна порядку по возрастанию id
+  (порядок id = порядок решения; при `N >= 2` совпадение лечится сдвигом на 1).
+  `mergeAdjacentPieces(silhouette, base)` — публичное детерминированное слияние
+  (два прохода: пары нетронутых ≤ 10, затем остатки в любого соседа ≤ 12).
 
 ## Зависит от
 

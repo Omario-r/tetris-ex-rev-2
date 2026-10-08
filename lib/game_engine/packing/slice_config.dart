@@ -1,23 +1,17 @@
+import 'dart:math' as math;
+
 import '../models/target_mask.dart';
 import 'pack_piece.dart';
 import 'pack_slicer.dart';
 
-/// Конфигурация нарезки детали на кусочки (dev-калибровка Ронин-1/07).
+/// Конфигурация нарезки детали на кусочки (dev-переключатель вариантов
+/// слияния; стори 04 добавит второе значение).
 ///
-/// Порядок значений — порядок кнопок в чит-меню. После КТ-1 лишние
-/// конфигурации удаляются.
+/// Порядок значений — порядок кнопок в чит-меню.
 enum SliceConfig {
-  /// «Крупные куски»: деталь целиком, поле 10×14, клетка 34; нарезка 3..5,
-  /// затем слияние соседних кусков в 5..12 клеток; ожидаемо 7–10 кусков.
+  /// «Крупные куски» (D-006): деталь целиком, поле 10×14, клетка 34; нарезка
+  /// 3..5, затем слияние соседних кусков в 5..12 клеток; ожидаемо 7–10 кусков.
   bigPieces,
-
-  /// «Полдетали»: связная половина детали (`ceil(n/2)` клеток), поле 10×14,
-  /// клетка 34; куски 3..5; ожидаемо ~8–10 кусков.
-  halfPart,
-
-  /// «Крупная клетка»: деталь, огрублённая 2×2, поле 5×7, клетка 68; куски
-  /// 3..5; ожидаемо ~4–6 кусков.
-  coarseCell,
 }
 
 /// Готовый к игре уровень: поле, силуэт в поле, масштаб клетки, нарезка.
@@ -33,11 +27,16 @@ class PreparedLevel {
   final int targetX;
   final int targetY;
 
-  /// Масштаб клетки: 1 — 34 px, 2 — 68 px.
-  final int cellScale;
-
   /// Нарезка [silhouette] (координаты поля).
   final PackSlice slice;
+
+  /// Порядок кусков в лотке: перестановка id кусков [slice] от seed уровня.
+  ///
+  /// Зачем (D-007): id кусков растут по минимальной клетке, то есть порядок id
+  /// совпадает с порядком решения; лоток «по id» подсказывал бы, куда класть
+  /// следующий кусок. Перемешивание детерминировано (один seed — один порядок)
+  /// и никогда не равно порядку по возрастанию id (при `N >= 2`).
+  final List<int> trayOrder;
 
   const PreparedLevel({
     required this.fieldWidth,
@@ -45,15 +44,13 @@ class PreparedLevel {
     required this.silhouette,
     required this.targetX,
     required this.targetY,
-    required this.cellScale,
     required this.slice,
+    required this.trayOrder,
   });
 }
 
 const int _fullFieldWidth = 10;
 const int _fullFieldHeight = 14;
-const int _coarseFieldWidth = 5;
-const int _coarseFieldHeight = 7;
 
 /// Из маски детали [partMask] (bbox-маска `RoninPartDef.mask`), конфигурации
 /// [config] и [seed] строит готовый уровень. Детерминирован: одни и те же
@@ -63,39 +60,21 @@ PreparedLevel prepareLevel(
   SliceConfig config, {
   required int seed,
 }) {
-  final int fieldWidth;
-  final int fieldHeight;
-  final int cellScale;
-  final TargetMask work;
-  switch (config) {
-    case SliceConfig.bigPieces:
-      fieldWidth = _fullFieldWidth;
-      fieldHeight = _fullFieldHeight;
-      cellScale = 1;
-      work = partMask;
-    case SliceConfig.halfPart:
-      fieldWidth = _fullFieldWidth;
-      fieldHeight = _fullFieldHeight;
-      cellScale = 1;
-      work = _halfOf(partMask);
-    case SliceConfig.coarseCell:
-      fieldWidth = _coarseFieldWidth;
-      fieldHeight = _coarseFieldHeight;
-      cellScale = 2;
-      work = _coarsen(partMask);
-  }
+  const fieldWidth = _fullFieldWidth;
+  const fieldHeight = _fullFieldHeight;
 
-  final targetX = (fieldWidth - work.width) ~/ 2;
-  final targetY = (fieldHeight - work.height) ~/ 2;
-  final silhouette = work.padTo(
+  final targetX = (fieldWidth - partMask.width) ~/ 2;
+  final targetY = (fieldHeight - partMask.height) ~/ 2;
+  final silhouette = partMask.padTo(
     width: fieldWidth,
     height: fieldHeight,
     dx: targetX,
     dy: targetY,
   );
   var slice = slicePolyomino(silhouette, seed: seed);
-  if (config == SliceConfig.bigPieces) {
-    slice = mergeAdjacentPieces(silhouette, slice);
+  switch (config) {
+    case SliceConfig.bigPieces:
+      slice = mergeAdjacentPieces(silhouette, slice);
   }
   return PreparedLevel(
     fieldWidth: fieldWidth,
@@ -103,9 +82,27 @@ PreparedLevel prepareLevel(
     silhouette: silhouette,
     targetX: targetX,
     targetY: targetY,
-    cellScale: cellScale,
     slice: slice,
+    trayOrder: _shuffledTrayOrder(slice, seed),
   );
+}
+
+/// Перемешанный порядок id кусков [slice] для лотка (см. [PreparedLevel.trayOrder]).
+/// ГСЧ лотка отличается от ГСЧ нарезки (`Random(seed)`) произвольными константами.
+List<int> _shuffledTrayOrder(PackSlice slice, int seed) {
+  final ids = [for (final p in slice.pieces) p.id]..sort();
+  final order = List<int>.of(ids)..shuffle(math.Random(seed * 7919 + 17));
+  var sorted = true;
+  for (var i = 0; i < order.length; i++) {
+    if (order[i] != ids[i]) {
+      sorted = false;
+      break;
+    }
+  }
+  if (sorted && order.length >= 2) {
+    order.add(order.removeAt(0));
+  }
+  return order;
 }
 
 /// Сливает соседние куски [base] (нарезка [silhouette]) в более крупные:
@@ -218,96 +215,3 @@ PackSlice mergeAdjacentPieces(TargetMask silhouette, PackSlice base) {
 }
 
 int _minOf(Set<int> s) => s.reduce((a, b) => a < b ? a : b);
-
-/// Связная половина детали: первые `ceil(n/2)` клеток BFS (4-соседство, порядок
-/// соседей — вверх, влево, вправо, вниз) от клетки с минимальным `(y, x)`.
-TargetMask _halfOf(TargetMask part) {
-  final all = part.cells; // порядок: сверху вниз, слева направо
-  final take = (all.length + 1) ~/ 2;
-  final start = all.first;
-  final visited = <({int x, int y})>{start};
-  final order = <({int x, int y})>[start];
-  for (var head = 0; head < order.length && order.length < take; head++) {
-    final c = order[head];
-    for (final n in <({int x, int y})>[
-      (x: c.x, y: c.y - 1),
-      (x: c.x - 1, y: c.y),
-      (x: c.x + 1, y: c.y),
-      (x: c.x, y: c.y + 1),
-    ]) {
-      if (order.length >= take) break;
-      if (part.contains(n.x, n.y) && visited.add(n)) order.add(n);
-    }
-  }
-  return _maskOf(order);
-}
-
-/// Огрубление 2×2: клетка блока есть, если в блоке ≥ 2 клеток детали; затем
-/// наибольшая 4-связная компонента (при равенстве — с минимальной клеткой по
-/// `(y, x)`), обрезка по bbox.
-TargetMask _coarsen(TargetMask part) {
-  final cw = (part.width + 1) ~/ 2;
-  final ch = (part.height + 1) ~/ 2;
-  final present = <({int x, int y})>{};
-  for (var cy = 0; cy < ch; cy++) {
-    for (var cx = 0; cx < cw; cx++) {
-      var count = 0;
-      for (final dy in const [0, 1]) {
-        for (final dx in const [0, 1]) {
-          if (part.contains(2 * cx + dx, 2 * cy + dy)) count++;
-        }
-      }
-      if (count >= 2) present.add((x: cx, y: cy));
-    }
-  }
-
-  // Компоненты в порядке минимальной клетки (y, x): обход сверху вниз.
-  final seen = <({int x, int y})>{};
-  var best = <({int x, int y})>[];
-  for (var cy = 0; cy < ch; cy++) {
-    for (var cx = 0; cx < cw; cx++) {
-      final start = (x: cx, y: cy);
-      if (!present.contains(start) || seen.contains(start)) continue;
-      final comp = <({int x, int y})>[start];
-      seen.add(start);
-      for (var head = 0; head < comp.length; head++) {
-        final c = comp[head];
-        for (final n in <({int x, int y})>[
-          (x: c.x, y: c.y - 1),
-          (x: c.x - 1, y: c.y),
-          (x: c.x + 1, y: c.y),
-          (x: c.x, y: c.y + 1),
-        ]) {
-          if (present.contains(n) && seen.add(n)) comp.add(n);
-        }
-      }
-      // Строго больше: при равенстве остаётся ранее найденная (мин. клетка).
-      if (comp.length > best.length) best = comp;
-    }
-  }
-  return _maskOf(best);
-}
-
-/// Маска по bbox заданных клеток.
-TargetMask _maskOf(List<({int x, int y})> cells) {
-  var minX = cells.first.x;
-  var maxX = minX;
-  var minY = cells.first.y;
-  var maxY = minY;
-  for (final c in cells) {
-    if (c.x < minX) minX = c.x;
-    if (c.x > maxX) maxX = c.x;
-    if (c.y < minY) minY = c.y;
-    if (c.y > maxY) maxY = c.y;
-  }
-  final set = cells.toSet();
-  return TargetMask(
-    rows: [
-      for (var y = minY; y <= maxY; y++)
-        [
-          for (var x = minX; x <= maxX; x++)
-            set.contains((x: x, y: y)) ? '#' : '.',
-        ].join(),
-    ],
-  );
-}

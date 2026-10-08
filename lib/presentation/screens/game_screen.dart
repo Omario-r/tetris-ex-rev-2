@@ -77,9 +77,6 @@ class _GameScreenState extends State<GameScreen>
   late TargetMask _silhouette;
   late int _fragmentIndex;
 
-  /// Масштаб клетки поля уровня: 1 — канон 34 px, 2 — 68 px (`coarseCell`).
-  late int _cellScale;
-
   /// Клетка лотка (и ширина клетки): `min(32, 160 / h)`, `h` — наибольшая
   /// высота куска уровня в клетках; считается один раз при (пере)сборке уровня.
   late double _trayCellSize;
@@ -147,7 +144,6 @@ class _GameScreenState extends State<GameScreen>
       seed: _seed,
     );
     _silhouette = prepared.silhouette;
-    _cellScale = prepared.cellScale;
     final slice = prepared.slice;
     var maxHeight = 1;
     for (final p in slice.pieces) {
@@ -488,7 +484,7 @@ class _GameScreenState extends State<GameScreen>
     final fitByHeight = availableHeight / boardHeight;
     final fitByWidth = availableWidth / boardWidth;
     final size = math.min(
-      _canonicalCellSize * _cellScale,
+      _canonicalCellSize,
       math.min(fitByHeight, fitByWidth),
     );
     return math.max(size, 8.0);

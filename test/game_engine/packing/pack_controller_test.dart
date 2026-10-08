@@ -150,4 +150,65 @@ void main() {
       expect(controller.state.trayOrder, isEmpty);
     });
   });
+
+  group('PackController.clear', () {
+    test('после place/move/remove возвращает все куски в исходный лоток', () {
+      final controller = _freshController();
+
+      controller.place(1, 0, 0);
+      controller.place(0, 0, 1);
+      controller.move(1, 0, 0);
+      controller.remove(1);
+      controller.place(1, 0, 0);
+
+      controller.clear();
+
+      expect(controller.state.placements, isEmpty);
+      expect(controller.state.trayOrder, [0, 1]);
+    });
+
+    test('исходный порядок лотка сохраняется (не по возрастанию id)', () {
+      final controller = PackController(
+        PackState(
+          silhouette: _fullSquare,
+          placements: const {},
+          pieces: const [_rowA, _rowB],
+          trayOrder: const [1, 0],
+        ),
+      );
+
+      controller.place(0, 0, 0);
+      controller.place(1, 0, 1);
+      controller.clear();
+
+      expect(controller.state.trayOrder, [1, 0]);
+    });
+
+    test('предуложенные куски возвращаются в конец исходного лотка', () {
+      final controller = PackController(
+        PackState(
+          silhouette: _fullSquare,
+          placements: const {0: (x: 0, y: 0)},
+          pieces: const [_rowA, _rowB],
+          trayOrder: const [1],
+        ),
+      );
+
+      controller.clear();
+
+      expect(controller.state.placements, isEmpty);
+      expect(controller.state.trayOrder, [1, 0]);
+    });
+
+    test('на пустом поле — no-op (состояние не меняется)', () {
+      final controller = _freshController();
+      final before = controller.state;
+
+      controller.clear();
+
+      expect(identical(controller.state, before), isTrue);
+      expect(controller.state.placements, isEmpty);
+      expect(controller.state.trayOrder, [0, 1]);
+    });
+  });
 }

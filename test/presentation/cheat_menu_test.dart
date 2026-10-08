@@ -226,12 +226,10 @@ void main() {
 
     const labels = {
       SliceConfig.bigPieces: 'Крупные куски',
-      SliceConfig.halfPart: 'Полдетали',
-      SliceConfig.coarseCell: 'Крупная клетка',
     };
 
     testWidgets(
-      'три кнопки в порядке SliceConfig.values, текущая отмечена «✓ »',
+      'кнопки в порядке SliceConfig.values, текущая отмечена «✓ »',
       (tester) async {
         for (final current in SliceConfig.values) {
           await pumpMenu(tester, current: current, onSet: (_) {});

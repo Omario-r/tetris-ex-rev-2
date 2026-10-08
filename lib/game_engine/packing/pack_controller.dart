@@ -9,7 +9,16 @@ import 'pack_state.dart';
 class PackController {
   PackState _state;
 
-  PackController(PackState initial) : _state = initial;
+  /// Полный порядок лотка на старте: исходный лоток, затем (для тестов с
+  /// предуложенными кусками) id уложенных по возрастанию. Нужен для [clear].
+  final List<int> _fullOrder;
+
+  PackController(PackState initial)
+    : _state = initial,
+      _fullOrder = [
+        ...initial.trayOrder,
+        ...(initial.placements.keys.toList()..sort()),
+      ];
 
   PackState get state => _state;
 
@@ -89,5 +98,15 @@ class PackController {
       ..remove(pieceId);
     final trayOrder = List<int>.from(_state.trayOrder)..add(pieceId);
     _state = _state.copyWith(placements: placements, trayOrder: trayOrder);
+  }
+
+  /// Возвращает все уложенные кусочки в лоток в исходном порядке. No-op, если
+  /// на поле пусто.
+  void clear() {
+    if (_state.placements.isEmpty) return;
+    _state = _state.copyWith(
+      placements: <int, ({int x, int y})>{},
+      trayOrder: List<int>.of(_fullOrder),
+    );
   }
 }

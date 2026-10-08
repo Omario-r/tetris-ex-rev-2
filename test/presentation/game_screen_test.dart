@@ -214,46 +214,6 @@ void main() {
       expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
     });
 
-    testWidgets('переключение на coarseCell: поле 5×7, клетка 68, ≤ 7 кусков, '
-        'конфигурация переживает переход на другой уровень', (tester) async {
-      await pumpGame(tester);
-      await pickSliceConfig(tester, SliceConfig.coarseCell);
-
-      expect(GameScreen.sliceConfig, SliceConfig.coarseCell);
-      var painter = packingPainter(tester);
-      expect(painter.state.silhouette.width, 5);
-      expect(painter.state.silhouette.height, 7);
-      expect(painter.cellSize, 68.0);
-      expect(
-        tester.getSize(
-          find.byWidgetPredicate(
-            (w) => w is CustomPaint && w.painter is PackingPainter,
-          ),
-        ),
-        const Size(5 * 68.0, 7 * 68.0),
-      );
-
-      final expected = prepareLevel(
-        RoninParts.parts[0].mask,
-        SliceConfig.coarseCell,
-        seed: 0,
-      ).slice.pieces.length;
-      expect(expected, lessThanOrEqualTo(7));
-      expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
-
-      // Выбор уровня читом создаёт новый GameScreen — конфигурация та же.
-      await tester.tap(find.byKey(const Key('cheat_button')));
-      await _pumpFrames(tester);
-      await tester.tap(find.byKey(const Key('cheat_level_1')));
-      await _pumpFrames(tester);
-
-      expect(find.text('ДЕТАЛЬ 2 / 13'), findsOneWidget);
-      painter = packingPainter(tester);
-      expect(painter.state.silhouette.width, 5);
-      expect(painter.state.silhouette.height, 7);
-      expect(painter.cellSize, 68.0);
-    });
-
     testWidgets('выбор конфигурации сохраняет seed; «Пересобрать» его меняет', (
       tester,
     ) async {
@@ -261,7 +221,7 @@ void main() {
       List<String> sig(int seed) => [
         for (final p in prepareLevel(
           RoninParts.parts[0].mask,
-          SliceConfig.halfPart,
+          SliceConfig.bigPieces,
           seed: seed,
         ).slice.pieces)
           p.cells.map((c) => '${c.x},${c.y}').join(';'),
@@ -274,7 +234,7 @@ void main() {
       await _pumpFrames(tester);
       await tester.tap(find.byKey(const Key('cheat_reshuffle')));
       await _pumpFrames(tester);
-      await pickSliceConfig(tester, SliceConfig.halfPart);
+      await pickSliceConfig(tester, SliceConfig.bigPieces);
       // seed остался 1 (reshuffle) — выбор конфигурации его не сбросил.
       expect([
         for (final p in packingPainter(tester).state.pieces)

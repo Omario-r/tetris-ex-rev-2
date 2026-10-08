@@ -63,18 +63,11 @@ void main() {
         for (final seed in seeds) {
           test('${part.id} seed $seed', () {
             final level = prepareLevel(part.mask, config, seed: seed);
+            final again = prepareLevel(part.mask, config, seed: seed);
             final sil = level.silhouette;
 
-            // Поле и масштаб.
-            switch (config) {
-              case SliceConfig.bigPieces:
-              case SliceConfig.halfPart:
-                expect((level.fieldWidth, level.fieldHeight), (10, 14));
-                expect(level.cellScale, 1);
-              case SliceConfig.coarseCell:
-                expect((level.fieldWidth, level.fieldHeight), (5, 7));
-                expect(level.cellScale, 2);
-            }
+            // Поле.
+            expect((level.fieldWidth, level.fieldHeight), (10, 14));
             expect(sil.width, level.fieldWidth);
             expect(sil.height, level.fieldHeight);
             expect(sil.isWellFormed, isTrue);
@@ -91,28 +84,23 @@ void main() {
             _expectExactCover(sil, level.slice);
 
             final sizes = _sizes(level.slice);
-            switch (config) {
-              case SliceConfig.bigPieces:
-                expect(silCells.length, part.mask.cells.length);
-                expect(sizes.every((s) => s >= 5 && s <= 12), isTrue,
-                    reason: 'размеры $sizes');
-                expect(sizes.length, lessThanOrEqualTo(10),
-                    reason: 'размеры $sizes');
-              case SliceConfig.halfPart:
-                expect(silCells.length, (part.mask.cells.length + 1) ~/ 2);
-                expect(sizes.every((s) => s >= 3 && s <= 5), isTrue,
-                    reason: 'размеры $sizes');
-                expect(sizes.length, lessThanOrEqualTo(11),
-                    reason: 'размеры $sizes');
-              case SliceConfig.coarseCell:
-                expect(sizes.every((s) => s >= 3 && s <= 5), isTrue,
-                    reason: 'размеры $sizes');
-                expect(sizes.length, lessThanOrEqualTo(7),
-                    reason: 'размеры $sizes');
+            expect(silCells.length, part.mask.cells.length);
+            expect(sizes.every((s) => s >= 5 && s <= 12), isTrue,
+                reason: 'размеры $sizes');
+            expect(sizes.length, lessThanOrEqualTo(10),
+                reason: 'размеры $sizes');
+
+            // Лоток: перестановка id, не порядок решения, детерминирован.
+            final n = level.slice.pieces.length;
+            final ids = [for (final p in level.slice.pieces) p.id];
+            expect([...level.trayOrder]..sort(), ids);
+            if (n >= 2) {
+              expect(level.trayOrder, isNot([for (var i = 0; i < n; i++) i]),
+                  reason: 'лоток совпал с порядком решения');
             }
+            expect(again.trayOrder, level.trayOrder);
 
             // Детерминизм.
-            final again = prepareLevel(part.mask, config, seed: seed);
             expect(again.silhouette.rows, sil.rows);
             expect(again.targetX, level.targetX);
             expect(again.targetY, level.targetY);
