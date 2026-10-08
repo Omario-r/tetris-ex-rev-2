@@ -9,6 +9,7 @@ import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 import 'package:explosive_tetris/presentation/theme/block_material.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
+import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
 /// Прокачивает кадры без `pumpAndSettle` — `GameScreen` держит пульс-контроллер
 /// (`AnimationController.repeat`), который не settle-ится.
@@ -62,16 +63,16 @@ void main() {
     });
 
     testWidgets(
-        'топбар: «ДЕТАЛЬ 1 / 13» + название детали на уровне 0',
+        'топбар: «ДЕТАЛЬ 1 / N» + название детали на уровне 0',
         (tester) async {
       await pumpGame(tester);
-      expect(find.text('ДЕТАЛЬ 1 / 13'), findsOneWidget);
-      // Уровень 0 ↔ деталь order 1 (`RoninParts.parts[0]`) — «Нос, левый борт».
-      expect(find.text('НОС, ЛЕВЫЙ БОРТ'), findsOneWidget);
+      expect(find.text('ДЕТАЛЬ 1 / $kShipPartCount'), findsOneWidget);
+      // Уровень 0 ↔ деталь order 1 (`RoninParts.parts[0]`) — «Нос».
+      expect(find.text('НОС'), findsOneWidget);
     });
 
     testWidgets(
-        'топбар на 360×640: название любой из 13 деталей помещается, '
+        'топбар на 360×640: название любой детали помещается, '
         'кнопки справа целиком в экране', (tester) async {
       const screen = Rect.fromLTWH(0, 0, 360, 640);
       for (var i = 0; i < RoninParts.parts.length; i++) {
@@ -201,7 +202,7 @@ void main() {
     PreparedLevel level0() => prepareLevel(
       RoninParts.parts[0].mask,
       SliceConfig.bigPieces,
-      seed: 0,
+      seed: RoninParts.parts[0].seed,
     );
 
     Finder trayPieces() => find.byWidgetPredicate(
@@ -382,7 +383,7 @@ void main() {
     PreparedLevel level0() => prepareLevel(
       RoninParts.parts[0].mask,
       SliceConfig.bigPieces,
-      seed: 0,
+      seed: RoninParts.parts[0].seed,
     );
 
     /// Узкий экран: ряд лотка не помещается и листается; клетка поля — 34.
@@ -634,7 +635,7 @@ void main() {
       final expected = prepareLevel(
         RoninParts.parts[0].mask,
         SliceConfig.bigPieces,
-        seed: 0,
+        seed: RoninParts.parts[0].seed,
       ).slice.pieces.length;
       expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
     });
@@ -651,8 +652,9 @@ void main() {
         ).slice.pieces)
           p.cells.map((c) => '${c.x},${c.y}').join(';'),
       ];
-      final seed0 = sig(0);
-      final seed1 = sig(1);
+      // Канонный seed детали и он же со сдвигом +1 (один «Пересобрать»).
+      final seed0 = sig(RoninParts.parts[0].seed);
+      final seed1 = sig(RoninParts.parts[0].seed + 1);
       expect(seed1, isNot(seed0));
 
       await tester.tap(find.byKey(const Key('cheat_button')));
@@ -660,7 +662,7 @@ void main() {
       await tester.tap(find.byKey(const Key('cheat_reshuffle')));
       await _pumpFrames(tester);
       await pickSliceConfig(tester, SliceConfig.bigPieces);
-      // seed остался 1 (reshuffle) — выбор конфигурации его не сбросил.
+      // сдвиг seed остался +1 (reshuffle) — выбор конфигурации его не сбросил.
       expect([
         for (final p in packingPainter(tester).state.pieces)
           p.cells.map((c) => '${c.x},${c.y}').join(';'),
@@ -668,7 +670,7 @@ void main() {
     });
 
     testWidgets(
-      'лоток не выше 160 px на всех 13 деталях во всех конфигурациях',
+      'лоток не выше 160 px на всех деталях во всех конфигурациях',
       (tester) async {
         tester.view.physicalSize = const Size(1200, 1600);
         tester.view.devicePixelRatio = 1.0;

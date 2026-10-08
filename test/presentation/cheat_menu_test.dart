@@ -85,7 +85,7 @@ void main() {
     expect(find.byKey(Key('cheat_level_$kShipPartCount')), findsNothing);
   });
 
-  testWidgets('Чит «состояние корабля»: N=2 → прогресс=2 → корабль 2/13',
+  testWidgets('Чит «состояние корабля»: N=2 → прогресс=2 → корабль 2/N',
       (tester) async {
     await pumpGame(tester);
 
@@ -115,7 +115,7 @@ void main() {
 
     final game = tester.widget<GameScreen>(find.byType(GameScreen));
     expect(game.levelIndex, 2);
-    expect(find.text('ДЕТАЛЬ 3 / 13'), findsOneWidget);
+    expect(find.text('ДЕТАЛЬ 3 / $kShipPartCount'), findsOneWidget);
   });
 
   testWidgets(

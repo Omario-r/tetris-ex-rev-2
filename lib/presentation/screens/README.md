@@ -14,12 +14,12 @@
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
   Стори 02 T2). **Уровень строит `prepareLevel`**
   (Ронин-1/07 T2): `_rebuild()` зовёт `prepareLevel(RoninParts.parts[levelIndex].mask,
-  GameScreen.sliceConfig, seed: _seed)` и берёт `silhouette`, `slice`. Поле —
+  GameScreen.sliceConfig, seed: part.seed + _seedOffset)` и берёт `silhouette`, `slice`. Поле —
   10×14; экран геометрию поля не выводит,
   читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Материал уложенных
-  клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все 13 деталей (Ронин-1/01
+  клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все детали (Ронин-1/01
   T3, было `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)`: 7-элементная карта
-  не покрывала 13 деталей «Ронина» — `RangeError` на 8-м уровне; `ShipMaterials` из экрана
+  не покрывала детали «Ронина» — `RangeError` на 8-м уровне; `ShipMaterials` из экрана
   больше не читается для этого поля). Нарезка (`prepared.slice`) →
   `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
@@ -67,11 +67,11 @@
   `static SliceConfig GameScreen.sliceConfig` (по умолчанию `bigPieces`, в т.ч. в release)
   живёт вне `State` до перезапуска приложения и действует на все уровни. Смена в чит-меню
   (`_cheatSetSliceConfig`) → запись в поле + `_restartLevel()` (пересборка текущего уровня с
-  ТЕКУЩИМ `_seed`, сброс драга); «Пересобрать нарезку» = `_seed++` + тот же `_restartLevel()`.
+  ТЕКУЩИМ `_seedOffset`, сброс драга); `_seedOffset` — сдвиг от канонного `RoninPartDef.seed` детали (стартует с 0); «Пересобрать нарезку» = `_seedOffset++` + тот же `_restartLevel()`.
 - Топбар (канон `.topbar`/`.title`/`.pausebtn` мокапа `ukladka-field.html`, высота 44,
-  Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / 13»
-  (N=`fragmentIndex+1`, 13=`kShipPartCount`) и `.name` название детали заглавными
-  (`RoninParts.parts[fragmentIndex].title.toUpperCase()`, напр. «НОС, ЛЕВЫЙ БОРТ»); свотча
+  Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / M»
+  (N=`fragmentIndex+1`, M=`kShipPartCount`=15) и `.name` название детали заглавными
+  (`RoninParts.parts[fragmentIndex].title.toUpperCase()`, напр. «НОС»); свотча
   материала в топбаре больше нет (был у прежнего чипа, Стори 02 T3). Справа dev-кнопки
   (`Key('cheat_button')` под `kDebugMode`, `Key('ship_button')`). Виджеты `_PartTitle`
   (заменил `_PartChip`/`_Swatch`) / `_DevButton`. Заголовок — `Expanded` (зазор 8 до кнопок),

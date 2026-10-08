@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../game_engine/data/ronin_parts.dart';
@@ -12,15 +14,18 @@ import '../theme/block_material.dart';
 /// константа) — использовать только в рантайме, не в const-контексте.
 final int kShipPartCount = RoninParts.parts.length;
 
-/// Рисует единый корабль из деталей `RoninParts.parts`: первые [collectedCount]
-/// деталей установлены (залиты), остальные — контуром.
+/// Рисует единый корабль из деталей `RoninParts.parts` (разметка v2: плиты
+/// обшивки и предметы поверх, каждая в своём масштабе; позиции — через
+/// `RoninPartDef.cellOnShip`, корабль вписывается в `size` по bbox всех
+/// клеток): первые [collectedCount] деталей установлены (залиты), остальные —
+/// контуром. Порядок рисования: слой 0 (плиты), затем слой 1 (предметы).
 ///
 /// **Отрисовка временная (Ронин-1/01 T3):** плоская заливка — заменяется
 /// композитом из рисунка «Ронина» в Стори 02 эпика Ронин-1 (канон —
 /// `docs/design/ronin-ship.html`), этот пейнтер целиком заменяется там же.
 /// Материал заливки — один временный `BlockMaterial.graphite` на все детали
 /// (решение Постановщика по эскалации T3, 2026-07-29: карта `ShipMaterials`
-/// не годится — она на 7 дев-деталей, под 13 деталей «Ронина» материалов нет и
+/// не годится — она на 7 дев-деталей, под детали «Ронина» материалов нет и
 /// канона на них тоже нет; палитра под заведомо неканоничный временный
 /// пейнтер не изобретается). `ShipMaterials` в этот модуль больше не приходит.
 ///
@@ -46,15 +51,27 @@ class ShipPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    const cols = RoninGrid.cols;
-    const rows = RoninGrid.rows;
-    // Сетка не квадратная (44×108) — вписываем по меньшей стороне без
-    // растяжения пропорций.
-    final cellByWidth = size.width / cols;
-    final cellByHeight = size.height / rows;
-    final cell = cellByWidth < cellByHeight ? cellByWidth : cellByHeight;
-    final ox = (size.width - cell * cols) / 2;
-    final oy = (size.height - cell * rows) / 2;
+    // Рамка корабля в клетках рисунка: bbox всех клеток всех деталей.
+    var minX = double.infinity;
+    var minY = double.infinity;
+    var maxX = double.negativeInfinity;
+    var maxY = double.negativeInfinity;
+    for (final part in RoninParts.parts) {
+      for (final c in part.mask.cells) {
+        final r = part.cellOnShip(c.x, c.y);
+        if (r.x < minX) minX = r.x;
+        if (r.y < minY) minY = r.y;
+        if (r.x + r.size > maxX) maxX = r.x + r.size;
+        if (r.y + r.size > maxY) maxY = r.y + r.size;
+      }
+    }
+    final frameW = maxX - minX;
+    final frameH = maxY - minY;
+    // Рамка не квадратная — вписываем по меньшей стороне без растяжения
+    // пропорций, по центру.
+    final k = math.min(size.width / frameW, size.height / frameH);
+    final ox = (size.width - frameW * k) / 2;
+    final oy = (size.height - frameH * k) / 2;
 
     final installedFill = Paint()..color = BlockMaterial.graphite.color;
     final installedStroke = Paint()
@@ -66,37 +83,45 @@ class ShipPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
 
-    for (int i = 0; i < RoninParts.parts.length; i++) {
-      final part = RoninParts.parts[i];
-      final collected = i < collectedCount;
-      // Только заработанная деталь (revealPartIndex) масштабируется от центра.
-      final scale = collected && i == revealPartIndex ? revealProgress : 1.0;
-      if (scale <= 0) continue;
+    // Сначала плиты обшивки (слой 0), затем предметы поверх (слой 1); внутри
+    // слоя — по order (список уже отсортирован).
+    for (final layer in const [0, 1]) {
+      for (int i = 0; i < RoninParts.parts.length; i++) {
+        final part = RoninParts.parts[i];
+        if (part.layer != layer) continue;
+        final collected = i < collectedCount;
+        // Только заработанная деталь (revealPartIndex) масштабируется от центра.
+        final scale = collected && i == revealPartIndex ? revealProgress : 1.0;
+        if (scale <= 0) continue;
 
-      canvas.save();
-      if (scale != 1.0) {
-        final cx = ox + (part.originCol + part.mask.width / 2) * cell;
-        final cy = oy + (part.originRow + part.mask.height / 2) * cell;
-        canvas.translate(cx, cy);
-        canvas.scale(scale);
-        canvas.translate(-cx, -cy);
-      }
-      for (final c in part.mask.cells) {
-        final rect = Rect.fromLTWH(
-          ox + (part.originCol + c.x) * cell,
-          oy + (part.originRow + c.y) * cell,
-          cell,
-          cell,
-        );
-        if (collected) {
-          // Плоская заливка временным материалом (см. doc-комментарий класса).
-          canvas.drawRect(rect, installedFill);
-          canvas.drawRect(rect, installedStroke);
-        } else {
-          canvas.drawRect(rect, ghostStroke);
+        canvas.save();
+        if (scale != 1.0) {
+          final cx = ox +
+              (part.shipX + part.mask.width / part.scale / 2 - minX) * k;
+          final cy = oy +
+              (part.shipY + part.mask.height / part.scale / 2 - minY) * k;
+          canvas.translate(cx, cy);
+          canvas.scale(scale);
+          canvas.translate(-cx, -cy);
         }
+        for (final c in part.mask.cells) {
+          final r = part.cellOnShip(c.x, c.y);
+          final rect = Rect.fromLTWH(
+            ox + (r.x - minX) * k,
+            oy + (r.y - minY) * k,
+            r.size * k,
+            r.size * k,
+          );
+          if (collected) {
+            // Плоская заливка временным материалом (см. doc-комментарий класса).
+            canvas.drawRect(rect, installedFill);
+            canvas.drawRect(rect, installedStroke);
+          } else {
+            canvas.drawRect(rect, ghostStroke);
+          }
+        }
+        canvas.restore();
       }
-      canvas.restore();
     }
   }
 

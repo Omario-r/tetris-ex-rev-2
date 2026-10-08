@@ -105,9 +105,9 @@ class _GameScreenState extends State<GameScreen>
   late double _trayCellSize;
   late BlockMaterial _partMaterial;
 
-  /// Сид нарезки (0 → детерминированная стартовая нарезка); «Пересобрать
-  /// нарезку» инкрементирует и режет заново.
-  int _seed = 0;
+  /// Сдвиг seed от канонного `RoninPartDef.seed` детали (0 → канонная
+  /// нарезка); «Пересобрать нарезку» инкрементирует и режет заново.
+  int _seedOffset = 0;
   late PackController _controller;
 
   /// Эталонная раскладка последней нарезки — solve-хук (дев + тесты).
@@ -164,7 +164,7 @@ class _GameScreenState extends State<GameScreen>
   void _loadLevel() {
     _fragmentIndex = LevelMap.levelAt(widget.levelIndex).fragmentIndex;
     // Временно: клетка станет куском рисунка в Стори 03 эпика Ронин-1. Один
-    // материал на все 13 деталей — `ShipMaterials` (7 записей, дев-детали) не
+    // материал на все детали — `ShipMaterials` (7 записей, дев-детали) не
     // покрывает их (Ронин-1/01 T3, было T4 п. 3, перенесено решением
     // Постановщика по эскалации T3: без этого смоук `win_flow_test.dart`
     // падал `RangeError`ом на 8-й детали).
@@ -173,12 +173,14 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Строит уровень через [prepareLevel]: силуэт в поле, масштаб клетки и
-  /// нарезка — в конфигурации [GameScreen.sliceConfig] с текущим `_seed`.
+  /// нарезка — в конфигурации [GameScreen.sliceConfig] с seed детали
+  /// плюс текущий `_seedOffset`.
   void _rebuild() {
+    final part = RoninParts.parts[_fragmentIndex];
     final prepared = prepareLevel(
-      RoninParts.parts[_fragmentIndex].mask,
+      part.mask,
       GameScreen.sliceConfig,
-      seed: _seed,
+      seed: part.seed + _seedOffset,
     );
     _silhouette = prepared.silhouette;
     final slice = prepared.slice;
@@ -321,14 +323,14 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Чит «Нарезка: калибровка»: запоминает конфигурацию (на все уровни до
-  /// перезапуска приложения) и перезапускает текущий уровень с тем же `_seed`.
+  /// перезапуска приложения) и перезапускает текущий уровень с тем же `_seedOffset`.
   void _cheatSetSliceConfig(SliceConfig config) {
     Navigator.of(context).pop();
     GameScreen.sliceConfig = config;
     _restartLevel();
   }
 
-  /// Дев-чит «Пересобрать нарезку»: новый `seed` → новая нарезка той же детали.
+  /// Дев-чит «Пересобрать нарезку»: новый сдвиг seed → новая нарезка той же детали.
   void _cheatReshuffle() {
     Navigator.of(context).pop();
     _reshuffle();
@@ -341,11 +343,11 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _reshuffle() {
-    _seed++;
+    _seedOffset++;
     _restartLevel();
   }
 
-  /// Пересобирает текущий уровень с текущим `_seed` и сбрасывает драг.
+  /// Пересобирает текущий уровень с текущим `_seedOffset` и сбрасывает драг.
   void _restartLevel() {
     setState(() {
       _dragPieceId = null;
@@ -1019,7 +1021,7 @@ class _GameScreenState extends State<GameScreen>
 }
 
 /// Заголовок топбара — канон `.title`/`.kick`/`.name` мокапа
-/// (`docs/design/ukladka-field.html`, Ронин-1/01 T4): «ДЕТАЛЬ N / 13» +
+/// (`docs/design/ukladka-field.html`, Ронин-1/01 T4): «ДЕТАЛЬ N / число деталей» +
 /// название детали заглавными (`RoninParts.parts[fragmentIndex].title`).
 /// Заменяет прежний чип со свотчем материала (Стори 02 T3) — свотча в
 /// топбаре больше нет.

@@ -23,15 +23,16 @@ void main() {
   setUp(() => SharedPreferences.setMockInitialValues({}));
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
-  group('ShipScreen — число деталей = min(current_level, 13)', () {
-    // ProgressService клампит персист к 0..12 на чтении (единый источник истины
-    // RoninParts.parts.length, Ронин-1/01 T3, было ShipParts.parts.length) —
-    // «сырые» значения ≥13 в SharedPreferences теперь читаются как 12
-    // (последний валидный уровень), не проходят насквозь. 7 и 12 отдельно —
-    // регресс на находку T3 (RangeError за пределами 7-элементной карты
-    // материалов дев-деталей; теперь один материал на все 13 деталей).
+  group('ShipScreen — число деталей = min(current_level, kShipPartCount)', () {
+    // ProgressService клампит персист к 0..kShipPartCount-1 на чтении (единый
+    // источник истины RoninParts.parts.length, Ронин-1/01 T3, было
+    // ShipParts.parts.length) — «сырые» значения ≥15 в SharedPreferences
+    // читаются как 14 (последний валидный уровень), не проходят насквозь.
+    // 7 и 12 отдельно — регресс на находку T3 (RangeError за пределами
+    // 7-элементной карты материалов дев-деталей; теперь один материал на все
+    // детали).
     for (final entry
-        in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 7: 7, 12: 12, 30: 12}.entries) {
+        in {0: 0, 1: 1, 2: 2, 3: 3, 5: 5, 6: 6, 7: 7, 12: 12, 14: 14, 30: 14}.entries) {
       final level = entry.key;
       final expected = entry.value;
       testWidgets('current_level=$level → собрано $expected', (tester) async {
@@ -41,7 +42,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(_shipPainter(tester).collectedCount, expected);
-        expect(find.text('Собрано $expected из 13'), findsOneWidget);
+        expect(find.text('Собрано $expected из $kShipPartCount'), findsOneWidget);
       });
     }
   });

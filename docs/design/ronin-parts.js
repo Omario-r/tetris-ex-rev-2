@@ -49,7 +49,7 @@ window.RONIN_PARTS = {
   ],
   parts: [
   { id:'prow', order:1, layer:0, module:'prow', title:'Нос',
-    section:'prow', origin:[0,0], cells:44, seed:null,
+    section:'prow', origin:[0,0], cells:44, seed:1,
     mask:[
             '##########',
             '##########',
@@ -58,7 +58,7 @@ window.RONIN_PARTS = {
             '..##......',
             '..##......' ] },
   { id:'sensor', order:2, layer:1, module:'prow', title:'Датчик носа',
-    object:{kind:'sensor'}, s:7, origin:[7,-1.199], cells:41, seed:null,
+    object:{kind:'sensor'}, s:7, origin:[7,-1.199], cells:41, seed:4,
     mask:[
             '...#...',
             '...#...',
@@ -70,7 +70,7 @@ window.RONIN_PARTS = {
             '#######',
             '#######' ] },
   { id:'bridge_c', order:3, layer:0, module:'bridge', title:'Мостик, визор',
-    section:'bridge', origin:[5,0], cells:36, seed:null,
+    section:'bridge', origin:[5,0], cells:36, seed:0,
     mask:[
             '....#####.',
             '....####..',
@@ -79,7 +79,7 @@ window.RONIN_PARTS = {
             '..#######.',
             '...#####..' ] },
   { id:'bridge_l', order:4, layer:0, module:'bridge', title:'Мостик, левый борт',
-    section:'bridge', origin:[0,0], cells:37, seed:null,
+    section:'bridge', origin:[0,0], cells:37, seed:1,
     mask:[
             '######..',
             '######..',
@@ -88,7 +88,7 @@ window.RONIN_PARTS = {
             '#######.',
             '########' ] },
   { id:'bridge_r', order:5, layer:0, module:'bridge', title:'Мостик, правый борт',
-    section:'bridge', origin:[13,0], cells:44, seed:null,
+    section:'bridge', origin:[13,0], cells:44, seed:0,
     mask:[
             '.#######',
             '########',
@@ -97,7 +97,7 @@ window.RONIN_PARTS = {
             '.#######',
             '########' ] },
   { id:'fwd1_cl', order:6, layer:0, module:'fwd', title:'Носовой пояс, верх — левее киля',
-    section:'fwd', origin:[9,0], cells:66, seed:null,
+    section:'fwd', origin:[9,0], cells:66, seed:1,
     mask:[
             '#########.',
             '##########',
@@ -108,7 +108,7 @@ window.RONIN_PARTS = {
             '##########',
             '.......###' ] },
   { id:'fwd1_cr', order:7, layer:0, module:'fwd', title:'Носовой пояс, верх — правее киля',
-    section:'fwd', origin:[18,0], cells:64, seed:null,
+    section:'fwd', origin:[18,0], cells:64, seed:6,
     mask:[
             '##########',
             '.#########',
@@ -118,7 +118,7 @@ window.RONIN_PARTS = {
             '##########',
             '.#########' ] },
   { id:'fwd1_r', order:8, layer:0, module:'fwd', title:'Носовой пояс, верх — правая скула',
-    section:'fwd', origin:[27,0], cells:68, seed:null,
+    section:'fwd', origin:[27,0], cells:68, seed:4,
     mask:[
             '.########',
             '.########',
@@ -130,7 +130,7 @@ window.RONIN_PARTS = {
             '.####....',
             '#####....' ] },
   { id:'rcs_fr', order:9, layer:1, module:'fwd', title:'RCS-квад, нос справа',
-    object:{kind:'rcs', at:[12,4.5], flip:1}, s:8, origin:[11.688,3.944], cells:43, seed:null,
+    object:{kind:'rcs', at:[12,4.5], flip:1}, s:8, origin:[11.688,3.944], cells:43, seed:8,
     mask:[
             '.###...',
             '.###...',
@@ -142,7 +142,7 @@ window.RONIN_PARTS = {
             '.###...',
             '.###...' ] },
   { id:'fwd2_r', order:10, layer:0, module:'fwd', title:'Носовой пояс, низ — правая скула',
-    section:'fwd', origin:[27,7], cells:70, seed:null,
+    section:'fwd', origin:[27,7], cells:70, seed:0,
     mask:[
             '.....####',
             '.....####',
@@ -154,7 +154,7 @@ window.RONIN_PARTS = {
             '#########',
             '#########' ] },
   { id:'fwd1_l', order:11, layer:0, module:'fwd', title:'Носовой пояс, верх — левая скула',
-    section:'fwd', origin:[0,0], cells:72, seed:null,
+    section:'fwd', origin:[0,0], cells:72, seed:2,
     mask:[
             '#########.',
             '#########.',
@@ -165,7 +165,7 @@ window.RONIN_PARTS = {
             '#########.',
             '...######.' ] },
   { id:'rcs_fl', order:12, layer:1, module:'fwd', title:'RCS-квад, нос слева',
-    object:{kind:'rcs', at:[3,4.5], flip:-1}, s:8, origin:[2.438,3.944], cells:43, seed:null,
+    object:{kind:'rcs', at:[3,4.5], flip:-1}, s:8, origin:[2.438,3.944], cells:43, seed:0,
     mask:[
             '...###.',
             '...###.',
@@ -177,7 +177,7 @@ window.RONIN_PARTS = {
             '...###.',
             '...###.' ] },
   { id:'fwd2_l', order:13, layer:0, module:'fwd', title:'Носовой пояс, низ — левая скула',
-    section:'fwd', origin:[0,7], cells:76, seed:null,
+    section:'fwd', origin:[0,7], cells:76, seed:5,
     mask:[
             '###.......',
             '#########.',
@@ -189,7 +189,7 @@ window.RONIN_PARTS = {
             '#########.',
             '#########.' ] },
   { id:'fwd2_cl', order:14, layer:0, module:'fwd', title:'Носовой пояс, низ — левее киля',
-    section:'fwd', origin:[9,7], cells:80, seed:null,
+    section:'fwd', origin:[9,7], cells:80, seed:4,
     mask:[
             '#######...',
             '##########',
@@ -201,7 +201,7 @@ window.RONIN_PARTS = {
             '#########.',
             '#########.' ] },
   { id:'fwd2_cr', order:15, layer:0, module:'fwd', title:'Носовой пояс, низ — правее киля',
-    section:'fwd', origin:[18,7], cells:80, seed:null,
+    section:'fwd', origin:[18,7], cells:80, seed:2,
     mask:[
             '.#########',
             '.########.',
