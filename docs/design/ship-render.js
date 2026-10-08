@@ -105,8 +105,11 @@ function glowDot(g,x,y,r,col){const gr=g.createRadialGradient(x,y,0,x,y,r*4);gr.
 /* ================================================================
    РЕНДЕР ВСЕЙ СЦЕНЫ в offscreen 2x
 ================================================================ */
-const off=document.createElement('canvas'); off.width=W*2; off.height=H*2;
-const g=off.getContext('2d'); g.setTransform(2,0,0,2,0,0);
+/* разрешение offscreen: по умолчанию 2x; страница может заказать крупнее,
+   задав window.__SHIP_RES до подключения файла (рисунок не меняется) */
+const RES=window.__SHIP_RES||2;
+const off=document.createElement('canvas'); off.width=W*RES; off.height=H*RES;
+const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 
 /* --- фон: космос --- */
 (function(){
@@ -582,5 +585,5 @@ for(const s of [-1,1]){
 /* --- контур корпуса --- */
 hullPath(g); g.strokeStyle='#07090c'; g.lineWidth=2.4; g.stroke();
 
-return {off, W, H, C, OX, OY, px, py, cx, span, ROWS, M, hsl};
+return {off, RES, W, H, C, OX, OY, px, py, cx, span, ROWS, M, hsl};
 })();

@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--
+  ЭКСПЕРИМЕНТ (D-010): «Ронин» как набор логических деталей, каждая в своём
+  масштабе. Черновик Дизайнера к решению PO — НЕ канон. Деталь задана векторной
+  областью в координатах рисунка ship-render.js и масштабом s (клеток поля на
+  клетку рисунка); маска уровня — растеризация области в поле 10×14.
+  Канон рисунка — ship-render.js; правила — docs/DESIGN.md.
+-->
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Логические детали — эксперимент</title>
+<style>
+  /* ===== ТОКЕНЫ (канон; имена и значения = docs/DESIGN.md) ===== */
+  :root {
+    --boardBg:     hsl(219 13% 10%);
+    --seam:        hsla(220 14% 4% / 55%);
+    --ghostTarget: hsl(23 62% 55% / 55%);
+    --shipOutline: hsla(215 14% 52% / 16%);
+    --spaceBg:     hsl(220 14% 7%);
+  }
+  /* ===== Декорация страницы (НЕ канон) ===== */
+  * { box-sizing:border-box; }
+  body { margin:0; background:#0f1216; color:#cfd4da; font:13px/1.55 system-ui,sans-serif; padding:22px; }
+  h1 { font-size:18px; margin:0 0 4px; color:#e6ebf0; }
+  h2 { font-size:13px; margin:28px 0 10px; color:#8b949e; letter-spacing:.06em; font-weight:600; }
+  .sub { color:#8b949e; max-width:820px; margin:0 0 16px; }
+  .legend { color:#9aa3ad; font-size:12.5px; max-width:820px; margin:0 0 20px;
+            border-left:2px solid #2c333d; padding-left:12px; }
+  .legend b, .note b { color:#c9a37a; font-weight:600; }
+  .grid { display:flex; flex-wrap:wrap; gap:18px; }
+  .part { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:14px; }
+  .hd { display:flex; align-items:baseline; gap:8px; margin-bottom:10px; }
+  .hd .ord { font-size:11px; color:#0f1216; background:#c9a37a; border-radius:999px; padding:1px 8px; font-weight:700; }
+  .hd .id { color:#c9a37a; font-family:ui-monospace,monospace; font-size:12.5px; }
+  .hd .ttl { color:#8b949e; font-size:12px; }
+  .row { display:flex; gap:14px; align-items:flex-start; }
+  .field { background:var(--boardBg); border:1px solid #222932; border-radius:8px; padding:6px; }
+  .loc { background:var(--spaceBg); border:1px solid #222932; border-radius:8px; padding:5px; }
+  canvas { display:block; }
+  .meta { font-size:11.5px; color:#8b949e; margin-top:8px; letter-spacing:.03em; max-width:420px; }
+  .meta b { color:#cfd4da; font-weight:600; }
+  table { border-collapse:collapse; font-size:12.5px; }
+  th, td { text-align:left; padding:4px 14px 4px 0; border-bottom:1px solid #222932; vertical-align:top; }
+  th { color:#8b949e; font-weight:600; }
+  td.n { color:#c9a37a; font-family:ui-monospace,monospace; }
+  .note { max-width:820px; color:#9aa3ad; font-size:12.5px; }
+  pre { color:#6e7781; font-size:10px; line-height:1.15; }
+</style>
+</head>
+<body>
+
+<h1>«Ронин» как набор деталей — эксперимент</h1>
+<p class="sub">Каждая деталь собирается отдельно, в своём масштабе: масштаб подобран так, чтобы деталь
+заняла поле 10×14 и дала нужное число кусков. Собранная деталь встаёт на своё место на корабле в его
+масштабе. Ниже — пять пробных уровней и перечень логических деталей всего корабля.</p>
+<p class="legend">
+  <b>s</b> — масштаб: сколько клеток поля приходится на клетку рисунка (на борту корабль 15 клеток рисунка
+  в ширину). Прежняя единая сетка — это s = 4 для всех деталей. <b>Пунктир</b> — контур мишени
+  (<code>ghostTarget</code>). <b>Справа</b> — место детали на борту: обведена её настоящая (векторная) форма.
+  Клетка входит в маску, если деталь покрывает больше половины клетки.
+</p>
+
+<div class="grid" id="cat"></div>
+
+<h2>ПЕРЕЧЕНЬ ЛОГИЧЕСКИХ ДЕТАЛЕЙ «РОНИНА» (оценка)</h2>
+<table>
+  <tr><th>Деталь</th><th>Тип</th><th>Сколько</th><th>Размер, клеток рисунка</th><th>s</th><th>Клеток поля</th><th>Кусков</th><th>Комментарий</th></tr>
+  <tr><td class="n">Нос с датчиком</td><td>предмет</td><td>1</td><td>5×2 + датчик</td><td>2</td><td>~42</td><td>4–5</td><td>шеврон рисунком, датчик — выступ сверху</td></tr>
+  <tr><td class="n">Мостик с визором</td><td>предмет</td><td>1</td><td>7×2</td><td>1.4</td><td>~30</td><td>3–4</td><td>визор слишком тонкий для отдельного уровня — идёт с плитой мостика</td></tr>
+  <tr><td class="n">RCS-квад</td><td>предмет</td><td>4</td><td>1.1×1.1</td><td>8</td><td>~40</td><td>4–5</td><td>Т-образный «крест»; левый и правый — зеркальные формы</td></tr>
+  <tr><td class="n">Стыковочный люк</td><td>предмет</td><td>1</td><td>1.8×1.8</td><td>4</td><td>~45</td><td>5</td><td>октагон</td></tr>
+  <tr><td class="n">Гондола</td><td>предмет</td><td>2</td><td>1.1×3.7</td><td>3.5</td><td>~45</td><td>5</td><td>вне корпуса, с кронштейнами и чашками сопел</td></tr>
+  <tr><td class="n">Грузовой люк, шлюз</td><td>предмет</td><td>2</td><td>1.9×1.6, 1.4×1.7</td><td>5</td><td>~70</td><td>8</td><td>почти прямоугольники — трудный старт, ставить ближе к концу</td></tr>
+  <tr><td class="n">Вернье-сопло</td><td>предмет</td><td>2</td><td>1.2×1.3</td><td>7</td><td>~55</td><td>6</td><td>колокол</td></tr>
+  <tr><td class="n">Корма: юбка и сопло</td><td>предмет</td><td>1</td><td>8.4×5.2</td><td>1.2</td><td>~30</td><td>3–4</td><td>сопло сейчас декор вне сетки; одно сопло в поле — всего 18 клеток, с юбкой — уровень; предлагаю сделать финальной деталью</td></tr>
+  <tr><td class="n">Плиты обшивки</td><td>плита</td><td>~20</td><td>8–12 клеток рисунка</td><td>2.5–3</td><td>60–80</td><td>7–10</td><td>фигурные, с вырезами под предметы; мелкое (иллюминаторы, надписи, торпедные люки, трубы, баки, радиатор) — рисунок на плите</td></tr>
+  <tr><td></td><td></td><td><b>~35</b></td><td></td><td></td><td></td><td></td><td>VISION говорит «~50–55»: при желании плиты мельче (s ниже) — деталей больше</td></tr>
+</table>
+
+<h2>ЧТО ВИДНО ПО ЭКСПЕРИМЕНТУ</h2>
+<div class="note">
+  <b>Предмет становится узнаваемым.</b> RCS-квад, люк, гондола, сопло на поле — это вещь, а не кусок борта;
+  неровный контур у них свой, природный.<br><br>
+  <b>Не всё годится в отдельный уровень.</b> Тонкое (визор, радиатор, трубы, щели иллюминаторов) в поле
+  10×14 вырождается в полоску в одну клетку — оно остаётся рисунком на плите. Прямоугольное (торпедные
+  люки) — тоже: уровень-прямоугольник скучный и трудный на старте.<br><br>
+  <b>Масштаб гуляет сильно:</b> RCS-квад показан втрое крупнее плиты рядом с ним (s = 8 против 2.25).
+  На поле это читается как «приблизили предмет» — по-моему, нормально, но это вопрос вкуса.<br><br>
+  <b>Вырез работает:</b> в плите остаются дыры под люк и RCS; дыра — это тоже неровность контура, то есть
+  подсказка для старта.<br><br>
+  <b>Метрика старта</b> (DESIGN.md § «Сложность старта», медиана по 6 seed «Крупных кусков»):
+  RCS-квад — 12 мест на кусок, корма — 11, люк и гондола — 15, плита с двумя вырезами — 24 (5 клеток-подсказок).
+  Предметы ложатся во вводную и среднюю полосу сами; плита с вырезами — в середину полной полосы.
+  Значит, трудные поздние уровни — плиты без вырезов или с одним, лёгкие ранние — предметы.<br><br>
+  <b>Рисунок в мокапе слегка мягкий</b> на крупных масштабах, и у RCS-квада поверх видна линия борта: страница
+  увеличивает готовую картинку корабля целиком. В игре каждая деталь рисуется кодом сразу в своём масштабе и
+  без чужого рисунка вокруг — там будет чётко.
+</div>
+
+<h2>МАСКИ (для прогона метрики)</h2>
+<pre id="masks"></pre>
+
+<script>window.__SHIP_RES = 6;</script>
+<script src="ship-render.js?res=1"></script>
+<script>
+(function(){
+"use strict";
+const SHIP = window.__SHIP, C = SHIP.C, px = SHIP.px, py = SHIP.py, cx = SHIP.cx, RES = SHIP.RES;
+const FW = 10, FH = 14, u = 26, lu = 13;    // поле в клетках; px на клетку поля и на клетку рисунка в локаторе
+
+/* --- геометрия областей (координаты рисунка, px до RES) --- */
+const P = (pts) => { const p = new Path2D(); pts.forEach(([x, y], i) => i ? p.lineTo(x, y) : p.moveTo(x, y)); p.closePath(); return p; };
+const H = (x, y) => [px(x), py(y)];          // клетка рисунка → px
+function rrPath(x, y, w, h, r){ const p = new Path2D(); p.moveTo(x+r,y); p.arcTo(x+w,y,x+w,y+h,r); p.arcTo(x+w,y+h,x,y+h,r); p.arcTo(x,y+h,x,y,r); p.arcTo(x,y,x+w,y,r); p.closePath(); return p; }
+function ellPath(x, y, rx, ry){ const p = new Path2D(); p.ellipse(x, y, rx, ry, 0, 0, 7); return p; }
+
+function rcsShapes(X, Y, flip){
+  const up = [[-5.2,-.56*C],[5.2,-.56*C],[3.4,-.3*C],[-3.4,-.3*C]];
+  const rot = (a) => up.map(([x, y]) => [X + x*Math.cos(a) - y*Math.sin(a), Y + x*Math.sin(a) + y*Math.cos(a)]);
+  return [rrPath(X-.3*C, Y-.3*C, .6*C, .6*C, 3), P(rot(0)), P(rot(flip*Math.PI/2)), P(rot(Math.PI))];
+}
+function octPath(R){ const ox = cx, oy = py(10.5), p = new Path2D();
+  for (let i = 0; i < 8; i++){ const a = Math.PI/8 + i*Math.PI/4; const X = ox+Math.cos(a)*R, Y = oy+Math.sin(a)*R; i ? p.lineTo(X, Y) : p.moveTo(X, Y); }
+  p.closePath(); return p; }
+function podShapes(){
+  const bw = 1.06*C, bh = 2.9*C, byt = py(13.55), bx = px(3) - bw + 2;
+  const cup = (dir) => { const ny = dir < 0 ? byt : byt + bh;
+    return [P([[bx+bw*.26,ny-dir],[bx+bw*.74,ny-dir],[bx+bw*.88,ny+dir*9],[bx+bw*.12,ny+dir*9]]), ellPath(bx+bw/2, ny+dir*9, bw*.37, 2.6)]; };
+  return [rrPath(bx, byt, bw, bh, 7), ...cup(-1), ...cup(1),
+          rrPath(bx+bw-4, py(14.15), 10, 5.5, 0), rrPath(bx+bw-4, py(15.6), 10, 5.5, 0)];
+}
+function bellShapes(){
+  const throatW = 1.75*C, exitW = 4.2*C, yT = py(27.0), yE = py(29.9), b = new Path2D();
+  b.moveTo(cx-throatW, yT); b.quadraticCurveTo(cx-throatW-5, yT+(yE-yT)*.62, cx-exitW, yE);
+  b.lineTo(cx+exitW, yE); b.quadraticCurveTo(cx+throatW+5, yT+(yE-yT)*.62, cx+throatW, yT); b.closePath();
+  return [rrPath(cx-2.15*C, yT-4, 4.3*C, 8, 0), b, ellPath(cx, yE, exitW*.97, .32*C)];
+}
+const torpedoL = rrPath(cx - 1.45*C - .42*C - 1, py(5.95) - 1, .84*C + 2, .66*C + 2, 3);
+
+/* Деталь: in — области, из которых состоит; out — вырезы; s — масштаб. */
+const PARTS = [
+  { id:'rcs_fl', title:'RCS-квад, нос слева', kind:'предмет', s:8,
+    in: rcsShapes(px(3), py(4.5), -1), out: [] },
+  { id:'dock_hatch', title:'Стыковочный люк', kind:'предмет', s:4,
+    in: [octPath(.9*C + 1.5)], out: [] },
+  { id:'pod_l', title:'Гондола, левый борт', kind:'предмет', s:3.5,
+    in: podShapes(), out: [] },
+  { id:'stern', title:'Корма: юбка и сопло-колокол', kind:'предмет', s:1.19,
+    in: [P([H(5,25),H(10,25),H(10,27),H(5,27)]), ...bellShapes()], out: [] },
+  { id:'fwd_plate_l', title:'Плита носовой секции, левая — с вырезами', kind:'плита', s:2.25,
+    in: [P([H(3,4),H(6,4),H(6,4.75),H(6.85,4.75),H(6.85,8),H(3,8)])],
+    out: [torpedoL, ...rcsShapes(px(3), py(4.5), -1)] },
+];
+
+/* --- растеризация: клетка в маске, если область покрывает > половины --- */
+const probe = document.createElement('canvas').getContext('2d');
+const inside = (part, x, y) => part.in.some(p => probe.isPointInPath(p, x, y)) && !part.out.some(p => probe.isPointInPath(p, x, y));
+function rasterize(part){
+  // bbox области: грубо (шаг 3 px), затем точно (шаг 0.5 px) в окрестности
+  let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+  for (let y = 0; y < SHIP.H; y += 3) for (let x = 0; x < SHIP.W; x += 3)
+    if (inside(part, x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  const X0 = x0 - 4, Y0 = y0 - 4, X1 = x1 + 4, Y1 = y1 + 4;
+  x0 = 1e9; y0 = 1e9; x1 = -1e9; y1 = -1e9;
+  for (let y = Y0; y <= Y1; y += .5) for (let x = X0; x <= X1; x += .5)
+    if (inside(part, x, y)) { x0 = Math.min(x0, x); y0 = Math.min(y0, y); x1 = Math.max(x1, x); y1 = Math.max(y1, y); }
+  const cs = C / part.s, bw = x1 - x0, bh = y1 - y0;
+  const cols = Math.ceil(bw / cs), rows = Math.ceil(bh / cs);
+  // сетка клеток центрирована на bbox: края режутся симметрично
+  let gx = x0 - (cols*cs - bw) / 2, gy = y0 - (rows*cs - bh) / 2;
+  const N = 6;
+  let mask = [];
+  for (let r = 0; r < rows; r++){
+    let line = '';
+    for (let c = 0; c < cols; c++){
+      let hit = 0;
+      for (let i = 0; i < N; i++) for (let j = 0; j < N; j++)
+        if (inside(part, gx + (c + (i+.5)/N)*cs, gy + (r + (j+.5)/N)*cs)) hit++;
+      line += hit * 2 > N*N ? '#' : '.';
+    }
+    mask.push(line);
+  }
+  // обрезаем пустые края со всех сторон
+  while (mask.length && !mask[0].includes('#')) { mask.shift(); gy += cs; }
+  while (mask.length && !mask[mask.length-1].includes('#')) mask.pop();
+  while (mask.every(l => l[0] === '.')) { mask = mask.map(l => l.slice(1)); gx += cs; }
+  while (mask.every(l => l[l.length-1] === '.')) mask = mask.map(l => l.slice(0, -1));
+  return { mask, gx, gy, cs };
+}
+
+const cat = document.getElementById('cat'), masksOut = [];
+PARTS.forEach((part, k) => {
+  const R = rasterize(part);
+  const mask = R.mask, w = mask[0].length, h = mask.length, gy = R.gy;
+  const cells = mask.join('').split('#').length - 1;
+  masksOut.push(`${part.id} s=${part.s} ${w}x${h} cells=${cells}\n` + mask.join('\n'));
+  const fits = w <= FW && h <= FH;
+  const el = document.createElement('div'); el.className = 'part';
+  el.innerHTML =
+    `<div class="hd"><span class="ord">${k+1}</span><span class="id">${part.id}</span><span class="ttl">${part.title}</span></div>` +
+    `<div class="row"><div class="field"><canvas></canvas></div><div class="loc"><canvas></canvas></div></div>` +
+    `<div class="meta">${part.kind} · s = <b>${part.s}</b> · <b>${cells}</b> клеток · маска <b>${w}×${h}</b>` +
+    `${fits ? '' : ' · <b style="color:#e07a5f">не влезает в поле</b>'} · кусков ≈ <b>${Math.max(3, Math.round(cells/8.5))}</b></div>`;
+  cat.appendChild(el);
+  const [cvF, cvL] = el.querySelectorAll('canvas');
+
+  /* поле укладки: каждая клетка — кусок рисунка в масштабе детали */
+  const k2 = window.devicePixelRatio || 1;
+  cvF.width = FW*u*k2; cvF.height = FH*u*k2; cvF.style.width = FW*u+'px'; cvF.style.height = FH*u+'px';
+  const g = cvF.getContext('2d'); g.scale(k2, k2); g.imageSmoothingQuality = 'high';
+  g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--boardBg').trim(); g.fillRect(0, 0, FW*u, FH*u);
+  g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
+  for (let c = 0; c <= FW; c++){ g.beginPath(); g.moveTo(c*u+.5, 0); g.lineTo(c*u+.5, FH*u); g.stroke(); }
+  for (let r = 0; r <= FH; r++){ g.beginPath(); g.moveTo(0, r*u+.5); g.lineTo(FW*u, r*u+.5); g.stroke(); }
+  const oc = Math.floor((FW - w) / 2), or = Math.floor((FH - h) / 2);
+  const on = (c, r) => r >= 0 && r < h && c >= 0 && c < w && mask[r][c] === '#';
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (on(c, r)) {
+    g.drawImage(SHIP.off, (R.gx + c*R.cs)*RES, (gy + r*R.cs)*RES, R.cs*RES, R.cs*RES, (oc+c)*u, (or+r)*u, u, u);
+    g.strokeStyle = 'hsla(220,14%,4%,.55)'; g.strokeRect((oc+c)*u+.5, (or+r)*u+.5, u, u);    // seam
+  }
+  g.strokeStyle = 'hsla(23,62%,55%,.6)'; g.lineWidth = 2; g.beginPath();                    // ghostTarget
+  for (let r = 0; r < h; r++) for (let c = 0; c < w; c++) if (on(c, r)) {
+    const X = (oc+c)*u, Y = (or+r)*u;
+    if (!on(c, r-1)) { g.moveTo(X, Y); g.lineTo(X+u, Y); }
+    if (!on(c, r+1)) { g.moveTo(X, Y+u); g.lineTo(X+u, Y+u); }
+    if (!on(c-1, r)) { g.moveTo(X, Y); g.lineTo(X, Y+u); }
+    if (!on(c+1, r)) { g.moveTo(X+u, Y); g.lineTo(X+u, Y+u); }
+  }
+  g.stroke();
+
+  /* локатор: весь корабль бледно, деталь — в полном свете по своей векторной форме */
+  const sx = px(0.5), sy = py(-1.5), sw = 14*C, sh = 33*C, sc = lu / C;
+  cvL.width = sw*sc*k2; cvL.height = sh*sc*k2; cvL.style.width = sw*sc+'px'; cvL.style.height = sh*sc+'px';
+  const gl = cvL.getContext('2d'); gl.scale(k2, k2);
+  gl.globalAlpha = .28; gl.drawImage(SHIP.off, sx*RES, sy*RES, sw*RES, sh*RES, 0, 0, sw*sc, sh*sc); gl.globalAlpha = 1;
+  gl.save(); gl.scale(sc, sc); gl.translate(-sx, -sy);
+  const region = new Path2D(); part.in.forEach(p => region.addPath(p));
+  gl.save(); gl.clip(region, 'nonzero');
+  if (part.out.length) { const holes = new Path2D(); holes.rect(-1e4, -1e4, 2e4, 2e4); part.out.forEach(p => holes.addPath(p)); gl.clip(holes, 'evenodd'); }
+  gl.drawImage(SHIP.off, 0, 0, SHIP.W*RES, SHIP.H*RES, 0, 0, SHIP.W, SHIP.H);
+  gl.restore();
+  gl.strokeStyle = 'hsla(23,62%,55%,.9)'; gl.lineWidth = 1.5 / sc;
+  part.in.forEach(p => gl.stroke(p)); part.out.forEach(p => { gl.setLineDash([3/sc, 2/sc]); gl.stroke(p); });
+  gl.restore();
+});
+document.getElementById('masks').textContent = masksOut.join('\n\n');
+})();
+</script>
+</body>
+</html>
