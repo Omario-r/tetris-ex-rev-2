@@ -12,8 +12,8 @@ import '../../game_engine/packing/pack_controller.dart';
 import '../../game_engine/packing/pack_piece.dart';
 import '../../game_engine/packing/slice_config.dart';
 import '../../game_engine/packing/pack_state.dart';
+import '../ship_render/ronin_art.dart';
 import '../theme/block_material.dart';
-import '../theme/ship_materials.dart';
 import '../widgets/packing_painter.dart';
 import '../widgets/ship.dart';
 import 'cheat_menu.dart';
@@ -98,12 +98,15 @@ class _GameScreenState extends State<GameScreen>
 
   // --- Силуэт уровня и нарезка ---
   late TargetMask _silhouette;
+
+  /// Сдвиг bbox маски детали в поле (`PreparedLevel.targetX/targetY`):
+  /// по нему уложенная клетка поля находит свой кусок рисунка.
+  late int _targetX, _targetY;
   late int _fragmentIndex;
 
   /// Клетка лотка (и ширина клетки): `min(32, 160 / h)`, `h` — наибольшая
   /// высота куска уровня в клетках; считается один раз при (пере)сборке уровня.
   late double _trayCellSize;
-  late BlockMaterial _partMaterial;
 
   /// Сдвиг seed от канонного `RoninPartDef.seed` детали (0 → канонная
   /// нарезка); «Пересобрать нарезку» инкрементирует и режет заново.
@@ -159,16 +162,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Запоминает деталь уровня ([LevelMap] — единый источник «уровень i ↔
-  /// деталь i») и материал, затем собирает уровень в выбранной конфигурации
-  /// нарезки ([_rebuild]).
+  /// деталь i»), затем собирает уровень в выбранной конфигурации нарезки
+  /// ([_rebuild]).
   void _loadLevel() {
     _fragmentIndex = LevelMap.levelAt(widget.levelIndex).fragmentIndex;
-    // Временно: клетка станет куском рисунка в Стори 03 эпика Ронин-1. Один
-    // материал на все детали — `ShipMaterials` (7 записей, дев-детали) не
-    // покрывает их (Ронин-1/01 T3, было T4 п. 3, перенесено решением
-    // Постановщика по эскалации T3: без этого смоук `win_flow_test.dart`
-    // падал `RangeError`ом на 8-й детали).
-    _partMaterial = BlockMaterial.graphite;
     _rebuild();
   }
 
@@ -183,6 +180,8 @@ class _GameScreenState extends State<GameScreen>
       seed: part.seed + _seedOffset,
     );
     _silhouette = prepared.silhouette;
+    _targetX = prepared.targetX;
+    _targetY = prepared.targetY;
     final slice = prepared.slice;
     var maxHeight = 1;
     for (final p in slice.pieces) {
@@ -869,9 +868,11 @@ class _GameScreenState extends State<GameScreen>
           painter: PackingPainter(
             state: state,
             cellSize: cellSize,
-            shipMaterials: ShipMaterials.defaultMaterials,
+            art: RoninArt.shared,
+            part: RoninParts.parts[_fragmentIndex],
+            targetX: _targetX,
+            targetY: _targetY,
             excludePieceId: _dragFromTray ? null : _dragPieceId,
-            partMaterial: _partMaterial,
             dragPreview: preview,
           ),
         ),

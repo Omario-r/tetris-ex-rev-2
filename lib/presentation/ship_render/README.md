@@ -16,9 +16,11 @@
   `toScene(x, y)` — клетка рисунка → px; `hullPicture` — слой 0, корпус без
   предметов; `objectsPicture` — слой 1, предметы; `outline` — контур борта +
   гондолы; `objectShape(partId)` — форма предмета (`'sensor'`, `'rcs_fl'`,
-  `'rcs_fr'`), px рисунка, иначе `ArgumentError`.
+  `'rcs_fr'`), px рисунка, иначе `ArgumentError`; `backdrop` — подложка клетки поля
+  там, где рисунка нет (фона в слоях нет; у «Ронина» `#070A11` — середина фона эталона).
 - `RoninArt implements ShipArt` (`ronin_art.dart`) — порт `ship-render.js` 1:1 в
-  объёме «Ронина-1». Статики: `cellPx` (`C=24`), `ox/oy`, `width/height`, `rows`,
+  объёме «Ронина-1». `RoninArt.shared` — общий экземпляр на запуск (экран корабля и
+  поле укладки). Статики: `cellPx` (`C=24`), `ox/oy`, `width/height`, `rows`,
   `px()/py()`, `cx`, `span`, `plates`. `mulberry32(seed)` — рандом эталона.
   `ShipObject`, `roninObjects` — параметры форм предметов (в `RoninPartDef` их нет).
 - `ShipCompositePainter({art, collectedCount, revealPartIndex?, revealProgress=1})`
@@ -29,10 +31,14 @@
   (объединение клеток) + `hullPicture`, затем предметы: один клип (формы) +
   `objectsPicture`. Деталь `revealPartIndex` при `0 < revealProgress < 1` —
   отдельный клип/replay со scale от центра bbox детали; при 1 — в общем клипе.
-- `paintPartCell(canvas, art, part, c, r, dst)` (`ship_cell_sampler.dart`) — точка
-  входа поля укладки (Стори 03): клетка маски детали → `dst` (масштаб + сдвиг, клип
-  `dst`); плита — `hullPicture`, предмет — `hullPicture` + `objectsPicture`.
+- `paintPartCell(canvas, art, part, c, r, dst)` (`ship_cell_sampler.dart`) — одна
+  клетка маски детали → `dst` (клип `dst`, подложка `backdrop`, масштаб + сдвиг);
+  плита — `hullPicture`, предмет — `hullPicture` + `objectsPicture`.
   `shipCellRect(art, part, c, r)` — та же клетка в px рисунка (источник сэмплинга).
+- `paintPartCells(canvas, art, part, cells, {origin, cellSize})` — точка входа поля
+  укладки (Ронин-1/03): клетки маски `cells` → `origin + (c, r) * cellSize`; один клип
+  (объединение клеток) → `backdrop` → один replay на слой. Растр клетки = `paintPartCell`
+  в том же прямоугольнике (тест). Пустой `cells` — ничего не рисует.
 
 ## Зависит от
 
@@ -41,15 +47,19 @@
 
 ## От него зависят
 
-- `presentation/screens` — `ship_screen` (`ShipCompositePainter`, `RoninArt`);
-  поле укладки — Стори 03 (`paintPartCell`).
+- `presentation/screens` — `ship_screen` (`ShipCompositePainter`, `RoninArt.shared`),
+  `game_screen` (`RoninArt.shared` → `PackingPainter`).
+- `presentation/widgets` — `PackingPainter` (`ShipArt`, `paintPartCells`; Ронин-1/03).
 
 ## Инварианты
 
 - Раскладка плит детерминирована и совпадает с эталоном JS (39 плит, тест держит
   `x, y, w, h, kind, i, jl, rv`). Порядок вызовов `rnd()` в нарезке не менять.
-- Картинки записываются один раз на экземпляр (`late final`); экран держит один
-  общий `RoninArt` на запуск. Собранное = один клип-путь на слой, не по клетке.
+- Картинки записываются один раз на экземпляр (`late final`); экраны берут один
+  общий `RoninArt.shared` на запуск. Собранное и уложенное на поле = один клип-путь
+  на слой, не по клетке.
+- Клетка поля и клетка корабля сэмплируют одно и то же: под рисунком — `backdrop`
+  в обеих точках входа (`paintPartCell`/`paintPartCells`), иначе вид разъедется.
 - `objectsPicture` — только под клипом `objectShape(id)` или поверх `hullPicture`
   (в конце слоя повторён штрих контура корпуса — так он совпадает с полным рисунком).
 - Не переносится (Ронин-2): фон, «РОНИН», люк, гондолы-объёмы, радиатор, корма.
@@ -58,4 +68,4 @@
 ## Как проверить
 
 `flutter test test/presentation/ship_render/` — эталоны, растр слоёв, контур,
-формы предметов, композит при 0/3/15, сэмплинг клетки.
+формы предметов, композит при 0/3/15, сэмплинг клетки и клеток поля.

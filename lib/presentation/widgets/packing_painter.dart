@@ -1,22 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../game_engine/data/ronin_parts.dart';
 import '../../game_engine/packing/pack_piece.dart';
 import '../../game_engine/packing/pack_state.dart';
+import '../ship_render/ship_art.dart';
+import '../ship_render/ship_cell_sampler.dart';
 import '../theme/block_material.dart';
 import '../theme/block_paint_utils.dart';
 import '../theme/block_theme.dart';
-import '../theme/ship_materials.dart';
-import 'ship.dart' show kShipPartCount;
 
 /// Рисует укладку (эпик «Укладка», Стори 01 T3, канон утверждён Стори 02 T1):
 /// силуэт (ghost для незаполненных клеток S, канон [BlockTheme.ghostTarget])
-/// + уложенные кусочки (залитые `el-block`, [BlockPaintUtils.paintElBlock]) +
-/// живое снап-превью драга (`el-drop-ok`/`el-drop-bad`, [dragPreview]).
-/// Уложенные клетки красятся единым [partMaterial] детали, если задан
-/// (канон `el-cell-filled`), иначе — прежней циклической [materialForPiece]
-/// (обратная совместимость прототипа). Реиспользует существующие токены/
-/// пейнтеры `presentation/theme` — новой палитры не заводит (Дизайн-референс
-/// Стори 02 T1).
+/// + уложенные клетки — каждая свой кусок рисунка корабля в масштабе детали
+/// (канон `el-cell-filled`, Ронин-1/03: [paintPartCells]) + [seam] по границе
+/// каждой уложенной клетки + живое снап-превью драга
+/// (`el-drop-ok`/`el-drop-bad`, [dragPreview]).
 ///
 /// Только вид — без игровой логики (инвариант модуля `widgets`): не мутирует
 /// [state], не знает про drag-жесты (это `presentation/screens`).
@@ -25,9 +23,11 @@ class PackingPainter extends CustomPainter {
   const PackingPainter({
     required this.state,
     required this.cellSize,
-    required this.shipMaterials,
+    required this.art,
+    required this.part,
+    required this.targetX,
+    required this.targetY,
     this.excludePieceId,
-    this.partMaterial,
     this.dragPreview,
   });
 
@@ -37,21 +37,24 @@ class PackingPainter extends CustomPainter {
   /// Пиксельный размер одной клетки силуэта.
   final double cellSize;
 
-  /// Материалы, которыми красятся кусочки (циклически по `pieceId`, см.
-  /// [materialForPiece]) — та же палитра, что у корабля/поля (эпик #4).
-  /// Используется, только если [partMaterial] не задан.
-  final ShipMaterials shipMaterials;
+  /// Рисунок корабля, из которого сэмплируются уложенные клетки.
+  final ShipArt art;
+
+  /// Деталь уровня: её маска лежит в поле со сдвигом [targetX]/[targetY];
+  /// масштаб и место клеток на корабле — `cellOnShip`.
+  final RoninPartDef part;
+
+  /// Сдвиг bbox маски детали в поле по X (`PreparedLevel.targetX`): клетка
+  /// поля (x, y) ↔ клетка маски (x − [targetX], y − [targetY]).
+  final int targetX;
+
+  /// Сдвиг bbox маски детали в поле по Y (`PreparedLevel.targetY`).
+  final int targetY;
 
   /// Id уложенного кусочка, который сейчас пропускается при отрисовке (экран
   /// рисует его отдельно как плавающий drag-фидбэк — иначе кусочек рисовался
   /// бы дважды, на старом месте и под пальцем).
   final int? excludePieceId;
-
-  /// Материал собранной детали (единый цвет). Если задан — ВСЕ уложенные
-  /// клетки красятся им (канон `el-cell-filled`, Стори 02 T1). Если `null` —
-  /// прежнее поведение: циклическая [materialForPiece] (обратная
-  /// совместимость с прототипом Стори 01 T3).
-  final BlockMaterial? partMaterial;
 
   /// Живое снап-превью текущего драга (клетки поля, куда ляжет кусок при
   /// текущем якоре, + валидность). `null` — драга нет, превью не рисуется
@@ -82,18 +85,15 @@ class PackingPainter extends CustomPainter {
   /// (пульс, канон `board.complete`).
   static const Color doneGlow = Color(0x8CE09952);
 
-  /// Материал кусочка по его `pieceId`: циклический выбор из
-  /// [ShipMaterials.defaultMaterials] (7 материалов эпика #4) — различает
-  /// соседние кусочки на существующих токенах, новой палитры не заводит
-  /// (Дизайн-референс T3).
-  static BlockMaterial materialForPiece(int pieceId, ShipMaterials materials) {
-    return materials.materialForPart(pieceId % kShipPartCount);
-  }
+  /// seam token (`docs/DESIGN.md`, `hsla(220 14% 4% / 55%)`): разделитель
+  /// уложенных клеток — только на поле укладки (на корабле швы даёт рисунок).
+  static const Color seam = Color(0x8C090A0C);
 
   /// Рисует один кусочек [piece] с левым-верхним углом в пиксельной точке
-  /// [originPx]. Единая точка правды «как выглядит кусочек» — переиспользуется
-  /// и здесь (уложенные кусочки), и в `packing_prototype_screen` (лоток +
-  /// drag-фидбэк), чтобы вид не разъезжался.
+  /// [originPx] — «сырой» вид кусочка вне поля (лоток и кусок в руке,
+  /// `el-piece-tray`/`el-piece-drag`, материал `graphite`). Единая точка
+  /// правды — её зовёт `GameScreen`, чтобы вид лотка и драга не разъезжался.
+  /// Уложенные клетки так не рисуются — они куски рисунка корабля.
   static void paintPiece(
     Canvas canvas,
     PackPiece piece,
@@ -155,19 +155,40 @@ class PackingPainter extends CustomPainter {
       }
     }
 
-    // Уложенные кусочки.
-    for (final entry in state.placements.entries) {
-      if (entry.key == excludePieceId) continue;
-      final piece = state.pieces.firstWhere((p) => p.id == entry.key);
-      final origin = entry.value;
-      final material =
-          partMaterial ?? materialForPiece(entry.key, shipMaterials);
-      paintPiece(
-        canvas,
-        piece,
-        Offset(origin.x * cellSize, origin.y * cellSize),
-        cellSize,
-        material,
+    // Уложенные клетки — куски рисунка детали (канон `el-cell-filled`): одним
+    // вызовом, один клип и один replay на слой. Клетка поля (x, y) ↔ клетка
+    // маски (x − targetX, y − targetY); маска (0, 0) ложится в клетку поля
+    // (targetX, targetY), поэтому кусок попадает ровно в свой прямоугольник.
+    paintPartCells(
+      canvas,
+      art,
+      part,
+      [for (final f in occupied) (x: f.x - targetX, y: f.y - targetY)],
+      origin: Offset(targetX * cellSize, targetY * cellSize),
+      cellSize: cellSize,
+    );
+
+    // seam по границе каждой уложенной клетки (мокап `renderPlaced`:
+    // `strokeRect(c*CELL+.5, r*CELL+.5, CELL, CELL)`, 1 px). Один путь —
+    // общая граница соседних клеток ложится одной линией, не двойной.
+    if (occupied.isNotEmpty) {
+      final seams = Path();
+      for (final f in occupied) {
+        seams.addRect(
+          Rect.fromLTWH(
+            f.x * cellSize + 0.5,
+            f.y * cellSize + 0.5,
+            cellSize,
+            cellSize,
+          ),
+        );
+      }
+      canvas.drawPath(
+        seams,
+        Paint()
+          ..color = seam
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.0,
       );
     }
 
@@ -206,9 +227,11 @@ class PackingPainter extends CustomPainter {
   bool shouldRepaint(covariant PackingPainter oldDelegate) {
     return state != oldDelegate.state ||
         cellSize != oldDelegate.cellSize ||
-        shipMaterials != oldDelegate.shipMaterials ||
+        art != oldDelegate.art ||
+        part != oldDelegate.part ||
+        targetX != oldDelegate.targetX ||
+        targetY != oldDelegate.targetY ||
         excludePieceId != oldDelegate.excludePieceId ||
-        partMaterial != oldDelegate.partMaterial ||
         dragPreview != oldDelegate.dragPreview;
   }
 }

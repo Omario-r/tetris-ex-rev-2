@@ -18,6 +18,62 @@ Future<int> _alpha(ui.Image img, int x, int y) async {
   return data.getUint8((y * img.width + x) * 4 + 3);
 }
 
+/// RGBA пикселя ([x], [y]) растра [img].
+Future<List<int>> _rgba(ui.Image img, int x, int y) async {
+  final data = (await img.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+  final i = (y * img.width + x) * 4;
+  return [for (var k = 0; k < 4; k++) data.getUint8(i + k)];
+}
+
+/// `paintPartCells` по [cells] детали [id] против `paintPartCell` по тем же
+/// клеткам (холст 1×, клетка 32, origin (0, 0)): в точках `(c + .5) * 32` и
+/// `(c + .2) * 32` каналы совпадают с допуском ±2.
+Future<void> _expectCellsMatchSingle(
+  RoninArt art,
+  String id,
+  List<({int x, int y})> cells,
+) async {
+  const cs = 32.0;
+  const size = 320;
+  final part = RoninParts.byId(id);
+  final many = await _raster(
+    size,
+    size,
+    (g) =>
+        paintPartCells(g, art, part, cells, origin: Offset.zero, cellSize: cs),
+  );
+  final single = await _raster(size, size, (g) {
+    for (final cell in cells) {
+      paintPartCell(
+        g,
+        art,
+        part,
+        cell.x,
+        cell.y,
+        Rect.fromLTWH(cell.x * cs, cell.y * cs, cs, cs),
+      );
+    }
+  });
+  for (final cell in cells) {
+    for (final f in const [0.5, 0.2]) {
+      final x = ((cell.x + f) * cs).floor(), y = ((cell.y + f) * cs).floor();
+      final a = await _rgba(many, x, y), b = await _rgba(single, x, y);
+      for (var k = 0; k < 4; k++) {
+        expect(
+          (a[k] - b[k]).abs(),
+          lessThanOrEqualTo(2),
+          reason:
+              '$id клетка (${cell.x}, ${cell.y}) точка ($x, $y) канал $k: '
+              '$a против $b',
+        );
+      }
+      expect(a[3], 255, reason: 'клетка залита целиком (подложка + рисунок)');
+    }
+  }
+  many.dispose();
+  single.dispose();
+}
+
 void main() {
   final art = RoninArt();
   const c = RoninArt.cellPx;
@@ -72,5 +128,88 @@ void main() {
     expect(await _alpha(img, 5, 27), 0); // вне dst — пусто
     expect(await _alpha(img, 50, 27), 0);
     img.dispose();
+  });
+
+  group('paintPartCells (поле укладки, Ронин-1/03)', () {
+    test(
+      'плита bridge_c: растр клеток = paintPartCell в тех же клетках',
+      () async {
+        await _expectCellsMatchSingle(art, 'bridge_c', const [
+          (x: 4, y: 0),
+          (x: 5, y: 0),
+          (x: 0, y: 2),
+        ]);
+      },
+    );
+
+    test(
+      'предмет sensor: растр клеток = paintPartCell в тех же клетках',
+      () async {
+        await _expectCellsMatchSingle(art, 'sensor', const [
+          (x: 3, y: 0),
+          (x: 3, y: 1),
+          (x: 0, y: 5),
+        ]);
+      },
+    );
+
+    test('вне переданных клеток — прозрачно', () async {
+      final part = RoninParts.byId('bridge_c');
+      final img = await _raster(
+        320,
+        320,
+        (g) => paintPartCells(
+          g,
+          art,
+          part,
+          const [(x: 4, y: 0), (x: 5, y: 0)],
+          origin: Offset.zero,
+          cellSize: 32,
+        ),
+      );
+      expect(await _alpha(img, 4 * 32 + 16, 16), 255);
+      expect(await _alpha(img, 6 * 32 + 16, 16), 0); // соседняя клетка маски
+      expect(await _alpha(img, 3 * 32 + 16, 16), 0);
+      expect(await _alpha(img, 4 * 32 + 16, 32 + 16), 0);
+      img.dispose();
+    });
+
+    test('origin сдвигает клетки: (0, 0) маски ложится в origin', () async {
+      final part = RoninParts.byId('bridge_c');
+      final img = await _raster(
+        320,
+        320,
+        (g) => paintPartCells(
+          g,
+          art,
+          part,
+          const [(x: 0, y: 2)],
+          origin: const Offset(64, 32),
+          cellSize: 32,
+        ),
+      );
+      expect(await _alpha(img, 64 + 16, 32 + 2 * 32 + 16), 255);
+      expect(await _alpha(img, 16, 2 * 32 + 16), 0); // без сдвига было бы тут
+      img.dispose();
+    });
+
+    test('пустой список — пустой растр', () async {
+      final part = RoninParts.byId('sensor');
+      final img = await _raster(
+        64,
+        64,
+        (g) => paintPartCells(
+          g,
+          art,
+          part,
+          const <({int x, int y})>[],
+          origin: Offset.zero,
+          cellSize: 32,
+        ),
+      );
+      final data = (await img.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+      expect(data.buffer.asUint8List().every((b) => b == 0), isTrue);
+      img.dispose();
+    });
   });
 }

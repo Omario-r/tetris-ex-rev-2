@@ -16,11 +16,11 @@
   (Ронин-1/07 T2): `_rebuild()` зовёт `prepareLevel(RoninParts.parts[levelIndex].mask,
   GameScreen.sliceConfig, seed: part.seed + _seedOffset)` и берёт `silhouette`, `slice`. Поле —
   10×14; экран геометрию поля не выводит,
-  читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Материал уложенных
-  клеток `_partMaterial` — один временный `BlockMaterial.graphite` на все детали (Ронин-1/01
-  T3, было `ShipMaterials.defaultMaterials.materialForPart(fragmentIndex)`: 7-элементная карта
-  не покрывала детали «Ронина» — `RangeError` на 8-м уровне; `ShipMaterials` из экрана
-  больше не читается для этого поля). Нарезка (`prepared.slice`) →
+  читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Уложенные
+  клетки — куски рисунка (Ронин-1/03): `_rebuild` запоминает `_targetX/_targetY`
+  (`prepared.targetX/targetY`, сдвиг маски в поле), `PackingPainter` получает
+  `art: RoninArt.shared`, `part: RoninParts.parts[_fragmentIndex]`, `targetX/targetY`;
+  материала детали (`_partMaterial`, `ShipMaterials`) у экрана нет. Нарезка (`prepared.slice`) →
   `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
   (`PackState.isComplete`) → **деталь собрана** → прежний мета-поток
@@ -96,7 +96,7 @@
   `top = p.y − _dragLiftGap(32) − h` (по центру X, низ выше пальца на 32 ≈ 1 клетка; подбирается
   на устройстве); им пользуются и `_buildFeedback`, и `_anchorAt`. Отпустил над силуэтом → `place`/`move`, вне поля с уложенного → `remove` (в лоток),
   `onPointerCancel` → сброс без укладки. Клетки лотка/драга — `graphite`
-  (`el-piece-tray`/`el-piece-drag`), уложенные — материал детали (`PackingPainter.partMaterial`).
+  (`el-piece-tray`/`el-piece-drag`), уложенные — куски рисунка детали (`PackingPainter`, Ронин-1/03).
   Снап-превью (`el-drop-ok`/`el-drop-bad`) пересчитывается в `build` (`_computePreview` →
   `PackController.canPlace`) и передаётся `PackingPainter.dragPreview`.
 - Завершение: `Key('packing_complete')` при `isComplete` (баннер «ДЕТАЛЬ СОБРАНА», без
@@ -113,8 +113,8 @@
   `initState`), справа пустое место 34 (кнопки «⤢» нет). Центр — `ShipCompositePainter`
   (`ship_render`) на всю свободную область. Низ — `Key('ship_continue_button')`
   «Продолжить сборку» (поля 16, высота 44, радиус 10, рамка 2 `hazardOrange`) → `pop`.
-  `SafeArea(minimum: bottom 22)` (`.safe.b`). `art` — рисунок (`ShipArt`), `null` → общий
-  статический `RoninArt` (картинки слоёв записываются раз за запуск). Вход —
+  `SafeArea(minimum: bottom 22)` (`.safe.b`). `art` — рисунок (`ShipArt`), `null` →
+  `RoninArt.shared` (картинки слоёв записываются раз за запуск; тот же экземпляр рисует поле). Вход —
   `Key('ship_button')` на `GameScreen`.
 - `ShipScreen.reveal({collectedCount, onNext, isComplete, art})` — авто-показ прироста после
   победы: тот же макет, деталь `collectedCount-1` въезжает scale-in (400 мс, easeOut),
@@ -136,10 +136,11 @@
 - `game_engine/packing` (`PackController`/`PackState`/`PackPiece`/`SliceConfig`/`prepareLevel`),
   `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`, `RoninParts` — только
   чтение, название детали для топбара, Ронин-1/01 T4),
-  `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`/`ShipMaterials`),
-  `presentation/widgets` (`PackingPainter`, `kShipPartCount` из `ship.dart` — `game_screen`/
-  `cheat_menu`), `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`, `ShipArt`,
-  `RoninArt`; Ронин-1/02 T2 — `ShipPainter` экраном больше не используется). `GameScreen` больше НЕ зависит от
+  `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`; `ShipMaterials` — нет,
+  Ронин-1/03), `presentation/widgets` (`PackingPainter`, `kShipPartCount` из `ship.dart` —
+  `game_screen`/`cheat_menu`), `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`,
+  `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03; Ронин-1/02
+  T2 — `ShipPainter` экраном больше не используется). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
   `theme/level_skin` (пересадка на укладку, Стори 02 T2).
 - `cheat_menu.dart` импортирует `FeedMode` из `game_screen.dart` (взаимный импорт —

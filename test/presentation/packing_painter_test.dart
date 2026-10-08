@@ -1,18 +1,23 @@
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/game_engine/models/target_mask.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_piece.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_state.dart';
+import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
+import 'package:explosive_tetris/presentation/ship_render/ronin_art.dart';
+import 'package:explosive_tetris/presentation/ship_render/ship_cell_sampler.dart';
 import 'package:explosive_tetris/presentation/theme/block_material.dart';
-import 'package:explosive_tetris/presentation/theme/ship_materials.dart';
+import 'package:explosive_tetris/presentation/theme/block_theme.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
 
 /// Силуэт 2×1, обе клетки в S — два однокелеточных кусочка (id 1 и 2) уложены
-/// каждый в свою клетку. Достаточно для проверки цвета уложенных клеток без
-/// лишней сложности нарезки/связности.
+/// каждый в свою клетку. Достаточно для проверки исключения поднятого куска
+/// без лишней сложности нарезки/связности.
 PackState _twoPieceState() {
   const silhouette = TargetMask(rows: ['##']);
   return const PackState(
@@ -26,91 +31,228 @@ PackState _twoPieceState() {
   );
 }
 
-/// Рендерит [painter] на изображение [width]×[height] и возвращает RGBA-байты
-/// пикселя в глобальных координатах ([x],[y]) как `(r, g, b, a)`.
-Future<(int, int, int, int)> _samplePixel(
-  CustomPainter painter,
-  int width,
-  int height,
-  int x,
-  int y,
-) async {
-  final recorder = ui.PictureRecorder();
-  final canvas = Canvas(recorder);
-  painter.paint(canvas, Size(width.toDouble(), height.toDouble()));
-  final picture = recorder.endRecording();
-  final image = await picture.toImage(width, height);
-  final byteData = await image.toByteData(format: ui.ImageByteFormat.rawRgba);
-  final data = byteData!;
-  final i = (y * width + x) * 4;
-  return (
-    data.getUint8(i),
-    data.getUint8(i + 1),
-    data.getUint8(i + 2),
-    data.getUint8(i + 3),
+/// Пейнтер с рисунком «Ронина» и деталью [partId] (по умолчанию `bridge_c`)
+/// без сдвига маски — для тестов, где важен не кусок рисунка, а остальное.
+PackingPainter _painter(
+  PackState state, {
+  String partId = 'bridge_c',
+  int targetX = 0,
+  int targetY = 0,
+  int? excludePieceId,
+  PackDragPreview? dragPreview,
+}) {
+  return PackingPainter(
+    state: state,
+    cellSize: 34.0,
+    art: RoninArt.shared,
+    part: RoninParts.byId(partId),
+    targetX: targetX,
+    targetY: targetY,
+    excludePieceId: excludePieceId,
+    dragPreview: dragPreview,
   );
 }
 
+/// Рисует [draw] на холст [width]×[height] и отдаёт RGBA-байты растра.
+Future<ByteData> _rasterBytes(
+  int width,
+  int height,
+  void Function(Canvas) draw,
+) async {
+  final recorder = ui.PictureRecorder();
+  draw(Canvas(recorder));
+  final image = await recorder.endRecording().toImage(width, height);
+  final data = (await image.toByteData(format: ui.ImageByteFormat.rawRgba))!;
+  image.dispose();
+  return data;
+}
+
+/// Пиксель ([x], [y]) растра шириной [width] как `[r, g, b, a]`.
+List<int> _px(ByteData data, int width, int x, int y) {
+  final i = (y * width + x) * 4;
+  return [for (var k = 0; k < 4; k++) data.getUint8(i + k)];
+}
+
+/// Каналы [a] и [b] совпадают с допуском [tol].
+bool _close(List<int> a, List<int> b, [int tol = 2]) {
+  for (var k = 0; k < 4; k++) {
+    if ((a[k] - b[k]).abs() > tol) return false;
+  }
+  return true;
+}
+
+int _sum(List<int> p) => p[0] + p[1] + p[2];
+
+List<int> _rgbaOf(Color c) => [
+  (c.r * 255).round(),
+  (c.g * 255).round(),
+  (c.b * 255).round(),
+  (c.a * 255).round(),
+];
+
 void main() {
-  group('PackingPainter — partMaterial (единый материал детали)', () {
-    test('с partMaterial уложенные клетки разных кусочков — одного цвета '
-        '(материал детали, не циклическая палитра)', () async {
-      final state = _twoPieceState();
-      const cellSize = 34.0; // baseCellSize — центр клетки далеко от бевела.
-      const material = BlockMaterial.hazardOrange;
+  group(
+    'PackingPainter — уложенные клетки из рисунка корабля (Ронин-1/03)',
+    () {
+      // Настоящий уровень: деталь bridge_c отцентрована в поле 10×14, на поле
+      // лежит один кусок эталонной раскладки, остальное — мишень.
+      const cs = 34.0;
+      const fieldW = 340, fieldH = 476;
+      final part = RoninParts.byId('bridge_c');
+      final prepared = prepareLevel(
+        part.mask,
+        SliceConfig.bigPieces,
+        seed: part.seed,
+      );
+      final placedId = prepared.slice.solution.keys.first;
+      final state = PackState(
+        silhouette: prepared.silhouette,
+        placements: {placedId: prepared.slice.solution[placedId]!},
+        pieces: prepared.slice.pieces,
+        trayOrder: prepared.trayOrder,
+      );
+      final occupied = state.occupiedCells.toList()
+        ..sort((a, b) => a.y != b.y ? a.y - b.y : a.x - b.x);
+      final ghostCell = prepared.silhouette.cells.firstWhere(
+        (c) => !state.occupiedCells.contains(c),
+      );
 
-      final painter = PackingPainter(
+      PackingPainter fieldPainter({int? excludePieceId}) => PackingPainter(
         state: state,
-        cellSize: cellSize,
-        shipMaterials: ShipMaterials.defaultMaterials,
-        partMaterial: material,
+        cellSize: cs,
+        art: RoninArt.shared,
+        part: part,
+        targetX: prepared.targetX,
+        targetY: prepared.targetY,
+        excludePieceId: excludePieceId,
       );
 
-      // Центры клетки 0 (кусочек id 1) и клетки 1 (кусочек id 2, +cellSize по X).
-      final cell0 = await _samplePixel(painter, 68, 34, 17, 17);
-      final cell1 = await _samplePixel(painter, 68, 34, 51, 17);
-
-      final expected = (
-        (material.color.r * 255).round(),
-        (material.color.g * 255).round(),
-        (material.color.b * 255).round(),
-        255,
+      Future<ByteData> paintField({int? excludePieceId}) => _rasterBytes(
+        fieldW,
+        fieldH,
+        (g) => fieldPainter(
+          excludePieceId: excludePieceId,
+        ).paint(g, const Size(340, 476)),
       );
 
-      expect(
-        cell0,
-        equals(expected),
-        reason: 'клетка кусочка id 1 должна быть покрашена partMaterial',
-      );
-      expect(
-        cell1,
-        equals(expected),
-        reason:
-            'клетка кусочка id 2 должна быть покрашена ТЕМ ЖЕ '
-            'partMaterial, а не циклической палитрой по pieceId',
-      );
-      expect(
-        cell0,
-        equals(cell1),
-        reason: 'единый материал детали — все уложенные клетки одного цвета',
-      );
-    });
-
-    test('без partMaterial (null) — прежнее поведение: не падает, материалы '
-        'могут отличаться по pieceId (обратная совместимость)', () async {
-      final state = _twoPieceState();
-      final painter = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      /// Эталон клетки поля [f]: её клетка маски через `paintPartCell`.
+      Future<ByteData> paintReferenceCell(({int x, int y}) f) => _rasterBytes(
+        fieldW,
+        fieldH,
+        (g) => paintPartCell(
+          g,
+          RoninArt.shared,
+          part,
+          f.x - prepared.targetX,
+          f.y - prepared.targetY,
+          Rect.fromLTWH(f.x * cs, f.y * cs, cs, cs),
+        ),
       );
 
-      expect(
-        () => painter.paint(Canvas(ui.PictureRecorder()), const Size(68, 34)),
-        returnsNormally,
-      );
-    });
-  });
+      /// Эталон ghost: фон поля + `ghostTarget` в клетке [f].
+      Future<ByteData> paintReferenceGhost(({int x, int y}) f) =>
+          _rasterBytes(fieldW, fieldH, (g) {
+            g.drawRect(
+              const Rect.fromLTWH(0, 0, 340, 476),
+              Paint()..color = PackingPainter.boardBg,
+            );
+            BlockTheme.ghostTarget.paint(
+              g,
+              Rect.fromLTWH(f.x * cs, f.y * cs, cs, cs),
+            );
+          });
+
+      test('уложенная клетка — кусок рисунка своей клетки маски: '
+          '≠ графит, ≠ boardBg, = paintPartCell (центр клетки)', () async {
+        final field = await paintField();
+        final graphite = _rgbaOf(BlockMaterial.graphite.color);
+        final board = _rgbaOf(PackingPainter.boardBg);
+        for (final f in occupied) {
+          final ref = await paintReferenceCell(f);
+          final x = ((f.x + 0.5) * cs).floor(), y = ((f.y + 0.5) * cs).floor();
+          final got = _px(field, fieldW, x, y);
+          expect(
+            _close(got, _px(ref, fieldW, x, y)),
+            isTrue,
+            reason: 'клетка $f: $got против эталона ${_px(ref, fieldW, x, y)}',
+          );
+          expect(
+            _close(got, board),
+            isFalse,
+            reason: 'клетка $f — не фон поля',
+          );
+          expect(
+            _close(got, graphite),
+            isFalse,
+            reason: 'клетка $f — не графит',
+          );
+        }
+      });
+
+      test('незанятая клетка силуэта — ghost, как было', () async {
+        final field = await paintField();
+        final ref = await paintReferenceGhost(ghostCell);
+        for (var dy = 2; dy < 32; dy++) {
+          for (var dx = 2; dx < 32; dx++) {
+            final x = ghostCell.x * 34 + dx, y = ghostCell.y * 34 + dy;
+            expect(
+              _close(_px(field, fieldW, x, y), _px(ref, fieldW, x, y)),
+              isTrue,
+              reason: 'ghost-клетка $ghostCell, пиксель ($x, $y)',
+            );
+          }
+        }
+      });
+
+      test('seam: граница уложенной клетки темнее её центра и того же '
+          'пикселя рисунка без seam', () async {
+        final field = await paintField();
+        final f = occupied.first;
+        final ref = await paintReferenceCell(f);
+        // Штрих 1 px по `x * cs + .5` закрывает столбец пикселей `x * cs`.
+        final ex = (f.x * cs).floor(), ey = ((f.y + 0.5) * cs).floor();
+        final cx = ((f.x + 0.5) * cs).floor();
+        final edge = _px(field, fieldW, ex, ey);
+        expect(
+          _sum(edge),
+          lessThan(_sum(_px(ref, fieldW, ex, ey))),
+          reason: 'seam затемняет рисунок на границе клетки',
+        );
+        expect(
+          _sum(edge),
+          lessThan(_sum(_px(field, fieldW, cx, ey))),
+          reason: 'граница клетки темнее её центра',
+        );
+      });
+
+      test('excludePieceId — клетки поднятого куска снова ghost', () async {
+        final field = await paintField(excludePieceId: placedId);
+        final f = occupied.first;
+        final ref = await paintReferenceGhost(f);
+        final x = ((f.x + 0.5) * cs).floor(), y = ((f.y + 0.5) * cs).floor();
+        expect(
+          _close(_px(field, fieldW, x, y), _px(ref, fieldW, x, y)),
+          isTrue,
+          reason: 'клетка $f поднятого куска — ghost мишени',
+        );
+      });
+
+      test('shouldRepaint реагирует на смену детали, но не на ту же', () {
+        final base = fieldPainter();
+        final same = fieldPainter();
+        final other = PackingPainter(
+          state: state,
+          cellSize: cs,
+          art: RoninArt.shared,
+          part: RoninParts.byId('sensor'),
+          targetX: prepared.targetX,
+          targetY: prepared.targetY,
+        );
+        expect(other.shouldRepaint(base), isTrue);
+        expect(same.shouldRepaint(base), isFalse);
+      });
+    },
+  );
 
   group('PackingPainter — dragPreview (снап-превью drop-ok/drop-bad)', () {
     PackState emptyState() {
@@ -125,10 +267,8 @@ void main() {
 
     test('valid:true — рисует без исключений (клетки внутри и за границами '
         'силуэта, за границами должны молча пропускаться)', () {
-      final painter = PackingPainter(
-        state: emptyState(),
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      final painter = _painter(
+        emptyState(),
         dragPreview: const PackDragPreview(
           cells: [(x: 0, y: 0), (x: 1, y: 0), (x: -1, y: 0), (x: 99, y: 99)],
           valid: true,
@@ -142,10 +282,8 @@ void main() {
     });
 
     test('valid:false — рисует без исключений', () {
-      final painter = PackingPainter(
-        state: emptyState(),
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      final painter = _painter(
+        emptyState(),
         dragPreview: const PackDragPreview(cells: [(x: 2, y: 2)], valid: false),
       );
 
@@ -157,27 +295,17 @@ void main() {
 
     test('shouldRepaint реагирует на появление/смену dragPreview', () {
       final state = emptyState();
-      final withoutPreview = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
-      );
-      final withValidPreview = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      final withoutPreview = _painter(state);
+      final withValidPreview = _painter(
+        state,
         dragPreview: const PackDragPreview(cells: [(x: 0, y: 0)], valid: true),
       );
-      final withInvalidPreview = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      final withInvalidPreview = _painter(
+        state,
         dragPreview: const PackDragPreview(cells: [(x: 0, y: 0)], valid: false),
       );
-      final withSameValidPreview = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      final withSameValidPreview = _painter(
+        state,
         dragPreview: const PackDragPreview(cells: [(x: 0, y: 0)], valid: true),
       );
 
@@ -200,10 +328,8 @@ void main() {
 
     test('клетки у краёв поля (углы силуэта) — рисует плашку без исключений '
         '(возврат Стори 04 T4: RRect-плашка на клетку, инсет 3px)', () {
-      final painter = PackingPainter(
-        state: emptyState(),
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
+      final painter = _painter(
+        emptyState(),
         dragPreview: const PackDragPreview(
           cells: [
             (x: 0, y: 0), // левый-верхний угол силуэта
@@ -221,22 +347,11 @@ void main() {
       );
     });
 
-    test('shouldRepaint реагирует на смену partMaterial', () {
+    test('shouldRepaint реагирует на смену сдвига маски targetX/targetY', () {
       final state = emptyState();
-      final withoutMaterial = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
-      );
-      final withMaterial = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
-        partMaterial: BlockMaterial.rust,
-      );
-
-      expect(withMaterial.shouldRepaint(withoutMaterial), isTrue);
-      expect(withoutMaterial.shouldRepaint(withMaterial), isTrue);
+      final base = _painter(state);
+      expect(_painter(state, targetX: 1).shouldRepaint(base), isTrue);
+      expect(_painter(state, targetY: 1).shouldRepaint(base), isTrue);
     });
   });
 
@@ -281,13 +396,7 @@ void main() {
 
     test('смоук paint: уложенный кусок + excludePieceId его id — не бросает '
         '(ghost на месте поднятого куска рисуется без исключений)', () {
-      final state = _twoPieceState();
-      final painter = PackingPainter(
-        state: state,
-        cellSize: 34.0,
-        shipMaterials: ShipMaterials.defaultMaterials,
-        excludePieceId: 1,
-      );
+      final painter = _painter(_twoPieceState(), excludePieceId: 1);
 
       expect(
         () => painter.paint(Canvas(ui.PictureRecorder()), const Size(68, 34)),

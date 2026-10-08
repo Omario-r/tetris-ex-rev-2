@@ -98,6 +98,10 @@ const double _middleAboveBaseline = 0.2757;
 class RoninArt implements ShipArt {
   RoninArt();
 
+  /// Общий экземпляр на запуск: картинки слоёв записываются один раз (экран
+  /// корабля и поле укладки рисуют из него).
+  static final RoninArt shared = RoninArt();
+
   /// Клетка рисунка, px (`C`).
   static const double cellPx = 24;
   static const int gw = 15, gh = 30;
@@ -211,6 +215,10 @@ class RoninArt implements ShipArt {
 
   @override
   Size get sceneSize => const Size(width, height);
+
+  /// Середина градиента фона `ship-render.js` (`#05070d → #080b13`), без звёзд.
+  @override
+  Color get backdrop => const Color(0xFF070A11);
 
   @override
   Offset toScene(double x, double y) => Offset(px(x), py(y));

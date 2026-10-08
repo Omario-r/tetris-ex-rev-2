@@ -60,10 +60,9 @@ const Color _primaryText = Color(0xFFF0D6C2); // `.btn.primary`
 
 class _ShipScreenState extends State<ShipScreen>
     with SingleTickerProviderStateMixin {
-  /// Общий рисунок «Ронина»: картинки слоёв записываются один раз за запуск.
-  static final ShipArt _roninArt = RoninArt();
-
-  ShipArt get _art => widget.art ?? _roninArt;
+  /// Рисунок: заданный или общий «Ронин» ([RoninArt.shared] — картинки слоёв
+  /// записываются один раз за запуск, тот же экземпляр рисует поле укладки).
+  ShipArt get _art => widget.art ?? RoninArt.shared;
 
   AnimationController? _revealController;
   late final Animation<double> _revealAnim;
