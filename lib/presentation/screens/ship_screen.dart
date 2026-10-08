@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../application/progress_service.dart';
@@ -6,43 +7,64 @@ import '../../game_engine/data/ronin_parts.dart';
 import '../ship_render/ronin_art.dart';
 import '../ship_render/ship_art.dart';
 import '../ship_render/ship_composite_painter.dart';
+import 'game_screen.dart';
+
+/// Режим экрана корабля (Ронин-1/05 T1).
+enum _ShipMode { manual, afterWin, finale }
 
 /// Экран корабля-композит (канон — `docs/design/ronin-ship.html`): сверху
 /// заголовок «РОНИН · СБОРКА» / «N / 15», в центре корабль из рисунка
-/// ([ShipCompositePainter]), снизу одна кнопка. Два режима:
+/// ([ShipCompositePainter]), снизу одна кнопка (или надпись финала). Три режима:
 ///
-/// - **ручной** (`ShipScreen()`) — собранное к моменту, `min(current_level, 15)`
-///   деталей; читает [ProgressService]; слева «Назад», внизу «Продолжить сборку»
-///   (`Navigator.pop`).
-/// - **авто-показ** (`ShipScreen.reveal(...)`) — после победы: фиксированное число
-///   деталей, только что заработанная въезжает scale-in; кнопка «Далее»/«Начать
-///   заново», без «Назад» (поток меняется в Ронин-1/05).
+/// - **ручной** (`ShipScreen()`) — собранное к моменту
+///   (`ProgressService.getCollectedCount`); слева «Назад», внизу «Продолжить
+///   сборку» (`Navigator.pop`). Вход — кнопка корабля на `GameScreen`.
+/// - **после сборки** (`ShipScreen.afterWin(...)`) — маршрут «К кораблю» с паузы
+///   «деталь собрана»: только что собранная деталь въезжает scale-in, «Назад»
+///   нет, «Продолжить сборку» → [onContinue] (следующий уровень).
+/// - **финал** (`ShipScreen.finale(...)`) — собраны все детали «Ронина-1»:
+///   надпись «ПРОДОЛЖЕНИЕ СЛЕДУЕТ», ни кнопок, ни «Назад»; прогресс не
+///   сбрасывается (решение PO 2026-07-29). В дев-сборке — «Сброс прогресса (dev)».
 ///
 /// Рисунок — через интерфейс [ShipArt] ([art]; по умолчанию — «Ронин»).
 class ShipScreen extends StatefulWidget {
-  final int? _revealCount;
-  final VoidCallback? _onNext;
-  final bool _isComplete;
+  final _ShipMode _mode;
+  final int? _afterWinCount;
+
+  /// Колбэк «Продолжить сборку» в режиме после сборки.
+  final VoidCallback? onContinue;
+
+  /// Финал: последняя деталь въезжает scale-in (`false` — холодный старт
+  /// приложения на финале, деталь уже на месте).
+  final bool animateLast;
 
   /// Рисунок корабля; `null` — общий экземпляр [RoninArt].
   final ShipArt? art;
 
+  /// Ручной экран корабля: собранное к моменту, «Назад» и «Продолжить сборку».
   const ShipScreen({super.key, this.art})
-    : _revealCount = null,
-      _onNext = null,
-      _isComplete = false;
+    : _mode = _ShipMode.manual,
+      _afterWinCount = null,
+      onContinue = null,
+      animateLast = false;
 
-  /// Авто-показ прироста после победы: корабль с [collectedCount] деталями и кнопкой
-  /// «Далее» (или «Начать заново», если [isComplete] — собран последний уровень).
-  const ShipScreen.reveal({
+  /// После сборки детали (маршрут «К кораблю»): корабль с [collectedCount]
+  /// деталями, деталь `collectedCount − 1` въезжает; «Продолжить сборку» →
+  /// [onContinue].
+  const ShipScreen.afterWin({
     super.key,
     required int collectedCount,
-    required this._onNext,
-    this._isComplete = false,
+    required VoidCallback this.onContinue,
     this.art,
-  }) : _revealCount = collectedCount;
+  }) : _mode = _ShipMode.afterWin,
+       _afterWinCount = collectedCount,
+       animateLast = true;
 
-  bool get _isReveal => _onNext != null;
+  /// Финал «Ронина-1»: собраны все детали, надпись «ПРОДОЛЖЕНИЕ СЛЕДУЕТ».
+  const ShipScreen.finale({super.key, this.art, this.animateLast = true})
+    : _mode = _ShipMode.finale,
+      _afterWinCount = null,
+      onContinue = null;
 
   @override
   State<ShipScreen> createState() => _ShipScreenState();
@@ -54,9 +76,13 @@ const Color _matteBlack = Color(0xFF1D2025); // hsl(220 12% 13%)
 const Color _gunmetal = Color(0xFF32363E); // hsl(220 10% 22%)
 const Color _hudIcon = Color(0xFFB1B7BE); // hsl(215 9% 72%)
 const Color _hazardOrange = Color(0xFFBE642D); // hsl(23 62% 46%)
+const Color _doneGlow = Color(0x8CE09952); // hsla(30 70% 60% / 55%)
 const Color _kickColor = Color(0xFF7C848D); // `.dtop .t .k`
 const Color _countColor = Color(0xFFD7DDE3); // `.dtop .t .n`
 const Color _primaryText = Color(0xFFF0D6C2); // `.btn.primary`
+
+/// Высота нижней кнопки `.dfoot .btn` — её же держит надпись финала.
+const double _footHeight = 44;
 
 class _ShipScreenState extends State<ShipScreen>
     with SingleTickerProviderStateMixin {
@@ -65,13 +91,18 @@ class _ShipScreenState extends State<ShipScreen>
   ShipArt get _art => widget.art ?? RoninArt.shared;
 
   AnimationController? _revealController;
-  late final Animation<double> _revealAnim;
-  late final Future<int> _level;
+  Animation<double>? _revealAnim;
+  late final Future<int> _collected;
 
   @override
   void initState() {
     super.initState();
-    if (widget._isReveal) {
+    final animate = switch (widget._mode) {
+      _ShipMode.manual => false,
+      _ShipMode.afterWin => true,
+      _ShipMode.finale => widget.animateLast,
+    };
+    if (animate) {
       final c = AnimationController(
         vsync: this,
         duration: const Duration(milliseconds: 400),
@@ -79,8 +110,9 @@ class _ShipScreenState extends State<ShipScreen>
       _revealController = c;
       _revealAnim = CurvedAnimation(parent: c, curve: Curves.easeOut);
       c.forward();
-    } else {
-      _level = ProgressService().getCurrentLevel();
+    }
+    if (widget._mode == _ShipMode.manual) {
+      _collected = ProgressService().getCollectedCount();
     }
   }
 
@@ -96,7 +128,11 @@ class _ShipScreenState extends State<ShipScreen>
       backgroundColor: _spaceBg,
       body: SafeArea(
         minimum: const EdgeInsets.only(bottom: 22), // `.safe.b`
-        child: widget._isReveal ? _buildReveal(context) : _buildManual(context),
+        child: switch (widget._mode) {
+          _ShipMode.manual => _buildManual(context),
+          _ShipMode.afterWin => _buildAfterWin(),
+          _ShipMode.finale => _buildFinale(context),
+        },
       ),
     );
   }
@@ -104,7 +140,7 @@ class _ShipScreenState extends State<ShipScreen>
   /// Ручной режим: читает прогресс, статичный корабль, «Назад» и «Продолжить сборку».
   Widget _buildManual(BuildContext context) {
     return FutureBuilder<int>(
-      future: _level,
+      future: _collected,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
@@ -113,10 +149,8 @@ class _ShipScreenState extends State<ShipScreen>
         return _layout(
           collected: collected,
           onBack: () => Navigator.of(context).pop(),
-          ship: CustomPaint(
-            painter: ShipCompositePainter(art: _art, collectedCount: collected),
-          ),
-          button: _PrimaryButton(
+          ship: _ship(collected),
+          foot: _PrimaryButton(
             key: const Key('ship_continue_button'),
             label: 'Продолжить сборку',
             onTap: () => Navigator.of(context).pop(),
@@ -126,26 +160,85 @@ class _ShipScreenState extends State<ShipScreen>
     );
   }
 
-  /// Авто-показ: деталь `collected-1` въезжает scale-in + кнопка перехода.
-  Widget _buildReveal(BuildContext context) {
-    final collected = widget._revealCount!;
+  /// После сборки: деталь `collected-1` въезжает scale-in + «Продолжить сборку».
+  Widget _buildAfterWin() {
+    final collected = widget._afterWinCount!;
     return _layout(
       collected: collected,
-      ship: AnimatedBuilder(
-        animation: _revealAnim,
-        builder: (_, _) => CustomPaint(
-          painter: ShipCompositePainter(
-            art: _art,
-            collectedCount: collected,
-            revealPartIndex: collected - 1,
-            revealProgress: _revealAnim.value,
-          ),
-        ),
+      ship: _ship(collected),
+      foot: _PrimaryButton(
+        key: const Key('ship_continue_button'),
+        label: 'Продолжить сборку',
+        onTap: widget.onContinue!,
       ),
-      button: _PrimaryButton(
-        key: const Key('ship_next_button'),
-        label: widget._isComplete ? 'Начать заново' : 'Далее',
-        onTap: widget._onNext!,
+    );
+  }
+
+  /// Финал: все детали, надпись «ПРОДОЛЖЕНИЕ СЛЕДУЕТ» на месте кнопки; в дев-сборке
+  /// под ней — сброс прогресса.
+  Widget _buildFinale(BuildContext context) {
+    final collected = RoninParts.parts.length;
+    return _layout(
+      collected: collected,
+      ship: _ship(collected),
+      foot: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            height: _footHeight,
+            child: Center(
+              child: Text(
+                'ПРОДОЛЖЕНИЕ СЛЕДУЕТ',
+                key: Key('ship_finale_text'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: _hazardOrange,
+                  fontSize: 12,
+                  letterSpacing: 2.88, // .24em @ 12px
+                  shadows: [Shadow(color: _doneGlow, blurRadius: 12)],
+                ),
+              ),
+            ),
+          ),
+          if (kDebugMode)
+            TextButton(
+              key: const Key('ship_dev_reset'),
+              onPressed: () => _devReset(context),
+              child: const Text('Сброс прогресса (dev)'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Дев-сброс с финала: прогресс 0 → первый уровень.
+  Future<void> _devReset(BuildContext context) async {
+    // Захватить navigator ДО await/перехода, пока context валиден.
+    final navigator = Navigator.of(context);
+    await ProgressService().reset();
+    navigator.pushReplacement(
+      MaterialPageRoute(builder: (_) => const GameScreen(levelIndex: 0)),
+    );
+  }
+
+  /// Корабль с [collected] деталями; при анимации — деталь `collected-1`
+  /// въезжает scale-in.
+  Widget _ship(int collected) {
+    final anim = _revealAnim;
+    if (anim == null) {
+      return CustomPaint(
+        painter: ShipCompositePainter(art: _art, collectedCount: collected),
+      );
+    }
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (_, _) => CustomPaint(
+        painter: ShipCompositePainter(
+          art: _art,
+          collectedCount: collected,
+          revealPartIndex: collected - 1,
+          revealProgress: anim.value,
+        ),
       ),
     );
   }
@@ -154,7 +247,7 @@ class _ShipScreenState extends State<ShipScreen>
   Widget _layout({
     required int collected,
     required Widget ship,
-    required Widget button,
+    required Widget foot,
     VoidCallback? onBack,
   }) {
     return Column(
@@ -163,16 +256,16 @@ class _ShipScreenState extends State<ShipScreen>
         Expanded(child: SizedBox.expand(child: ship)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: button,
+          child: foot,
         ),
       ],
     );
   }
 }
 
-/// `.dtop`: кнопка 34×34 слева (в авто-показе — пусто), по центру заголовок
-/// в две строки. Правой кнопки «⤢» нет (функции нет) — справа пустое место
-/// той же ширины, чтобы заголовок стоял по центру.
+/// `.dtop`: кнопка 34×34 слева (после сборки и в финале — пусто), по центру
+/// заголовок в две строки. Правой кнопки «⤢» нет (функции нет) — справа пустое
+/// место той же ширины, чтобы заголовок стоял по центру.
 class _Header extends StatelessWidget {
   const _Header({required this.collected, this.onBack});
 
@@ -283,7 +376,7 @@ class _PrimaryButton extends StatelessWidget {
         onTap: onTap,
         child: Container(
           width: double.infinity,
-          height: 44,
+          height: _footHeight,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: _matteBlack,

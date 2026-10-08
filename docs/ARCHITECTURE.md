@@ -57,6 +57,13 @@ lib/main.dart (вход)
   DESIGN.md § «Сложность старта»), держит рамп сложности тестом.
 
 - `screens` — единственный композиционный корень: тянет ядро укладки, данные и виджеты.
+- Поток «деталь собрана» (Ронин-1/05 T1): **пауза вместо авто-перехода** — `game_screen`
+  засчитывает деталь сразу (`ProgressService.completeLevel`) и ждёт выбора: «Следующая
+  деталь» → следующий уровень, «К кораблю» → `ship_screen` (`afterWin`) → «Продолжить
+  сборку» → следующий уровень; после последней детали — `ship_screen` (`finale`,
+  «продолжение следует», без сброса). Внутри `screens` связь `ship_screen → game_screen`
+  (финал и `afterWin` возвращают в игру) — взаимный импорт с `game_screen → ship_screen`.
+- `main → screens/ship_screen`: при собраны все N деталей вход открывает финал.
 - `application` тонкий: только персист прогресса (`ProgressService`); игрового цикла в слое
   нет — пульс-`AnimationController` живёт в `screens/game_screen`.
 - `widgets → data`: `ShipPainter` берёт форму деталей из `RoninParts` (тот же источник, что и
@@ -80,14 +87,16 @@ lib/main.dart (вход)
   Импорты внутри `lib/` — относительные.
 - **Навигация:** захватить `NavigatorState` до `pushReplacement`; `context` из `State` в колбэках
   после ухода с экрана не использовать (проверка `mounted`).
-- **Точка входа:** `lib/main.dart` → `ProgressService.getCurrentLevel()` → `GameScreen(levelIndex)`.
+- **Точка входа:** `lib/main.dart` → `ProgressService.getCollectedCount()` → собрано N →
+  `ShipScreen.finale(animateLast: false)`, иначе `GameScreen(levelIndex: собрано)`.
 - **Тестовая фикстура:** `defaultLevel`/`defaultTargetMask` (крест 6×6, строки
   `..##..`/`######`) — НЕ игровой уровень; на нём написаны тесты движка, не удалять
   при чистке контента.
 - **Команды и смоук-тест:** `flutter pub get` / `flutter run` / `flutter test` / `flutter analyze`
   (analyze — ноль ошибок и предупреждений). Смоук/сквозной сценарий:
   `flutter test test/widget_test.dart test/presentation/win_flow_test.dart`
-  (`win_flow` — полный прогон всех уровней контента (`kShipPartCount`) укладкой
-  до победы, «Далее» между уровнями и «Начать заново» на последнем со сбросом
-  прогресса, Стори 03 эпика «Укладка»; `widget_test.dart` — пустая заглушка,
+  (`win_flow` — полный прогон всех уровней контента укладкой до паузы «деталь
+  собрана», оба маршрута — «Следующая деталь» и «К кораблю» + «Продолжить
+  сборку» — и финал 15/15 «продолжение следует» без сброса прогресса, затем
+  перезапуск `AppRoot` открывает финал (Ронин-1/05 T1); `widget_test.dart` — пустая заглушка,
   см. BACKLOG. `golden_scenario_test` удалён вместе со старым ядром, Стори 02 T4).

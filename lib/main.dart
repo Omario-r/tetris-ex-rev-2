@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import 'application/progress_service.dart';
+import 'game_engine/data/ronin_parts.dart';
 import 'presentation/screens/game_screen.dart';
+import 'presentation/screens/ship_screen.dart';
 
 void main() {
   runApp(const AppRoot());
@@ -23,14 +25,20 @@ class AppRoot extends StatelessWidget {
         useMaterial3: true,
       ),
       home: FutureBuilder<int>(
-        future: ProgressService().getCurrentLevel(),
+        future: ProgressService().getCollectedCount(),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return const Scaffold(
               body: Center(child: CircularProgressIndicator()),
             );
           }
-          return GameScreen(levelIndex: snapshot.data!);
+          final collected = snapshot.data!;
+          // Собраны все детали «Ронина-1» — финал «продолжение следует»
+          // (без въезда последней детали: она уже на месте).
+          if (collected >= RoninParts.parts.length) {
+            return const ShipScreen.finale(animateLast: false);
+          }
+          return GameScreen(levelIndex: collected);
         },
       ),
     );

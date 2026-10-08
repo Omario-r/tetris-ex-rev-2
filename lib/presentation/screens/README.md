@@ -23,8 +23,8 @@
   материала детали (`_partMaterial`, `ShipMaterials`) у экрана нет. Нарезка (`prepared.slice`) →
   `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
-  (`PackState.isComplete`) → **деталь собрана** → прежний мета-поток
-  (`ProgressService.advanceOnWin` → `ShipScreen.reveal`). Ни гравитации, ни таймера, ни
+  (`PackState.isComplete`) → **деталь собрана** → пауза с выбором маршрута (Ронин-1/05 T1,
+  см. «Завершение»). Ни гравитации, ни таймера, ни
   проигрыша; отдельного игрового цикла нет — только лёгкий пульс-`AnimationController`
   (`repeat(reverse)`) для ободка «готово». Старое тетрис-ядро (`game`/`rules`/`BoardPainter`/
   `GameHud`) `GameScreen` больше не тянет.
@@ -70,7 +70,7 @@
   ТЕКУЩИМ `_seedOffset`, сброс драга); `_seedOffset` — сдвиг от канонного `RoninPartDef.seed` детали (стартует с 0); «Пересобрать нарезку» = `_seedOffset++` + тот же `_restartLevel()`.
 - Топбар (канон `.topbar`/`.title`/`.pausebtn` мокапа `ukladka-field.html`, высота 44,
   Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / M»
-  (N=`fragmentIndex+1`, M=`kShipPartCount`=15) и `.name` название детали заглавными
+  (N=`fragmentIndex+1`, M=`RoninParts.parts.length`=15) и `.name` название детали заглавными
   (`RoninParts.parts[fragmentIndex].title.toUpperCase()`, напр. «НОС»); свотча
   материала в топбаре больше нет (был у прежнего чипа, Стори 02 T3). Справа dev-кнопки
   (`Key('cheat_button')` под `kDebugMode`, `Key('ship_button')`). Виджеты `_PartTitle`
@@ -99,9 +99,22 @@
   (`el-piece-tray`/`el-piece-drag`), уложенные — куски рисунка детали (`PackingPainter`, Ронин-1/03).
   Снап-превью (`el-drop-ok`/`el-drop-bad`) пересчитывается в `build` (`_computePreview` →
   `PackController.canPlace`) и передаётся `PackingPainter.dragPreview`.
-- Завершение: `Key('packing_complete')` при `isComplete` (баннер «ДЕТАЛЬ СОБРАНА», без
-  кнопки «Заново») + пульс-ободок `doneGlow` на поле; через ~900 мс идемпотентно
-  (`_winHandled`/`_winScheduled`) — прежний мета-поток `_onWin`. Solve-хук `_solveAll()`
+- Завершение — **пауза «деталь собрана»** (Ронин-1/05 T1, канон `.proglbl.done`/`.donebtns`
+  мокапа `ukladka-field.html`): `isComplete` (и чит «Победить») → сразу, идемпотентно
+  (`_markDone`, флаг `_done`) `ProgressService.completeLevel(levelIndex)` + пауза; автоперехода
+  нет. На паузе: строка над полем — `Key('packing_complete')` «ДЕТАЛЬ СОБРАНА» (по центру,
+  `hazardOrange` 12 px, .24em, тень `doneGlow` blur 12; «Очистить поле» скрыта); пульс-ободок
+  `doneGlow` на поле; зона лотка заменена `Key('done_buttons')` той же высоты 206 (ряд кнопок
+  сверху, отступы 14/10/10, зазор 10, подпись лотка — пустое место): слева
+  `Key('done_to_ship_button')` «К кораблю» (`gunmetal`/`matteBlack`/`#cbd2d9`), справа
+  `Key('done_next_button')` «Следующая деталь» (основная: рамка 2 `hazardOrange`, `#f0d6c2`),
+  высота 44, радиус 10, 12 px .05em (`_DoneButton`). На последней детали — одна «К кораблю»
+  на всю ширину в основном стиле. Поле и лоток касаний не принимают (`_done` в
+  pointer-обработчиках). Переходы дожидаются записи прогресса (`_progressSaved`), повторное
+  нажатие игнорируется (`_leaving`): «Следующая деталь» → `GameScreen(levelIndex+1)`;
+  «К кораблю» → `ShipScreen.afterWin(collectedCount: levelIndex+1, onContinue: →
+  GameScreen(levelIndex+1))`; на последней → `ShipScreen.finale()`. Пересборка уровня
+  дев-читами нарезки снимает паузу. Solve-хук `_solveAll()`
   (раскладка по `PackSlice.solution`) — дев-кнопка `Key('cheat_solve')` И programmatic-хук
   для тестов (доводит до `isComplete` без симуляции drag). `FeedMode {fullSet, tray3}`
   объявлен в `game_screen.dart` (в `tray3` в лотке первые 3 из `trayOrder` + индикатор «+N»).
@@ -109,22 +122,28 @@
   Ронин-1/02 T2): фон `spaceBg`, без `AppBar`. Верх `.dtop` (поля 16, отступ 4, высота 38):
   слева `Key('ship_back_button')` 34×34 (`matteBlack`/`gunmetal`/глиф `hudIcon`, `pop`),
   по центру «РОНИН · СБОРКА» (9 px) и `Key('ship_collected_text')` «N / 15» (13 px; N =
-  `min(current_level, RoninParts.parts.length)`, читает `ProgressService` один раз в
-  `initState`), справа пустое место 34 (кнопки «⤢» нет). Центр — `ShipCompositePainter`
+  `ProgressService.getCollectedCount()` 0..15, читается один раз в `initState`), справа
+  пустое место 34 (кнопки «⤢» нет). Центр — `ShipCompositePainter`
   (`ship_render`) на всю свободную область. Низ — `Key('ship_continue_button')`
   «Продолжить сборку» (поля 16, высота 44, радиус 10, рамка 2 `hazardOrange`) → `pop`.
   `SafeArea(minimum: bottom 22)` (`.safe.b`). `art` — рисунок (`ShipArt`), `null` →
   `RoninArt.shared` (картинки слоёв записываются раз за запуск; тот же экземпляр рисует поле). Вход —
   `Key('ship_button')` на `GameScreen`.
-- `ShipScreen.reveal({collectedCount, onNext, isComplete, art})` — авто-показ прироста после
-  победы: тот же макет, деталь `collectedCount-1` въезжает scale-in (400 мс, easeOut),
-  нижняя кнопка того же вида — `Key('ship_next_button')` «Далее» (или «Начать заново»,
-  если `isComplete`), без «Назад» (слева пустое место 34). Поток меняется в Ронин-1/05.
+- `ShipScreen.afterWin({required collectedCount, required onContinue, art})` — маршрут
+  «К кораблю» с паузы (Ронин-1/05 T1): тот же макет, деталь `collectedCount-1` въезжает
+  scale-in (400 мс, easeOut), без «Назад» (слева пустое место 34), «Продолжить сборку»
+  (`ship_continue_button`) → `onContinue`. Прогресс не читает и не пишет.
+- `ShipScreen.finale({art, animateLast = true})` — финал «Ронина-1»: собрано N (15 / 15),
+  последняя деталь въезжает при `animateLast`; ни «Назад», ни кнопок; на месте кнопки
+  (высота 44) — `Key('ship_finale_text')` «ПРОДОЛЖЕНИЕ СЛЕДУЕТ» (стиль «ДЕТАЛЬ СОБРАНА»);
+  только в `kDebugMode` под ней `TextButton` `Key('ship_dev_reset')` «Сброс прогресса (dev)» →
+  `ProgressService.reset()` → `pushReplacement(GameScreen(0))`. Прогресс финал не трогает.
 - `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, feedMode, onSetFeedMode,
   onReshuffle, onSolve, sliceConfig, onSetSliceConfig, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
   Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
-  `kDebugMode`. Секции: выбор уровня, мгновенная победа (мета-уровень, `_handleWin`),
-  состояние корабля (N=0..`kShipPartCount`), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
+  `kDebugMode`. Секции: выбор уровня (прогресс не меняет), мгновенная победа (пауза
+  «деталь собрана», `_markDone`), состояние корабля (N=0..`kShipPartCount`, пишет
+  `setCollectedCount(N)` — «15» даёт 15 / 15), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
   — тумблер `FeedMode`), **нарезка: калибровка** (Ронин-1/07; по кнопке на значение
   `Key('slice_config_<имя>')` (две — `bigPieces` «Крупные куски», `spikyPieces` «Колючие куски») в порядке `SliceConfig.values`, текущая —
   префикс «✓ »; перед секцией «Нарезка (dev)»), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
@@ -137,20 +156,25 @@
   `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`, `RoninParts` — только
   чтение, название детали для топбара, Ронин-1/01 T4),
   `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`; `ShipMaterials` — нет,
-  Ронин-1/03), `presentation/widgets` (`PackingPainter`, `kShipPartCount` из `ship.dart` —
-  `game_screen`/`cheat_menu`), `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`,
+  Ронин-1/03), `presentation/widgets` (`PackingPainter`; `kShipPartCount` из `ship.dart` —
+  только `cheat_menu`, `game_screen` с Ронин-1/05 T1 берёт `RoninParts.parts.length`),
+  `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`,
   `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03; Ронин-1/02
   T2 — `ShipPainter` экраном больше не используется). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
   `theme/level_skin` (пересадка на укладку, Стори 02 T2).
 - `cheat_menu.dart` импортирует `FeedMode` из `game_screen.dart` (взаимный импорт —
   допустим в Dart; enum живёт у экрана, меню лишь типизирует параметр).
+- `ship_screen.dart` ↔ `game_screen.dart` — взаимный импорт (Ронин-1/05 T1): игра открывает
+  корабль, финал (дев-сброс) возвращает в `GameScreen(0)`; `afterWin` возвращает в игру
+  колбэком `onContinue` от `GameScreen`.
 - Это композиционный корень — потому зависимостей больше «правила трёх модулей»; ожидаемо
   для верхнего экрана, глубже дробить незачем.
 
 ## От него зависят
 
-- `lib/main.dart` — точка входа (`ProgressService` → `GameScreen(levelIndex)`).
+- `lib/main.dart` — точка входа (`ProgressService.getCollectedCount()`: `== N` →
+  `ShipScreen.finale(animateLast: false)`, иначе `GameScreen(levelIndex: собрано)`).
 
 ## Инварианты
 
@@ -161,13 +185,16 @@
 - Мутация ядра (`PackController`) — только через сам контроллер; `PackState`/`PackPiece`
   иммутабельны. Невалидная укладка — no-op контроллера (не бросает).
 - Навигация: захватить `NavigatorState` (`Navigator.of(context)`) ДО `pushReplacement`;
-  после ухода с экрана `context` не трогать (проверка `mounted`). Победа обрабатывается
-  один раз (`_winHandled`); укладка-завершение планирует её через ~900 мс (`_winScheduled`),
-  чит «мгновенная победа» — сразу.
-- Поток после победы: Game → `ProgressService.advanceOnWin` → `ShipScreen.reveal`
-  (деталь +1) → «Далее» → Game(следующий). На последнем дев-уровне (индекс
-  `kShipPartCount-1`) → корабль N/N + «Начать заново» → `ProgressService.reset()` → Game(0).
-- Экран корабля открывается `Navigator.push` (НЕ `pushReplacement`): `GameScreen` остаётся
+  после ухода с экрана `context` не трогать (проверка `mounted`). Сборка детали
+  обрабатывается один раз (`_done`) — сразу, без задержки; чит «мгновенная победа» — так же.
+- Поток после сборки (Ронин-1/05 T1): Game → `completeLevel` (+1 сразу) → пауза →
+  «Следующая деталь» → Game(следующий) | «К кораблю» → `ShipScreen.afterWin` →
+  «Продолжить сборку» → Game(следующий). Прогресс +1 ровно один раз на обоих маршрутах.
+  На последней детали (индекс N−1) → только «К кораблю» → `ShipScreen.finale` (15 / 15,
+  «продолжение следует»); прогресс НЕ сбрасывается, «Начать заново» нет — сброс только
+  дев-кнопкой финала. Перезапуск при собрано N открывает финал (`main.dart`).
+- Ручной экран корабля открывается `Navigator.push` (НЕ `pushReplacement`; `afterWin`/`finale`
+  — наоборот, `pushReplacement` с паузы): `GameScreen` остаётся
   под стеком, «Назад» (`ship_back_button`) или «Продолжить сборку» возвращают в ту же партию.
 - У `GameScreen` нет `AppBar` → его `body` обёрнут в `SafeArea` вручную; иначе шапка
   (в т.ч. кнопка «Корабль») уходит под системный статус-бар/вырез и не нажимается.

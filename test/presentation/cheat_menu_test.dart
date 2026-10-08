@@ -96,12 +96,49 @@ void main() {
     await tester.tap(find.byKey(const Key('cheat_ship_parts_2')));
     await _pumpFrames(tester, const Duration(seconds: 2));
 
-    expect(await ProgressService().getCurrentLevel(), 2);
+    expect(await ProgressService().getCollectedCount(), 2);
 
     await tester.tap(find.byKey(const Key('ship_button')));
     await _pumpFrames(tester);
     expect(find.byType(ShipScreen), findsOneWidget);
     expect(_shipPainter(tester).collectedCount, 2);
+  });
+
+  testWidgets('Чит «состояние корабля»: N=15 → собрано 15 → корабль 15/15',
+      (tester) async {
+    await pumpGame(tester);
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+
+    final last = Key('cheat_ship_parts_$kShipPartCount');
+    await tester.scrollUntilVisible(
+      find.byKey(last),
+      200.0,
+      scrollable: find.byType(Scrollable).last,
+    );
+    await tester.tap(find.byKey(last));
+    await _pumpFrames(tester, const Duration(seconds: 2));
+
+    expect(await ProgressService().getCollectedCount(), kShipPartCount);
+
+    await tester.tap(find.byKey(const Key('ship_button')));
+    await _pumpFrames(tester);
+    expect(_shipPainter(tester).collectedCount, kShipPartCount);
+    expect(find.text('$kShipPartCount / $kShipPartCount'), findsOneWidget);
+  });
+
+  testWidgets('Чит «выбор уровня» прогресс не меняет', (tester) async {
+    SharedPreferences.setMockInitialValues({'current_level': 5});
+    await pumpGame(tester, level: 5);
+
+    await tester.tap(find.byKey(const Key('cheat_button')));
+    await _pumpFrames(tester);
+    await tester.tap(find.byKey(const Key('cheat_level_2')));
+    await _pumpFrames(tester);
+
+    expect(tester.widget<GameScreen>(find.byType(GameScreen)).levelIndex, 2);
+    expect(await ProgressService().getCollectedCount(), 5);
   });
 
   testWidgets('Чит «выбор уровня»: тап уровня 3 → GameScreen(levelIndex=2)',
@@ -181,7 +218,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Чит «мгновенная победа»: прогресс +1 и пост-победный экран',
+  testWidgets('Чит «мгновенная победа»: прогресс +1 и пауза «деталь собрана»',
       (tester) async {
     SharedPreferences.setMockInitialValues({'current_level': 0});
     await pumpGame(tester, level: 0);
@@ -192,9 +229,13 @@ void main() {
     await tester.tap(find.byKey(const Key('cheat_instant_win')));
     await _pumpFrames(tester);
 
-    expect(find.byType(ShipScreen), findsOneWidget);
-    expect(find.byKey(const Key('ship_next_button')), findsOneWidget);
-    expect(await ProgressService().getCurrentLevel(), 1);
+    // Пауза на том же экране: автоперехода на корабль нет.
+    expect(find.byType(GameScreen), findsOneWidget);
+    expect(find.byType(ShipScreen), findsNothing);
+    expect(find.byKey(const Key('packing_complete')), findsOneWidget);
+    expect(find.byKey(const Key('done_next_button')), findsOneWidget);
+    expect(find.byKey(const Key('done_to_ship_button')), findsOneWidget);
+    expect(await ProgressService().getCollectedCount(), 1);
   });
 
   group('Секция «Нарезка: калибровка»', () {

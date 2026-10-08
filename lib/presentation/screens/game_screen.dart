@@ -15,7 +15,6 @@ import '../../game_engine/packing/pack_state.dart';
 import '../ship_render/ronin_art.dart';
 import '../theme/block_material.dart';
 import '../widgets/packing_painter.dart';
-import '../widgets/ship.dart';
 import 'cheat_menu.dart';
 import 'ship_screen.dart';
 
@@ -31,11 +30,13 @@ enum FeedMode { fullSet, tray3 }
 ///
 /// Игрок перетаскивает кусочки-полиомино из лотка в силуэт детали корабля,
 /// пока не заполнит его без дыр (`PackState.isComplete`). Ни гравитации, ни
-/// таймера, ни проигрыша; уложенный кусок можно переложить. Победа = деталь
-/// собрана → прежний мета-поток (`ProgressService.advanceOnWin` →
-/// `ShipScreen.reveal` → следующий уровень / сброс).
+/// таймера, ни проигрыша; уложенный кусок можно переложить. Деталь собрана →
+/// прогресс засчитан сразу (`ProgressService.completeLevel`) и **пауза**
+/// (Ронин-1/05 T1): над полем «ДЕТАЛЬ СОБРАНА», на месте лотка — кнопки
+/// «К кораблю» (`ShipScreen.afterWin`) и «Следующая деталь»; на последней
+/// детали — одна «К кораблю» (`ShipScreen.finale`).
 class GameScreen extends StatefulWidget {
-  /// Индекс уровня (0..`kShipPartCount-1`). Деталь `i` ↔ уровень `i`.
+  /// Индекс уровня (0..`RoninParts.parts.length-1`). Деталь `i` ↔ уровень `i`.
   final int levelIndex;
 
   /// Creates a [GameScreen] with the given [levelIndex].
@@ -119,9 +120,17 @@ class _GameScreenState extends State<GameScreen>
   /// Режим подачи лотка (тумблер чит-меню). Дефолт — полный набор.
   FeedMode _feedMode = FeedMode.fullSet;
 
-  // --- Победа / завершение ---
-  bool _winHandled = false;
-  bool _winScheduled = false;
+  // --- Деталь собрана: пауза (Ронин-1/05 T1) ---
+  /// Пауза «деталь собрана»: поле и лоток касаний не принимают, на месте
+  /// лотка — кнопки выбора маршрута. Флаг же — идемпотентность засчитывания.
+  bool _done = false;
+
+  /// Запись прогресса (`completeLevel`), начатая в момент сборки; переходы с
+  /// паузы дожидаются её, прежде чем уйти с экрана.
+  Future<int>? _progressSaved;
+
+  /// Переход с паузы уже начат — повторное нажатие кнопки игнорируется.
+  bool _leaving = false;
   late final AnimationController _pulseController;
 
   // --- Drag state (сырые pointer-события, НЕ GestureDetector.onPan* —
@@ -199,8 +208,9 @@ class _GameScreenState extends State<GameScreen>
         trayOrder: prepared.trayOrder,
       ),
     );
-    _winHandled = false;
-    _winScheduled = false;
+    // Пересборка уровня (дев-читы нарезки) снимает паузу: деталь снова не
+    // собрана; прогресс уже засчитан, повторное засчитывание идемпотентно.
+    _done = false;
   }
 
   @override
@@ -210,67 +220,58 @@ class _GameScreenState extends State<GameScreen>
     super.dispose();
   }
 
-  // --- Победа ---
+  // --- Деталь собрана: пауза и выбор маршрута (Ронин-1/05 T1) ---
 
-  /// Планирует пост-победный поток, когда деталь собрана (`isComplete`): даёт
-  /// ~900 мс на пульс-ободок «готово», затем идемпотентно запускает `_onWin`.
-  void _onPackingComplete() {
-    if (_winScheduled || _winHandled) return;
-    _winScheduled = true;
-    Future.delayed(const Duration(milliseconds: 900), () {
-      if (!mounted) return;
-      _handleWin();
-    });
+  /// Последняя деталь «Ронина-1»: с паузы — только «К кораблю» (финал).
+  bool get _isLastPart => widget.levelIndex >= RoninParts.parts.length - 1;
+
+  /// Деталь собрана (`isComplete`) или чит «Победить»: сразу, без задержки,
+  /// засчитывает прогресс (`completeLevel`) и ставит паузу. Идемпотентно
+  /// (`_done`). Прогресс пишется до выбора кнопки — оба маршрута дают ровно
+  /// +1, закрытие игры на паузе деталь не теряет.
+  void _markDone() {
+    if (_done) return;
+    setState(() => _done = true);
+    _progressSaved = ProgressService().completeLevel(widget.levelIndex);
   }
 
-  /// Единая точка обработки победы (укладка-завершение и чит «мгновенная
-  /// победа»). Идемпотентна (`_winHandled`).
-  void _handleWin() {
-    if (_winHandled) return;
-    _winHandled = true;
-    _onWin();
-  }
-
-  Future<void> _onWin() async {
-    final completedLevel = widget.levelIndex;
-    await ProgressService().advanceOnWin();
-    if (!mounted) return;
-
-    // Захватить navigator ДО pushReplacement, пока context валиден.
+  /// «Следующая деталь» → следующий уровень.
+  Future<void> _onDoneNext() async {
+    if (_leaving) return;
+    _leaving = true;
+    // Захватить navigator ДО await/pushReplacement, пока context валиден.
     final navigator = Navigator.of(context);
-
-    final isLastDevLevel = completedLevel >= kShipPartCount - 1;
-    final collected = isLastDevLevel ? kShipPartCount : completedLevel + 1;
-
+    await _progressSaved;
+    final next = widget.levelIndex + 1;
     navigator.pushReplacement(
-      MaterialPageRoute(
-        builder: (_) => ShipScreen.reveal(
-          collectedCount: collected,
-          isComplete: isLastDevLevel,
-          onNext: () =>
-              _afterShipReveal(navigator, completedLevel, isLastDevLevel),
-        ),
-      ),
+      MaterialPageRoute(builder: (_) => GameScreen(levelIndex: next)),
     );
   }
 
-  Future<void> _afterShipReveal(
-    NavigatorState navigator,
-    int completedLevel,
-    bool isLastDevLevel,
-  ) async {
-    if (isLastDevLevel) {
-      await ProgressService().reset();
+  /// «К кораблю» → корабль с приросшей деталью («Продолжить сборку» →
+  /// следующий уровень); на последней детали — финал.
+  Future<void> _onDoneToShip() async {
+    if (_leaving) return;
+    _leaving = true;
+    final navigator = Navigator.of(context);
+    await _progressSaved;
+    if (_isLastPart) {
       navigator.pushReplacement(
-        MaterialPageRoute(builder: (_) => const GameScreen(levelIndex: 0)),
+        MaterialPageRoute(builder: (_) => const ShipScreen.finale()),
       );
-    } else {
-      navigator.pushReplacement(
-        MaterialPageRoute(
-          builder: (_) => GameScreen(levelIndex: completedLevel + 1),
-        ),
-      );
+      return;
     }
+    final next = widget.levelIndex + 1;
+    navigator.pushReplacement(
+      MaterialPageRoute(
+        builder: (_) => ShipScreen.afterWin(
+          collectedCount: next,
+          onContinue: () => navigator.pushReplacement(
+            MaterialPageRoute(builder: (_) => GameScreen(levelIndex: next)),
+          ),
+        ),
+      ),
+    );
   }
 
   // --- Читы (только dev-сборка, вход под kDebugMode) ---
@@ -297,15 +298,16 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// Чит «мгновенная победа»: тот же пост-победный поток, движок не трогаем.
+  /// Чит «мгновенная победа»: та же пауза «деталь собрана», движок не трогаем.
   void _cheatInstantWin() {
     Navigator.of(context).pop();
-    _handleWin();
+    _markDone();
   }
 
+  /// Чит «Состояние корабля → n»: собрано n деталей (0..N; «15» — 15 / 15).
   Future<void> _cheatSetShipParts(int parts) async {
     Navigator.of(context).pop();
-    await ProgressService().setCurrentLevel(parts);
+    await ProgressService().setCollectedCount(parts);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -366,7 +368,7 @@ class _GameScreenState extends State<GameScreen>
         _controller.place(entry.key, entry.value.x, entry.value.y);
       }
     });
-    if (_controller.state.isComplete) _onPackingComplete();
+    if (_controller.state.isComplete) _markDone();
   }
 
   // --- Drag-and-drop (перенос эталонной логики прототипа) ---
@@ -435,7 +437,7 @@ class _GameScreenState extends State<GameScreen>
   // прокрутке.
 
   void _onTrayPointerDown(int id, PointerDownEvent event) {
-    if (_dragPieceId != null) return;
+    if (_done || _dragPieceId != null) return;
     _candidateId = id;
     _candidateDown = event.position;
     _candidateTrayOffset =
@@ -498,6 +500,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _onBoardPointerDown(PointerDownEvent event) {
+    // Пауза «деталь собрана»: собранную деталь не разобрать.
+    if (_done) return;
     final local = _globalToLocal(_boardKey, event.position);
     if (local == null) return;
     final x = (local.dx / _cellSize).floor();
@@ -542,7 +546,7 @@ class _GameScreenState extends State<GameScreen>
       _dragGlobalPos = null;
       _dragFromTray = false;
     });
-    if (_controller.state.isComplete) _onPackingComplete();
+    if (_controller.state.isComplete) _markDone();
   }
 
   /// Прямоугольник поднятого куска (глобальные координаты) при пальце в
@@ -653,12 +657,13 @@ class _GameScreenState extends State<GameScreen>
                         ),
                       ),
                     ),
-                    _buildTray(state),
+                    // Пауза «деталь собрана» — кнопки на месте лотка, та же
+                    // высота зоны: поле не прыгает.
+                    _done ? _buildDoneButtons() : _buildTray(state),
                   ],
                 ),
                 if (_dragPieceId != null && _dragGlobalPos != null)
                   _buildFeedback(cellSize),
-                if (state.isComplete) _buildCompleteBanner(),
               ],
             );
           },
@@ -745,16 +750,34 @@ class _GameScreenState extends State<GameScreen>
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(14.0, 4.0, 14.0, 0.0),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: Text(
-              'уложено ${state.placements.length} / ${state.pieces.length} кусков',
-              style: _progressLabelStyle,
-            ),
-          ),
+          // Пауза — надпись «ДЕТАЛЬ СОБРАНА» (`.proglbl.done`, по центру, как
+          // в мокапе) вместо счётчика кусков.
+          // Высота строки — остаток бюджета зоны (34 − 8 − 6 − 4 = 16): строка
+          // 12 px выше 10.5 px подписи и иначе переполнила бы зону на 1 px.
+          child: _done
+              ? const SizedBox(
+                  height: 16.0,
+                  child: Center(
+                    child: Text(
+                      'ДЕТАЛЬ СОБРАНА',
+                      key: Key('packing_complete'),
+                      style: _doneLabelStyle,
+                    ),
+                  ),
+                )
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'уложено ${state.placements.length} / ${state.pieces.length} кусков',
+                    style: _progressLabelStyle,
+                  ),
+                ),
         ),
       ],
     );
+
+    // На паузе «Очистить поле» нет: собранную деталь не разобрать.
+    if (_done) return SizedBox(height: _progZoneHeight, child: content);
 
     final canClear = state.placements.isNotEmpty;
     // Строка прогресса держит бюджетную высоту [_progZoneHeight] (её же
@@ -812,6 +835,15 @@ class _GameScreenState extends State<GameScreen>
     letterSpacing: 0.63, // .06em @ 10.5px
   );
 
+  /// `.proglbl.done`: `hazardOrange`, 12 px, разрядка .24em, свечение
+  /// `doneGlow` blur 12.
+  static const TextStyle _doneLabelStyle = TextStyle(
+    color: Color(0xFFBE642D), // hazardOrange
+    fontSize: 12.0,
+    letterSpacing: 2.88, // .24em @ 12px
+    shadows: [Shadow(color: PackingPainter.doneGlow, blurRadius: 12.0)],
+  );
+
   Widget _buildBoard(
     PackState state,
     double boardPixelWidth,
@@ -822,7 +854,8 @@ class _GameScreenState extends State<GameScreen>
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, child) {
-        final complete = state.isComplete;
+        // Ободок `doneGlow` — на паузе (в т.ч. по читу «Победить»).
+        final complete = _done;
         // `SizedBox` фиксирует внешний габарит панели (сетка + 2×паддинг);
         // `DecoratedBox` (в отличие от `Container`) красит фон/рамку БЕЗ
         // автоматической вставки внутреннего отступа под рамку — иначе
@@ -995,25 +1028,108 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _buildCompleteBanner() {
-    return Positioned.fill(
-      child: Container(
-        key: const Key('packing_complete'),
-        color: Colors.black54,
-        child: const Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'ДЕТАЛЬ СОБРАНА',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ],
+  /// Пауза «деталь собрана» на месте лотка (канон `.donebtns` мокапа
+  /// `ukladka-field.html`): та же высота [_trayZoneHeight] (поле не прыгает),
+  /// ряд кнопок сверху (отступы 14/10/10, зазор 10), подпись лотка скрыта —
+  /// её место остаётся пустым. Слева «К кораблю», справа основная «Следующая
+  /// деталь»; на последней детали — одна «К кораблю» в основном стиле.
+  Widget _buildDoneButtons() {
+    return SizedBox(
+      key: const Key('done_buttons'),
+      width: double.infinity,
+      height: _trayZoneHeight,
+      child: Align(
+        alignment: Alignment.topCenter,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10.0, 14.0, 10.0, 10.0),
+          child: Row(
+            children: _isLastPart
+                ? [
+                    Expanded(
+                      child: _DoneButton(
+                        key: const Key('done_to_ship_button'),
+                        label: 'К кораблю',
+                        primary: true,
+                        onTap: _onDoneToShip,
+                      ),
+                    ),
+                  ]
+                : [
+                    Expanded(
+                      child: _DoneButton(
+                        key: const Key('done_to_ship_button'),
+                        label: 'К кораблю',
+                        onTap: _onDoneToShip,
+                      ),
+                    ),
+                    const SizedBox(width: 10.0),
+                    Expanded(
+                      child: _DoneButton(
+                        key: const Key('done_next_button'),
+                        label: 'Следующая деталь',
+                        primary: true,
+                        onTap: _onDoneNext,
+                      ),
+                    ),
+                  ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Кнопка паузы «деталь собрана» — канон `.donebtns .btn` мокапа
+/// `ukladka-field.html`: высота 44 (паддинг 13 + строка), скругление 10, текст
+/// 12 px `.05em`. Обычная — рамка 1 `gunmetal`, фон `matteBlack`, текст
+/// `#cbd2d9`; основная ([primary]) — рамка 1 + внутренняя обводка 1
+/// `hazardOrange` (= 2 px), текст `#f0d6c2`.
+class _DoneButton extends StatelessWidget {
+  const _DoneButton({
+    super.key,
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+  });
+
+  final String label;
+  final VoidCallback onTap;
+  final bool primary;
+
+  static const Color _text = Color(0xFFCBD2D9); // `.donebtns .btn`
+  static const Color _primaryText = Color(0xFFF0D6C2); // `.btn.primary`
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        child: Container(
+          height: 44.0,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(horizontal: 6.0),
+          decoration: BoxDecoration(
+            color: BlockMaterial.matteBlack.color,
+            border: Border.all(
+              color: primary
+                  ? BlockMaterial.hazardOrange.color
+                  : BlockMaterial.gunmetal.color,
+              width: primary ? 2.0 : 1.0,
+            ),
+            borderRadius: BorderRadius.circular(10.0),
+          ),
+          child: Text(
+            label,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: primary ? _primaryText : _text,
+              fontSize: 12.0,
+              letterSpacing: 0.6, // .05em @ 12px
+            ),
           ),
         ),
       ),
@@ -1043,7 +1159,7 @@ class _PartTitle extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'ДЕТАЛЬ ${fragmentIndex + 1} / $kShipPartCount',
+          'ДЕТАЛЬ ${fragmentIndex + 1} / ${RoninParts.parts.length}',
           style: const TextStyle(
             color: _kickColor,
             fontSize: 10.0,

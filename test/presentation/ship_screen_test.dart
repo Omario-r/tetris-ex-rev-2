@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
@@ -44,10 +45,11 @@ void main() {
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   group(
-    'ShipScreen — число деталей = min(current_level, 15), счётчик «N / 15»',
+    'ShipScreen — число деталей = getCollectedCount (0..15), счётчик «N / 15»',
     () {
-      // ProgressService клампит персист к 0..14 на чтении (единый источник истины
-      // RoninParts.parts.length) — «сырые» значения ≥15 читаются как 14.
+      // ProgressService клампит персист к 0..15 на чтении (число собранных,
+      // Ронин-1/05 T1; единый источник истины RoninParts.parts.length) —
+      // «сырые» значения >15 читаются как 15.
       for (final entry in {
         0: 0,
         1: 1,
@@ -58,7 +60,8 @@ void main() {
         7: 7,
         12: 12,
         14: 14,
-        30: 14,
+        15: 15,
+        30: 15,
       }.entries) {
         final level = entry.key;
         final expected = entry.value;
@@ -91,7 +94,7 @@ void main() {
     expect(find.byKey(const Key('ship_continue_button')), findsOneWidget);
     expect(find.text('Продолжить сборку'), findsOneWidget);
     expect(find.byKey(const Key('ship_back_button')), findsOneWidget);
-    expect(find.byKey(const Key('ship_next_button')), findsNothing);
+    expect(find.byKey(const Key('ship_finale_text')), findsNothing);
     expect(find.byType(AppBar), findsNothing);
   });
 
@@ -186,12 +189,14 @@ void main() {
     );
   });
 
-  group('Авто-показ', () {
+  group('После сборки (afterWin)', () {
     testWidgets('заработанная деталь въезжает (revealProgress 0→1)', (
       tester,
     ) async {
       await tester.pumpWidget(
-        MaterialApp(home: ShipScreen.reveal(collectedCount: 2, onNext: () {})),
+        MaterialApp(
+          home: ShipScreen.afterWin(collectedCount: 2, onContinue: () {}),
+        ),
       );
 
       // Первый кадр: деталь index 1 ещё не на месте (scale < 1).
@@ -205,42 +210,94 @@ void main() {
       expect(_shipPainter(tester).revealProgress, 1.0);
     });
 
-    testWidgets('счётчик «N / 15», кнопка «Далее» зовёт onNext, без «Назад»', (
+    testWidgets(
+      'счётчик «N / 15», «Продолжить сборку» зовёт onContinue, без «Назад»',
+      (tester) async {
+        var continued = 0;
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ShipScreen.afterWin(
+              collectedCount: 4,
+              onContinue: () => continued++,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          tester
+              .widget<Text>(find.byKey(const Key('ship_collected_text')))
+              .data,
+          '4 / $total',
+        );
+        expect(_shipPainter(tester).collectedCount, 4);
+        expect(find.text('Продолжить сборку'), findsOneWidget);
+        expect(find.byKey(const Key('ship_back_button')), findsNothing);
+        expect(find.byKey(const Key('ship_finale_text')), findsNothing);
+
+        await tester.tap(find.byKey(const Key('ship_continue_button')));
+        expect(continued, 1);
+      },
+    );
+  });
+
+  group('Финал «продолжение следует»', () {
+    testWidgets(
+      'собрано N: надпись, без «Продолжить сборку» и «Назад»; последняя '
+      'деталь въезжает',
+      (tester) async {
+        await tester.pumpWidget(const MaterialApp(home: ShipScreen.finale()));
+
+        await tester.pump();
+        final p0 = _shipPainter(tester);
+        expect(p0.collectedCount, total);
+        expect(p0.revealPartIndex, total - 1);
+        expect(p0.revealProgress, lessThan(1.0));
+
+        await tester.pumpAndSettle();
+        expect(_shipPainter(tester).revealProgress, 1.0);
+        expect(find.text('$total / $total'), findsOneWidget);
+        expect(
+          tester.widget<Text>(find.byKey(const Key('ship_finale_text'))).data,
+          'ПРОДОЛЖЕНИЕ СЛЕДУЕТ',
+        );
+        expect(find.byKey(const Key('ship_continue_button')), findsNothing);
+        expect(find.byKey(const Key('ship_back_button')), findsNothing);
+        expect(find.text('Начать заново'), findsNothing);
+      },
+    );
+
+    testWidgets('animateLast: false — корабль сразу целиком, без въезда', (
       tester,
     ) async {
-      var next = 0;
       await tester.pumpWidget(
-        MaterialApp(
-          home: ShipScreen.reveal(collectedCount: 4, onNext: () => next++),
-        ),
+        const MaterialApp(home: ShipScreen.finale(animateLast: false)),
       );
-      await tester.pumpAndSettle();
-
-      expect(
-        tester.widget<Text>(find.byKey(const Key('ship_collected_text'))).data,
-        '4 / $total',
-      );
-      expect(find.text('Далее'), findsOneWidget);
-      expect(find.byKey(const Key('ship_back_button')), findsNothing);
-      expect(find.byKey(const Key('ship_continue_button')), findsNothing);
-
-      await tester.tap(find.byKey(const Key('ship_next_button')));
-      expect(next, 1);
+      await tester.pump();
+      final p = _shipPainter(tester);
+      expect(p.collectedCount, total);
+      expect(p.revealPartIndex, isNull);
+      expect(find.byKey(const Key('ship_finale_text')), findsOneWidget);
     });
 
-    testWidgets('последняя деталь — «Начать заново»', (tester) async {
+    testWidgets('dev-сброс: прогресс 0 → игра с уровня 1', (tester) async {
+      tester.view.physicalSize = const Size(1200, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+
+      SharedPreferences.setMockInitialValues({'current_level': total});
       await tester.pumpWidget(
-        MaterialApp(
-          home: ShipScreen.reveal(
-            collectedCount: total,
-            onNext: () {},
-            isComplete: true,
-          ),
-        ),
+        const MaterialApp(home: ShipScreen.finale(animateLast: false)),
       );
-      await tester.pumpAndSettle();
-      expect(find.text('Начать заново'), findsOneWidget);
-      expect(find.text('$total / $total'), findsOneWidget);
+      await tester.pump();
+
+      // В тестах kDebugMode = true — дев-кнопка есть.
+      await tester.tap(find.byKey(const Key('ship_dev_reset')));
+      await _pumpFrames(tester);
+
+      expect(find.byType(ShipScreen), findsNothing);
+      expect(tester.widget<GameScreen>(find.byType(GameScreen)).levelIndex, 0);
+      expect(await ProgressService().getCollectedCount(), 0);
     });
   });
 }

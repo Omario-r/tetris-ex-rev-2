@@ -127,29 +127,133 @@ void main() {
       expect(find.textContaining('уложено 0 / '), findsOneWidget);
     });
 
-    testWidgets(
-        'завершение через solve-хук: деталь собрана → баннер → мета-поток '
-        '(авто-показ корабля)', (tester) async {
-      SharedPreferences.setMockInitialValues({'current_level': 0});
-      await pumpGame(tester);
-
+    Future<void> solve(WidgetTester tester) async {
       // Solve-хук из чит-меню раскладывает всю деталь без drag-жестов.
       await tester.tap(find.byKey(const Key('cheat_button')));
       await _pumpFrames(tester);
       await tester.tap(find.byKey(const Key('cheat_solve')));
       await _pumpFrames(tester);
+    }
 
-      // Деталь собрана — баннер «ДЕТАЛЬ СОБРАНА».
+    testWidgets(
+        'завершение через solve-хук: пауза «деталь собрана» — надпись над '
+        'полем, кнопки на месте лотка, прогресс засчитан сразу', (tester) async {
+      SharedPreferences.setMockInitialValues({'current_level': 0});
+      await pumpGame(tester);
+
+      await solve(tester);
+
+      // Надпись «ДЕТАЛЬ СОБРАНА» вместо «уложено N / M кусков».
+      expect(
+        tester.widget<Text>(find.byKey(const Key('packing_complete'))).data,
+        'ДЕТАЛЬ СОБРАНА',
+      );
+      expect(find.textContaining('уложено'), findsNothing);
+      // Лотка нет — на его месте две кнопки; «Очистить поле» скрыта.
+      expect(find.byKey(const Key('packing_tray')), findsNothing);
+      expect(find.byKey(const Key('done_to_ship_button')), findsOneWidget);
+      expect(find.byKey(const Key('done_next_button')), findsOneWidget);
+      expect(find.byKey(const Key('clear_field')), findsNothing);
+      // «К кораблю» слева, «Следующая деталь» справа.
+      expect(
+        tester.getCenter(find.byKey(const Key('done_to_ship_button'))).dx,
+        lessThan(
+          tester.getCenter(find.byKey(const Key('done_next_button'))).dx,
+        ),
+      );
+      // Прогресс засчитан в момент сборки, до выбора кнопки.
+      expect(await ProgressService().getCollectedCount(), 1);
+
+      // Автоперехода нет: пауза держится.
+      await tester.pump(const Duration(seconds: 3));
+      expect(find.byType(GameScreen), findsOneWidget);
+      expect(find.byType(ShipScreen), findsNothing);
+    });
+
+    testWidgets('пауза: касание поля ничего не меняет', (tester) async {
+      await pumpGame(tester);
+      await solve(tester);
+
+      final painter = packingPainter(tester);
+      final before = painter.state;
+      final board = find.byWidgetPredicate(
+        (w) => w is CustomPaint && w.painter is PackingPainter,
+      );
+      // Клетка, занятая уложенным куском.
+      final cell = before.occupiedCells.first;
+      final at = tester.getTopLeft(board) +
+          Offset(
+            (cell.x + 0.5) * painter.cellSize,
+            (cell.y + 0.5) * painter.cellSize,
+          );
+      // Тянем уложенный кусок с поля далеко вниз — без паузы он ушёл бы в лоток.
+      final gesture = await tester.startGesture(at);
+      await tester.pump();
+      await gesture.moveBy(const Offset(0, 600));
+      await tester.pump();
+      expect(find.byKey(const Key('packing_drag_feedback')), findsNothing);
+      await gesture.up();
+      await _pumpFrames(tester);
+
+      final after = packingPainter(tester).state;
+      expect(after.placements, before.placements);
+      expect(after.isComplete, isTrue);
       expect(find.byKey(const Key('packing_complete')), findsOneWidget);
+    });
 
-      // Через ~900 мс запускается прежний мета-поток — авто-показ корабля.
-      await tester.pump(const Duration(milliseconds: 1000));
+    testWidgets('«Следующая деталь» → следующий уровень, прогресс +1 один раз',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'current_level': 0});
+      await pumpGame(tester);
+      await solve(tester);
+
+      await tester.tap(find.byKey(const Key('done_next_button')));
+      await _pumpFrames(tester);
+
+      expect(tester.widget<GameScreen>(find.byType(GameScreen)).levelIndex, 1);
+      expect(find.byType(ShipScreen), findsNothing);
+      expect(await ProgressService().getCollectedCount(), 1);
+    });
+
+    testWidgets(
+        '«К кораблю» → корабль с приросшей деталью → «Продолжить сборку» → '
+        'следующий уровень, прогресс +1 один раз', (tester) async {
+      SharedPreferences.setMockInitialValues({'current_level': 0});
+      await pumpGame(tester);
+      await solve(tester);
+
+      await tester.tap(find.byKey(const Key('done_to_ship_button')));
       await _pumpFrames(tester);
 
       expect(find.byType(ShipScreen), findsOneWidget);
-      expect(find.byKey(const Key('ship_next_button')), findsOneWidget);
-      // Прогресс засчитан.
-      expect(await ProgressService().getCurrentLevel(), 1);
+      expect(find.text('1 / $kShipPartCount'), findsOneWidget);
+      expect(find.byKey(const Key('ship_back_button')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('ship_continue_button')));
+      await _pumpFrames(tester);
+
+      expect(tester.widget<GameScreen>(find.byType(GameScreen)).levelIndex, 1);
+      expect(await ProgressService().getCollectedCount(), 1);
+    });
+
+    testWidgets('последняя деталь: одна кнопка «К кораблю» → финал',
+        (tester) async {
+      final last = RoninParts.parts.length - 1;
+      SharedPreferences.setMockInitialValues({'current_level': last});
+      await pumpGame(tester, level: last);
+      await solve(tester);
+
+      expect(find.byKey(const Key('done_next_button')), findsNothing);
+      final toShip = find.byKey(const Key('done_to_ship_button'));
+      expect(toShip, findsOneWidget);
+      expect(await ProgressService().getCollectedCount(), last + 1);
+
+      await tester.tap(toShip);
+      await _pumpFrames(tester);
+
+      expect(find.byKey(const Key('ship_finale_text')), findsOneWidget);
+      expect(find.byKey(const Key('ship_continue_button')), findsNothing);
+      expect(await ProgressService().getCollectedCount(), last + 1);
     });
 
     testWidgets(
@@ -349,8 +453,9 @@ void main() {
       expect(button.bottom, lessThanOrEqualTo(progressTop.dy + 44.0 + 34.0));
     });
 
-    testWidgets('поле и лоток не прыгают, когда лоток опустел',
-        (tester) async {
+    testWidgets(
+        'поле не прыгает, когда лоток опустел: кнопки паузы занимают ту же '
+        'зону', (tester) async {
       await pumpGame(tester);
       final boardFinder = find.byWidgetPredicate(
         (w) => w is CustomPaint && w.painter is PackingPainter,
@@ -368,11 +473,12 @@ void main() {
 
       expect(trayPieces(), findsNothing, reason: 'лоток должен опустеть');
       expect(tester.getRect(boardFinder), boardBefore);
-      expect(tester.getRect(trayFinder), trayBefore);
-
-      // Дать отработать отложенному мета-потоку победы.
-      await tester.pump(const Duration(milliseconds: 1000));
-      await _pumpFrames(tester);
+      // На паузе лоток сменился кнопками — зона той же высоты и на том же месте
+      // по вертикали.
+      final doneZone = tester.getRect(find.byKey(const Key('done_buttons')));
+      expect(doneZone.height, trayBefore.height);
+      expect(doneZone.top, trayBefore.top);
+      expect(doneZone.bottom, trayBefore.bottom);
     });
   });
 
