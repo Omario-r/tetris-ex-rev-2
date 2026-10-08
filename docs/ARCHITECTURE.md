@@ -17,6 +17,7 @@
 | data | `lib/game_engine/data/` | Контент: разметка «Ронина» v2 (`RoninParts` — 15 деталей: плиты обшивки по секциям в своём масштабе и предметы поверх, D-010…D-012) + `LevelMap` (уровень i ↔ деталь с order i+1, поле 10×14); `ShipParts` — осиротевшие дев-детали, выпил в Стори 06 | models |
 | application | `lib/application/` | Персист прогресса (`ProgressService`) | data ¹ |
 | theme | `lib/presentation/theme/` | Скины блоков и оверлеи (только отрисовка) | models |
+| ship_render | `lib/presentation/ship_render/` | Рисунок корабля в Dart (`ShipArt`, `RoninArt` — порт `ship-render.js`): слой корпуса, слой предметов, контур борта, формы предметов; сэмплинг клетки детали | game_engine/data |
 | widgets | `lib/presentation/widgets/` | Пейнтеры укладки и корабля | packing, data, theme |
 | screens | `lib/presentation/screens/` | Экраны + композиционный корень партии укладки | packing, models, data, application, theme, widgets |
 
