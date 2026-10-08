@@ -1,7 +1,8 @@
 <!DOCTYPE html>
 <!--
-  Каталог деталей «Ронина-1»: каждая деталь — отдельно и крупно, в рамке поля
-  укладки 10x14, плюс локатор «где на корабле». Это каталог элементов к экранам
+  Каталог деталей «Ронина-1» (разметка v2, D-010/D-011): каждая деталь —
+  отдельно и крупно, в рамке поля укладки 10x14 и в своём масштабе, плюс
+  локатор «где на корабле». Это каталог элементов к экранам
   ronin-grid.html и ronin-ship.html: ТЗ и реализация привязываются к id детали.
   КАНОН разметки — ronin-parts.js; канон правил — docs/DESIGN.md.
 -->
@@ -45,34 +46,38 @@
 <body>
 
 <h1>Каталог деталей — «Ронин-1»</h1>
-<p class="sub">16 деталей: нос (4), мостик (4), носовой пояс (8). Каждая показана так, как её увидит игрок
-на поле укладки, — силуэт в рамке поля 10×14, заполненный настоящим куском корабля.</p>
+<p class="sub"><span id="cnt"></span> Каждая показана так, как её увидит игрок на поле укладки, — силуэт в
+рамке поля 10×14, заполненный настоящим куском корабля в масштабе детали.</p>
 <p class="legend">
   <b>Рамка</b> — поле укладки 10×14 клеток, силуэт детали в нём отцентрован.
   <b>Пунктир</b> (<code>ghostTarget</code>) — контур мишени, каким игрок видит его до укладки.
-  <b>Тонкие линии внутри</b> (<code>seam</code>) — разделители клеток; каждая четвёртая совпадает со швом плиты
-  рисунка, остальные швами не притворяются. <b>Справа</b> — место детали на борту.
+  <b>Тонкие линии внутри</b> (<code>seam</code>) — разделители клеток. <b>Масштаб</b> — сколько клеток поля
+  приходится на клетку рисунка. На поле плиты нет предметов слоя 1 — они собираются отдельно.
+  <b>Справа</b> — место детали на борту.
 </p>
 
 <div class="grid" id="cat"></div>
 
-<script src="ship-render.js"></script>
-<script src="ronin-parts.js"></script>
-<script src="ronin-draw.js"></script>
+<script>window.__SHIP_RES = 6; window.__SHIP_NO_OBJECTS = true;</script>
+<script src="ship-render.js?hull"></script>
+<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
+<script src="ship-render.js?full"></script>
+<script src="ronin-parts.js?v=2"></script>
+<script src="ronin-objects.js?v=2"></script>
+<script src="ronin-draw.js?v=2"></script>
 <script>
 (function(){
 "use strict";
 const P = window.RONIN_PARTS, D = window.RONIN_DRAW, SHIP = window.__SHIP;
 const FW = 10, FH = 14;              // поле укладки в клетках (канон, DESIGN.md)
 const u  = 24;                       // px на клетку в каталоге
-const lu = 2.4;                      // px на клетку в локаторе
+const k  = 9 / SHIP.C;               // локатор: px на px рисунка
+const sx = SHIP.px(1.2), sy = SHIP.py(-1.6), sw = 12.6*SHIP.C, sh = 10.6*SHIP.C;
 
 const cat = document.getElementById('cat');
 P.parts.forEach(part => {
   const w = part.mask[0].length, h = part.mask.length;
-  const [c0, r0] = part.origin;
-  const offC = Math.floor((FW - w) / 2), offR = Math.floor((FH - h) / 2);   // центрируем в поле
-
+  const oc = Math.floor((FW - w) / 2), or = Math.floor((FH - h) / 2);
   const el = document.createElement('div');
   el.className = 'part';
   el.innerHTML =
@@ -80,40 +85,33 @@ P.parts.forEach(part => {
     `<span class="id">${part.id}</span><span class="ttl">${part.title}</span></div>` +
     `<div class="row"><div class="field"><canvas></canvas></div>` +
     `<div><div class="loc"><canvas></canvas></div></div></div>` +
-    `<div class="meta"><b>${part.cells}</b> клеток · bbox <b>${w}×${h}</b> · ` +
-    `origin <b>${c0},${r0}</b> · модуль <b>${part.module}</b></div>`;
+    `<div class="meta"><b>${part.cells}</b> клеток · маска <b>${w}×${h}</b> · масштаб <b>${D.frame(part).s}</b> · ` +
+    `слой <b>${part.layer}</b> (${part.layer ? 'предмет' : 'плита'}) · модуль <b>${part.module}</b></div>`;
   cat.appendChild(el);
   const [cvField, cvLoc] = el.querySelectorAll('canvas');
 
-  /* --- деталь на поле укладки --- */
+  /* деталь на поле укладки */
   const g = D.dpr(cvField, FW*u, FH*u);
-  const map = (col, row) => [ (col - c0 + offC) * u, (row - r0 + offR) * u ];
   g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--boardBg').trim();
   g.fillRect(0, 0, FW*u, FH*u);
-  /* слабая сетка поля — чтобы читался размер 10x14 */
   g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
   for (let c = 0; c <= FW; c++){ g.beginPath(); g.moveTo(c*u+.5, 0); g.lineTo(c*u+.5, FH*u); g.stroke(); }
   for (let r = 0; r <= FH; r++){ g.beginPath(); g.moveTo(0, r*u+.5); g.lineTo(FW*u, r*u+.5); g.stroke(); }
-  D.drawPart(g, part, map, u);                                    // кусок оригинала
-  D.drawCellSeams(g, part, map, u, 'hsla(220,14%,4%,.55)');       // seam — только на поле
-  D.strokeOutline(g, part, map, u, 'hsla(23,62%,55%,.55)', 2);    // ghostTarget
+  D.drawField(g, part, u, oc, or);                                  // кусок оригинала
+  D.drawSeams(g, part, u, oc, or, 'hsla(220,14%,4%,.55)');          // seam — только на поле
+  D.strokeOutline(g, part, u, oc, or, 'hsla(23,62%,55%,.55)', 2);   // ghostTarget
 
-  /* --- локатор: где на корабле --- */
-  const lw = P.grid.cols * lu, lh = P.grid.rows * lu;
-  const gl = D.dpr(cvLoc, lw, lh);
-  const T = (x, y) => [ (x - D.rx(0)) * (lu / (SHIP.C / P.grid.renderCell)),
-                        (y - D.ry(0)) * (lu / (SHIP.C / P.grid.renderCell)) ];
-  gl.globalAlpha = .3;                                            // весь борт — бледно
-  gl.drawImage(SHIP.off,
-    D.rx(0)*D.SC, D.ry(0)*D.SC, (D.rx(P.grid.cols)-D.rx(0))*D.SC, (D.ry(P.grid.rows)-D.ry(0))*D.SC,
-    0, 0, lw, lh);
-  gl.globalAlpha = 1;
-  gl.strokeStyle = 'hsla(215,14%,52%,.16)'; gl.lineWidth = 1;     // shipOutline
-  D.shipOutlinePath(gl, T);
-  const lmap = (col, row) => [ col * lu, row * lu ];
-  D.drawPart(gl, part, lmap, lu);
-  D.strokeOutline(gl, part, lmap, lu, 'hsla(23,62%,55%,.75)', 1.2);
+  /* локатор: верх корабля бледно, деталь — в полном свете */
+  const gl = D.dpr(cvLoc, sw*k, sh*k);
+  gl.fillStyle = 'hsl(220,14%,7%)'; gl.fillRect(0, 0, sw*k, sh*k);
+  gl.save(); gl.scale(k, k); gl.translate(-sx, -sy);
+  gl.globalAlpha = .3; gl.drawImage(SHIP.off, 0, 0, SHIP.W*D.RES, SHIP.H*D.RES, 0, 0, SHIP.W, SHIP.H); gl.globalAlpha = 1;
+  D.drawOnShip(gl, part);
+  D.strokeOnShip(gl, part, 'hsla(23,62%,55%,.85)', 1.6 / k);
+  gl.restore();
 });
+const plates = P.parts.filter(p => p.layer === 0).length;
+document.getElementById('cnt').textContent = `${P.parts.length} деталей: ${plates} плит обшивки и ${P.parts.length - plates} предмета.`;
 })();
 </script>
 </body>

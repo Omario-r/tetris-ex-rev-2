@@ -220,7 +220,7 @@
 
   <div class="panel">
     <h2>ПАНЕЛЬ МОКАПА</h2>
-    <p><b>Деталь</b> — любая из 13 по разметке. Каждая влезает в поле 10×14; кусочки
+    <p><b>Деталь</b> — любая из разметки. Каждая влезает в поле 10×14; кусочки
        нарезаются здесь же тем критерием, что уйдёт в генератор.</p>
     <select id="partSel"></select>
     <p><b>Подача кусочков</b> — тумблер чит-меню: полный набор на виду против
@@ -327,9 +327,13 @@
 
 <div id="dragLayer"></div>
 
-<script src="ship-render.js"></script>
-<script src="ronin-parts.js"></script>
-<script src="ronin-draw.js"></script>
+<script>window.__SHIP_RES = 6; window.__SHIP_NO_OBJECTS = true;</script>
+<script src="ship-render.js?hull"></script>
+<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
+<script src="ship-render.js?full"></script>
+<script src="ronin-parts.js?v=2"></script>
+<script src="ronin-objects.js?v=2"></script>
+<script src="ronin-draw.js?v=2"></script>
 <script>
 /* ================= ИНТЕРАКТИВ МОКАПА (иллюстрация, не прод-код) ================= */
 "use strict";
@@ -410,7 +414,7 @@ const isTarget = (c,r) => targetSet.has(key(c,r));
 
 function loadPart(id){
   part = P.parts.find(p => p.id === id);
-  const [c0, r0] = part.origin, w = part.mask[0].length, h = part.mask.length;
+  const w = part.mask[0].length, h = part.mask.length;
   offC = Math.floor((FW-w)/2); offR = Math.floor((FH-h)/2);   // силуэт по центру поля
   targetSet = new Set();
   part.mask.forEach((line, dr) => { for (let dc = 0; dc < line.length; dc++)
@@ -447,15 +451,11 @@ const cellAt = (c,r) => grid.querySelector(`.gcell[data-c="${c}"][data-r="${r}"]
 /* уложенные клетки — куски ОРИГИНАЛА + seam по границам клеток */
 function renderPlaced(){
   gfill.clearRect(0, 0, FW*CELL, FH*CELL);
-  const [c0, r0] = part.origin;
   grid.querySelectorAll('.hit').forEach(e => e.remove());
   for (const id in placedCells){
     for (const k of placedCells[id]){
       const [c, r] = k.split(',').map(Number);
-      const gc = c0 + c - offC, gr = r0 + r - offR;              // клетка на сетке корабля
-      gfill.drawImage(SHIP.off,
-        D.rx(gc)*D.SC, D.ry(gr)*D.SC, (D.rx(gc+1)-D.rx(gc))*D.SC, (D.ry(gr+1)-D.ry(gr))*D.SC,
-        c*CELL, r*CELL, CELL, CELL);
+      D.drawCell(gfill, part, c - offC, r - offR, c*CELL, r*CELL, CELL);   // кусок оригинала в масштабе детали
       gfill.strokeStyle = 'hsla(220,14%,4%,.55)'; gfill.lineWidth = 1;   /* seam */
       gfill.strokeRect(c*CELL+.5, r*CELL+.5, CELL, CELL);
       const hit = document.createElement('div');                  // хит-зона для подъёма
@@ -619,7 +619,7 @@ loadPart(P.parts[0].id);
   const p = P.parts.find(x => x.id === 'bridge_c');       // визор: проявление видно сразу
   const u = 20, cv = document.getElementById('elPartial');
   const g = D.dpr(cv, FW*u, FH*u);
-  const [c0, r0] = p.origin, w = p.mask[0].length, h = p.mask.length;
+  const w = p.mask[0].length, h = p.mask.length;
   const oc = Math.floor((FW-w)/2), or = Math.floor((FH-h)/2);
   const target = new Set();
   p.mask.forEach((line, dr) => { for (let dc = 0; dc < line.length; dc++)
@@ -630,9 +630,7 @@ loadPart(P.parts[0].id);
   g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, FW*u, FH*u);          /* boardBg */
   for (const k of placed){                                                 /* el-cell-filled */
     const [c, r] = k.split(',').map(Number);
-    const gc = c0 + c - oc, gr = r0 + r - or;
-    g.drawImage(SHIP.off, D.rx(gc)*D.SC, D.ry(gr)*D.SC,
-      (D.rx(gc+1)-D.rx(gc))*D.SC, (D.ry(gr+1)-D.ry(gr))*D.SC, c*u, r*u, u, u);
+    D.drawCell(g, p, c - oc, r - or, c*u, r*u, u);
     g.strokeStyle = 'hsla(220,14%,4%,.55)'; g.lineWidth = 1;               /* seam */
     g.strokeRect(c*u+.5, r*u+.5, u, u);
   }
@@ -650,10 +648,8 @@ loadPart(P.parts[0].id);
 /* каталог: el-cell-filled — настоящий кусок рисунка (клетка визора мостика) */
 (function(){
   const g = document.getElementById('elFilled').getContext('2d');
-  const bc = P.parts.find(p => p.id === 'bridge_c'), [c0, r0] = bc.origin;
-  const gc = c0+5, gr = r0+2;
-  g.drawImage(SHIP.off, D.rx(gc)*D.SC, D.ry(gr)*D.SC,
-    (D.rx(gc+1)-D.rx(gc))*D.SC, (D.ry(gr+1)-D.ry(gr))*D.SC, 0, 0, 68, 68);
+  const bc = P.parts.find(p => p.id === 'bridge_c');
+  D.drawCell(g, bc, 5, 3, 0, 0, 68);
   g.strokeStyle = 'hsla(220,14%,4%,.55)'; g.lineWidth = 2; g.strokeRect(1, 1, 66, 66);
 })();
 </script>

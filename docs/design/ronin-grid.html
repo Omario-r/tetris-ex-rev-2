@@ -1,15 +1,15 @@
 <!DOCTYPE html>
 <!--
-  Схема разметки: «Ронин» в сетке 44x108 с нарезкой на детали.
-  Для глаз PO. КАНОН разметки — ronin-parts.js (id, маска, порядок),
-  канон правил — docs/DESIGN.md § «Модель модулей Ронин-1».
+  Схема разметки v2: «Ронин» как набор логических деталей (D-010), слои (D-011).
+  Для глаз PO. КАНОН разметки — ronin-parts.js (id, маска, масштаб, слой,
+  порядок), формы предметов — ronin-objects.js, правила — docs/DESIGN.md.
   Рисунок — ship-render.js (утв. PO), копий рендера здесь нет.
 -->
 <html lang="ru">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Разметка — «Ронин» в сетке 44×108</title>
+<title>Разметка «Ронина»</title>
 <style>
   /* ===== ТОКЕНЫ (канон; имена и значения = docs/DESIGN.md) ===== */
   :root {
@@ -39,88 +39,81 @@
 </head>
 <body>
 
-<h1>«Ронин» в сетке 44×108 — разметка на детали</h1>
-<p class="sub">Область «Ронина-1» — строки 0–31 (нос, мостик, носовой пояс): 16 деталей, 960 клеток.
-Ниже 31-й строки борт ещё не размечен — это «Ронин-2». Номер на детали = порядок в сборке.</p>
+<h1>«Ронин» — разметка на детали</h1>
+<p class="sub">Область «Ронина-1» — нос, мостик и носовой пояс: <b id="cnt"></b>. Каждая деталь собирается
+отдельно, в своём масштабе, и встаёт на своё место. Слой 0 — плиты обшивки, слой 1 — предметы поверх.
+Номер на детали = порядок в сборке.</p>
 
 <div class="wrap">
   <div class="card">
-    <h2>СЕТКА И НАРЕЗКА</h2>
+    <h2>ДЕТАЛИ НА КОРАБЛЕ</h2>
     <canvas id="grid"></canvas>
-    <div class="dim">44 × 108 клеток · клетка сетки = ¼ клетки рисунка</div>
+    <div class="dim">тонкие линии — сетка клеток секции в её масштабе</div>
   </div>
 
   <div class="card">
     <h2>ПОРЯДОК СБОРКИ</h2>
     <table id="legend"></table>
     <div class="note">
-      <b>Границы деталей.</b> Между секциями — по швам рисунка (строки 8 и 16):
-      деталь кончается там же, где кончается секция корабля. Внутри секции —
-      неровно и не зеркально: левый и правый борт режутся по-разному.<br><br>
-      <b>Рамп сложности.</b> Нос — 4 малые детали (29–51 клетка) с глубокими
-      зубами: они подсказывают первый ход. Мостик — 4 детали (52–62) со ступенями.
-      Пояс — 8 деталей (64–80) почти ровных: начало приходится искать.
-      Подробно — DESIGN.md § «Сложность старта».
+      <b>Секции и масштаб.</b> Нос собирается в масштабе 2, мостик — 3, пояс — 4 (клеток поля на
+      клетку рисунка); предметы — 7–8. Плиты одной секции режутся по её сетке, поэтому края чистые.
+      Между секциями — шов рисунка; нос заходит в мостик язычком.<br><br>
+      <b>Слои.</b> Плита под предметом целая. Датчик и RCS-квады собираются после своей плиты и
+      ложатся поверх неё. На поле плиты их ещё нет.<br><br>
+      <b>Рамп сложности.</b> Нос и мостик — малые фигурные плиты (36–44 клетки), пояс — 64–80.
+      Предметы — передышки (41–43 клетки, лёгкий старт). Метрика — DESIGN.md § «Сложность старта».
     </div>
   </div>
 </div>
 
-<script src="ship-render.js"></script>
-<script src="ronin-parts.js"></script>
-<script src="ronin-draw.js"></script>
+<script>window.__SHIP_RES = 4; window.__SHIP_NO_OBJECTS = true;</script>
+<script src="ship-render.js?hull"></script>
+<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
+<script src="ship-render.js?full"></script>
+<script src="ronin-parts.js?v=2"></script>
+<script src="ronin-objects.js?v=2"></script>
+<script src="ronin-draw.js?v=2"></script>
 <script>
 (function(){
 "use strict";
 const P = window.RONIN_PARTS, D = window.RONIN_DRAW, SHIP = window.__SHIP;
-const u = 7;                                    // экранных px на клетку сетки
-const W = P.grid.cols * u, H = P.grid.rows * u;
-const hue = i => `hsl(${(i * 47) % 360} 70% 60%)`;   // цвет детали — только для схемы
+const k = 40 / SHIP.C;                                   // экранных px на px рисунка (клетка рисунка = 40)
+const sx = SHIP.px(1.2), sy = SHIP.py(-1.6), sw = 12.6*SHIP.C, sh = 10.6*SHIP.C;   // кадр: верх корабля
+const W = sw*k, H = sh*k;
+const hue = i => `hsl(${(i * 47) % 360} 70% 60%)`;      // цвет детали — только для схемы
 
 const g = D.dpr(document.getElementById('grid'), W, H);
-g.fillStyle = getComputedStyle(document.body).getPropertyValue('--spaceBg') || '#0e1116';
-g.fillRect(0, 0, W, H);
+g.fillStyle = '#0e1116'; g.fillRect(0, 0, W, H);
+g.save(); g.scale(k, k); g.translate(-sx, -sy);
+g.globalAlpha = .35; g.drawImage(SHIP.off, 0, 0, SHIP.W*D.RES, SHIP.H*D.RES, 0, 0, SHIP.W, SHIP.H); g.globalAlpha = 1;
+const byLayer = [...P.parts].sort((a, b) => a.layer - b.layer || a.order - b.order);
+byLayer.forEach(part => {
+  const i = P.parts.indexOf(part);
+  D.drawOnShip(g, part);
+  g.save(); g.clip(D.shipRegion(part)); g.fillStyle = hue(i); g.globalAlpha = .14; g.fillRect(sx, sy, sw, sh); g.restore();
+  if (part.layer === 0) {                                  // сетка секции в её масштабе
+    g.strokeStyle = 'rgba(255,255,255,.07)'; g.lineWidth = 1 / k;
+    D.eachCell(part, (c, r) => { const [x, y, cs] = D.cellRect(part, c, r); g.strokeRect(x, y, cs, cs); });
+  }
+  D.strokeOnShip(g, part, hue(i), 2 / k);
+});
+g.restore();
 
-const map = (col, row) => [col * u, row * u];
-/* весь борт бледно — «сюда дорастёт» */
-const T = (x, y) => [ (x - D.rx(0)) * (u / (SHIP.C / P.grid.renderCell)),
-                      (y - D.ry(0)) * (u / (SHIP.C / P.grid.renderCell)) ];
-g.globalAlpha = .38;
-g.drawImage(SHIP.off,
-  D.rx(0)*D.SC, D.ry(0)*D.SC, (D.rx(P.grid.cols)-D.rx(0))*D.SC, (D.ry(P.grid.rows)-D.ry(0))*D.SC,
-  0, 0, W, H);
-g.globalAlpha = 1;
-
-/* размеченные детали — в полном свете, поверх бледного борта */
+g.font = 'bold 12px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
 P.parts.forEach((part, i) => {
-  D.drawPart(g, part, map, u);
-  g.save(); D.maskPath(g, part, map, u); g.clip();
-  g.fillStyle = hue(i); g.globalAlpha = .18; g.fillRect(0, 0, W, H); g.restore();
-  D.strokeOutline(g, part, map, u, hue(i), 2);
+  const [cx, cy] = D.centerOnShip(part), x = (cx - sx) * k, y = (cy - sy) * k;
+  g.fillStyle = 'rgba(0,0,0,.7)'; g.beginPath(); g.arc(x, y, 10, 0, 7); g.fill();
+  g.fillStyle = hue(i); g.fillText(part.order, x, y + .5);
 });
 
-/* клеточная сетка поверх всего — слабая */
-g.strokeStyle = 'rgba(255,255,255,.05)'; g.lineWidth = 1;
-for (let c = 0; c <= P.grid.cols; c++){ g.beginPath(); g.moveTo(c*u+.5, 0); g.lineTo(c*u+.5, H); g.stroke(); }
-for (let r = 0; r <= P.grid.rows; r++){ g.beginPath(); g.moveTo(0, r*u+.5); g.lineTo(W, r*u+.5); g.stroke(); }
-
-/* номер порядка в центре масс детали */
-g.font = 'bold 13px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
-P.parts.forEach((part, i) => {
-  let sx = 0, sy = 0, n = 0;
-  D.eachCell(part, (col, row) => { sx += col + .5; sy += row + .5; n++; });
-  const x = sx / n * u, y = sy / n * u;
-  g.fillStyle = 'rgba(0,0,0,.65)'; g.beginPath(); g.arc(x, y, 10, 0, 7); g.fill();
-  g.fillStyle = hue(i); g.fillText(part.order, x, y+.5);
-});
-
-/* легенда */
-const rows = ['<tr><th>#</th><th>id</th><th>деталь</th><th>клеток</th></tr>'];
+const rows = ['<tr><th>#</th><th>id</th><th>деталь</th><th>слой</th><th>масштаб</th><th>клеток</th></tr>'];
 P.parts.forEach((part, i) => rows.push(
   `<tr><td class="n"><span class="sw" style="background:${hue(i)}"></span>${part.order}</td>` +
-  `<td><code>${part.id}</code></td><td>${part.title}</td><td class="n">${part.cells}</td></tr>`));
-rows.push(`<tr><td></td><td></td><td style="color:#8b949e">всего</td><td class="n">${
-  P.parts.reduce((s, p) => s + p.cells, 0)}</td></tr>`);
+  `<td><code>${part.id}</code></td><td>${part.title}</td><td class="n">${part.layer}</td>` +
+  `<td class="n">${D.frame(part).s}</td><td class="n">${part.cells}</td></tr>`));
 document.getElementById('legend').innerHTML = rows.join('');
+const plates = P.parts.filter(p => p.layer === 0).length;
+document.getElementById('cnt').textContent = `${P.parts.length} деталей: ${plates} плит и ${P.parts.length - plates} предмета`;
 })();
 </script>
 </body>

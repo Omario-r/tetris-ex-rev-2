@@ -106,7 +106,8 @@ function glowDot(g,x,y,r,col){const gr=g.createRadialGradient(x,y,0,x,y,r*4);gr.
    РЕНДЕР ВСЕЙ СЦЕНЫ в offscreen 2x
 ================================================================ */
 /* разрешение offscreen: по умолчанию 2x; страница может заказать крупнее,
-   задав window.__SHIP_RES до подключения файла (рисунок не меняется) */
+   задав window.__SHIP_RES до подключения файла (рисунок не меняется).
+   window.__SHIP_NO_OBJECTS = true — корпус без предметов слоя 1 (датчик, RCS). */
 const RES=window.__SHIP_RES||2;
 const off=document.createElement('canvas'); off.width=W*RES; off.height=H*RES;
 const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
@@ -213,7 +214,9 @@ g.lineTo(cx,py(1.38));g.lineTo(cx+2.1*C,py(.38));g.lineTo(cx+2.1*C,py(.9));g.clo
 g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;
 g.beginPath();g.moveTo(cx-2.1*C,py(.24));g.lineTo(cx,py(1.22));g.lineTo(cx+2.1*C,py(.24));g.stroke();
 g.restore();
-/* датчик-блок на носу */
+/* датчик-блок на носу (предмет слоя 1, D-011) */
+const NO_OBJ=!!window.__SHIP_NO_OBJECTS;   /* страница может заказать корпус без предметов слоя 1 */
+if(!NO_OBJ){
 g.fillStyle=hsl(M.DARK,-2);
 g.fillRect(cx-.5*C,py(-.55),1*C,.6*C);
 g.fillStyle=hsl(M.GUN,6);
@@ -222,6 +225,7 @@ g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;
 g.strokeRect(cx-.5*C,py(-.55),1*C,.6*C); g.strokeRect(cx-.26*C,py(-.95),.52*C,.42*C);
 g.fillStyle='rgba(180,220,255,.9)'; g.fillRect(cx-.18*C,py(-.78),.36*C,2.2);
 glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
+}
 
 /* --- мостик: визор со щелями --- */
 (function(){
@@ -364,8 +368,10 @@ function rcs(X,Y,flip){
   };
   noz(0); noz(flip*Math.PI/2); noz(Math.PI);
 }
+if(!NO_OBJ){                                     /* RCS-квады — предметы слоя 1 */
 rcs(px(3),py(4.5),-1); rcs(px(12),py(4.5),1);
 rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
+}
 
 /* --- грузовой люк (лево) и шлюз (право) --- */
 (function(){

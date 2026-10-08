@@ -17,11 +17,8 @@
       "name": "design-mockups",
       "runtimeExecutable": "python3",
       "runtimeArgs": [
-        "-m",
-        "http.server",
-        "5960",
-        "--directory",
-        "docs/design"
+        "-c",
+        "import http.server as h, functools; H = type('H', (h.SimpleHTTPRequestHandler,), {'end_headers': lambda s: (s.send_header('Cache-Control', 'no-store'), h.SimpleHTTPRequestHandler.end_headers(s))}); h.ThreadingHTTPServer(('', 5960), functools.partial(H, directory='docs/design')).serve_forever()"
       ],
       "port": 5960
     }

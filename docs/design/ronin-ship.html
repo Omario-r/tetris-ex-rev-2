@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
-  Экран корабля-композита: собранные детали — из рисунка, несобранное — тонкий
-  контур борта (включая гондолы). Ползунок прогресса — чтобы PO увидел порядок
+  Экран корабля-композита: собранные детали — из рисунка, по слоям (обшивка,
+  затем предметы поверх, D-011); несобранное — тонкий контур борта (включая гондолы). Ползунок прогресса — чтобы PO увидел порядок
   сборки: что игрок увидит первым, вторым, третьим.
   КАНОН разметки — ronin-parts.js; канон правил — docs/DESIGN.md.
 -->
@@ -69,7 +69,7 @@
       <div class="safe"></div>
       <div class="dtop">
         <div class="iconbtn">≡</div>
-        <div class="t"><div class="k">РОНИН · СБОРКА</div><div class="n" id="hud">0 / 16</div></div>
+        <div class="t"><div class="k">РОНИН · СБОРКА</div><div class="n" id="hud">0 / 15</div></div>
         <div class="iconbtn">⤢</div>
       </div>
       <div class="shipstage"><canvas id="ship"></canvas></div>
@@ -81,23 +81,27 @@
   <div class="card">
     <h2>ПРОГРЕСС СБОРКИ</h2>
     <div class="ctl">
-      <input id="slider" type="range" min="0" max="16" value="3" step="1">
-      <div class="val" id="val">3 / 16</div>
+      <input id="slider" type="range" min="0" max="15" value="3" step="1">
+      <div class="val" id="val">3 / 15</div>
     </div>
     <div class="now" id="now"></div>
     <div class="note">
-      <b>Что видно первым.</b> Сверху вниз: четыре детали носа, затем визор и
-      борта мостика, затем носовой пояс. Каждая деталь прирастает к уже собранному;
-      порядок внутри секции задаёт рамп сложности, а не симметрия.<br><br>
+      <b>Что видно первым.</b> Сверху вниз: нос и датчик над ним, три плиты мостика,
+      затем носовой пояс. Каждая плита прирастает к уже собранному; предмет (датчик,
+      RCS-квад) ложится поверх своей плиты сразу после неё.<br><br>
       <b>Сетку клеток на корабле не рисуем</b> — швы даёт сам рисунок. Разделители клеток
       живут только на поле укладки (решение PO 2026-07-28).
     </div>
   </div>
 </div>
 
-<script src="ship-render.js"></script>
-<script src="ronin-parts.js"></script>
-<script src="ronin-draw.js"></script>
+<script>window.__SHIP_RES = 3; window.__SHIP_NO_OBJECTS = true;</script>
+<script src="ship-render.js?hull"></script>
+<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
+<script src="ship-render.js?full"></script>
+<script src="ronin-parts.js?v=2"></script>
+<script src="ronin-objects.js?v=2"></script>
+<script src="ronin-draw.js?v=2"></script>
 <script>
 (function(){
 "use strict";
@@ -106,21 +110,22 @@ const P = window.RONIN_PARTS, D = window.RONIN_DRAW, SHIP = window.__SHIP;
 const sx = 44, sy = 26, sw = SHIP.W - 88, sh = SHIP.H - 40;   // кадр: обрезаем поля
 const destW = 210, scale = destW / sw, destH = sh * scale;
 const g = D.dpr(document.getElementById('ship'), destW, destH);
-const T   = (x, y) => [ (x - sx) * scale, (y - sy) * scale ];
-const map = (col, row) => T(D.rx(col), D.ry(row));
-const u   = (D.rx(1) - D.rx(0)) * scale;                      // клетка сетки на экране
+const T = (x, y) => [ (x - sx) * scale, (y - sy) * scale ];
 
 function render(n){
   g.clearRect(0, 0, destW, destH);
   g.strokeStyle = 'hsla(215,14%,52%,.16)'; g.lineWidth = 1;   /* shipOutline */
   D.shipOutlinePath(g, T);
-  P.parts.filter(p => p.order <= n).forEach(p => D.drawPart(g, p, map, u));
+  g.save(); g.scale(scale, scale); g.translate(-sx, -sy);
+  const built = P.parts.filter(p => p.order <= n).sort((a, b) => a.layer - b.layer || a.order - b.order);
+  built.forEach(p => D.drawOnShip(g, p));                     /* слой 0, затем слой 1 */
+  g.restore();
 
   document.getElementById('hud').textContent = n + ' / ' + P.parts.length;
   document.getElementById('val').textContent = n + ' / ' + P.parts.length;
   const last = P.parts.find(p => p.order === n);
   document.getElementById('now').innerHTML = last
-    ? `последняя: <code>${last.id}</code> — ${last.title} · ${last.cells} клеток`
+    ? `последняя: <code>${last.id}</code> — ${last.title} · ${last.cells} клеток · слой ${last.layer}`
     : 'ничего не собрано — виден только контур борта';
 }
 const slider = document.getElementById('slider');
