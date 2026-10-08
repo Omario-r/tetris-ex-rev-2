@@ -71,7 +71,7 @@ void main() {
         // Авто-показ корабля; деталь +1.
         expect(find.byType(ShipScreen), findsOneWidget);
         expect(
-          find.text('Собрано ${level + 1} из $kShipPartCount'),
+          find.text('${level + 1} / $kShipPartCount'),
           findsOneWidget,
         );
         expect(

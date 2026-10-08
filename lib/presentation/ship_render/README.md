@@ -7,46 +7,55 @@
 
 Рисунок корабля в Dart (процедурно, без PNG): сцена в px рисунка системы
 `docs/design/ship-render.js`, два слоя (D-011) — корпус и предметы, контур борта,
-формы предметов. Экраны/поле берут рисунок только через интерфейс `ShipArt`.
+формы предметов; экран корабля-композит и сэмплинг клетки детали. Экраны/поле
+берут рисунок только через интерфейс `ShipArt`.
 
 ## Публичный интерфейс
 
 - `abstract class ShipArt` (`ship_art.dart`): `sceneSize` (W×H, px рисунка);
-  `toScene(x, y)` — клетка рисунка → px (как `px()/py()`); `hullPicture` — слой 0,
-  корпус без предметов; `objectsPicture` — слой 1, предметы; `outline` — контур
-  борта + гондолы (штрих — токен `shipOutline`); `objectShape(partId)` — форма
-  предмета (`'sensor'`, `'rcs_fl'`, `'rcs_fr'`), px рисунка, иначе `ArgumentError`.
+  `toScene(x, y)` — клетка рисунка → px; `hullPicture` — слой 0, корпус без
+  предметов; `objectsPicture` — слой 1, предметы; `outline` — контур борта +
+  гондолы; `objectShape(partId)` — форма предмета (`'sensor'`, `'rcs_fl'`,
+  `'rcs_fr'`), px рисунка, иначе `ArgumentError`.
 - `RoninArt implements ShipArt` (`ronin_art.dart`) — порт `ship-render.js` 1:1 в
   объёме «Ронина-1». Статики: `cellPx` (`C=24`), `ox/oy`, `width/height`, `rows`,
-  `px()/py()`, `cx`, `span`, `plates` (`List<RoninPlate>` — нарезка эталона).
-- `mulberry32(seed)` — рандом эталона, точная эмуляция 32-битной арифметики JS.
-- `ShipObject`, `roninObjects` — параметры форм предметов (из `ronin-parts.js`,
-  поле `object`; в `RoninPartDef` их нет).
+  `px()/py()`, `cx`, `span`, `plates`. `mulberry32(seed)` — рандом эталона.
+  `ShipObject`, `roninObjects` — параметры форм предметов (в `RoninPartDef` их нет).
+- `ShipCompositePainter({art, collectedCount, revealPartIndex?, revealProgress=1})`
+  (`ship_composite_painter.dart`) — экран корабля по `ronin-ship.html`: кадр
+  `frameOf(art)` = `x 44..W−44, y 26..H−14` вписан в `size` по центру (поля сцены
+  обрезаны клипом кадра); контур `outline` штрихом `shipOutlineColor` 1 px экрана;
+  собранные (`order ≤ collectedCount`, клампится 0..15) — плиты: один клип
+  (объединение клеток) + `hullPicture`, затем предметы: один клип (формы) +
+  `objectsPicture`. Деталь `revealPartIndex` при `0 < revealProgress < 1` —
+  отдельный клип/replay со scale от центра bbox детали; при 1 — в общем клипе.
+- `paintPartCell(canvas, art, part, c, r, dst)` (`ship_cell_sampler.dart`) — точка
+  входа поля укладки (Стори 03): клетка маски детали → `dst` (масштаб + сдвиг, клип
+  `dst`); плита — `hullPicture`, предмет — `hullPicture` + `objectsPicture`.
+  `shipCellRect(art, part, c, r)` — та же клетка в px рисунка (источник сэмплинга).
 
 ## Зависит от
 
-- `dart:ui` / `package:flutter/painting.dart` — запись `Picture`, `Path`, `TextPainter`.
-- (ARCHITECTURE: `game_engine/data` — по нарезке стори; в T1 не импортируется.)
+- `dart:ui` / `package:flutter/painting.dart` — `Picture`, `Path`, `TextPainter`.
+- `game_engine/data` — `RoninParts`/`RoninPartDef` (`cellOnShip`, `layer`, `order`).
 
 ## От него зависят
 
-- никто (экран корабля — Стори 02 T2; поле укладки — Стори 03).
+- `presentation/screens` — `ship_screen` (`ShipCompositePainter`, `RoninArt`);
+  поле укладки — Стори 03 (`paintPartCell`).
 
 ## Инварианты
 
-- Раскладка плит детерминирована и совпадает с эталоном JS (39 плит; тест
-  держит полный список `x, y, w, h, kind, i, jl, rv`). Порядок вызовов `rnd()` в
-  нарезке не менять — сдвинет весь рисунок.
-- Картинки записываются один раз на экземпляр (`late final`) и воспроизводятся
-  под клипом: собранное = один клип-путь на слой, не по клетке.
-- `objectsPicture` рисовать только под клипом `objectShape(id)`: в конце слоя
-  повторён штрих контура корпуса (в эталоне контур рисуется последним, поверх
-  предметов) — без клипа он виден по всему борту.
-- Не переносится (Ронин-2): фон, «РОНИН», стыковочный люк, гондолы (объёмы),
-  грузовой люк/шлюз, радиатор, корма. Текст — системный sans-serif bold,
-  сжатый по ширине до `Arial Narrow Bold` эталона; тень canvas → σ = blur/4.
+- Раскладка плит детерминирована и совпадает с эталоном JS (39 плит, тест держит
+  `x, y, w, h, kind, i, jl, rv`). Порядок вызовов `rnd()` в нарезке не менять.
+- Картинки записываются один раз на экземпляр (`late final`); экран держит один
+  общий `RoninArt` на запуск. Собранное = один клип-путь на слой, не по клетке.
+- `objectsPicture` — только под клипом `objectShape(id)` или поверх `hullPicture`
+  (в конце слоя повторён штрих контура корпуса — так он совпадает с полным рисунком).
+- Не переносится (Ронин-2): фон, «РОНИН», люк, гондолы-объёмы, радиатор, корма.
+  Текст — системный sans-serif bold, сжат до ширины `Arial Narrow`; тень σ = blur/4.
 
 ## Как проверить
 
-`flutter test test/presentation/ship_render/` — эталоны `mulberry32` и плит,
-растеризация слоёв, контур, формы предметов.
+`flutter test test/presentation/ship_render/` — эталоны, растр слоёв, контур,
+формы предметов, композит при 0/3/15, сэмплинг клетки.

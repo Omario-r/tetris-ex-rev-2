@@ -105,11 +105,21 @@
   (раскладка по `PackSlice.solution`) — дев-кнопка `Key('cheat_solve')` И programmatic-хук
   для тестов (доводит до `isComplete` без симуляции drag). `FeedMode {fullSet, tray3}`
   объявлен в `game_screen.dart` (в `tray3` в лотке первые 3 из `trayOrder` + индикатор «+N»).
-- `ShipScreen()` — ручной статичный экран корабля: `ShipPainter` по `min(current_level,
-  kShipPartCount)`; читает `ProgressService`. Вход — `Key('ship_button')` на `GameScreen`.
-- `ShipScreen.reveal({collectedCount, onNext, isComplete})` — авто-показ прироста после
-  победы: фиксированное число деталей, кнопка `Key('ship_next_button')` «Далее»
-  (или «Начать заново», если `isComplete`), без «Назад».
+- `ShipScreen({art})` — ручной экран корабля-композит (канон `docs/design/ronin-ship.html`,
+  Ронин-1/02 T2): фон `spaceBg`, без `AppBar`. Верх `.dtop` (поля 16, отступ 4, высота 38):
+  слева `Key('ship_back_button')` 34×34 (`matteBlack`/`gunmetal`/глиф `hudIcon`, `pop`),
+  по центру «РОНИН · СБОРКА» (9 px) и `Key('ship_collected_text')` «N / 15» (13 px; N =
+  `min(current_level, RoninParts.parts.length)`, читает `ProgressService` один раз в
+  `initState`), справа пустое место 34 (кнопки «⤢» нет). Центр — `ShipCompositePainter`
+  (`ship_render`) на всю свободную область. Низ — `Key('ship_continue_button')`
+  «Продолжить сборку» (поля 16, высота 44, радиус 10, рамка 2 `hazardOrange`) → `pop`.
+  `SafeArea(minimum: bottom 22)` (`.safe.b`). `art` — рисунок (`ShipArt`), `null` → общий
+  статический `RoninArt` (картинки слоёв записываются раз за запуск). Вход —
+  `Key('ship_button')` на `GameScreen`.
+- `ShipScreen.reveal({collectedCount, onNext, isComplete, art})` — авто-показ прироста после
+  победы: тот же макет, деталь `collectedCount-1` въезжает scale-in (400 мс, easeOut),
+  нижняя кнопка того же вида — `Key('ship_next_button')` «Далее» (или «Начать заново»,
+  если `isComplete`), без «Назад» (слева пустое место 34). Поток меняется в Ронин-1/05.
 - `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, feedMode, onSetFeedMode,
   onReshuffle, onSolve, sliceConfig, onSetSliceConfig, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
   Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
@@ -127,7 +137,9 @@
   `game_engine/models` (`TargetMask`), `game_engine/data` (`LevelMap`, `RoninParts` — только
   чтение, название детали для топбара, Ронин-1/01 T4),
   `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`/`ShipMaterials`),
-  `presentation/widgets` (`PackingPainter`, `ship`). `GameScreen` больше НЕ зависит от
+  `presentation/widgets` (`PackingPainter`, `kShipPartCount` из `ship.dart` — `game_screen`/
+  `cheat_menu`), `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`, `ShipArt`,
+  `RoninArt`; Ронин-1/02 T2 — `ShipPainter` экраном больше не используется). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
   `theme/level_skin` (пересадка на укладку, Стори 02 T2).
 - `cheat_menu.dart` импортирует `FeedMode` из `game_screen.dart` (взаимный импорт —
@@ -155,7 +167,7 @@
   (деталь +1) → «Далее» → Game(следующий). На последнем дев-уровне (индекс
   `kShipPartCount-1`) → корабль N/N + «Начать заново» → `ProgressService.reset()` → Game(0).
 - Экран корабля открывается `Navigator.push` (НЕ `pushReplacement`): `GameScreen` остаётся
-  под стеком, «Назад» из `AppBar` возвращает в ту же партию.
+  под стеком, «Назад» (`ship_back_button`) или «Продолжить сборку» возвращают в ту же партию.
 - У `GameScreen` нет `AppBar` → его `body` обёрнут в `SafeArea` вручную; иначе шапка
   (в т.ч. кнопка «Корабль») уходит под системный статус-бар/вырез и не нажимается.
 - Drag: `_boardKey` — origin координат клеток поля (globalToLocal). Якорь укладки —

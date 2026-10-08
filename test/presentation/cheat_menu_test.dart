@@ -7,12 +7,13 @@ import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/presentation/screens/cheat_menu.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
+import 'package:explosive_tetris/presentation/ship_render/ship_composite_painter.dart';
 import 'package:explosive_tetris/presentation/widgets/ship.dart';
 
-ShipPainter _shipPainter(WidgetTester tester) => tester
+ShipCompositePainter _shipPainter(WidgetTester tester) => tester
     .widgetList<CustomPaint>(find.byType(CustomPaint))
     .map((cp) => cp.painter)
-    .whereType<ShipPainter>()
+    .whereType<ShipCompositePainter>()
     .first;
 
 /// Прокачивает кадры без `pumpAndSettle` — `GameScreen` держит пульс-контроллер.

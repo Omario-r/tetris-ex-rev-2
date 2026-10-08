@@ -29,7 +29,9 @@
   `ShipMaterials` — параметр `materials` убран вместе с зависимостью от `theme`; решение
   Постановщика по эскалации T3, 2026-07-29: 7-элементная карта `ShipMaterials.defaultMaterials`
   не покрывает детали «Ронина», расширять её под заведомо неканоничный временный пейнтер не
-  стали). Заменяется композитом из рисунка «Ронина» в Стори 02 эпика Ронин-1.
+  стали). **Выведен из употребления (Ронин-1/02 T2):** экран корабля рисует
+  `ship_render/ShipCompositePainter`; у `ShipPainter` потребителей и тестов больше нет, файл
+  сносится в Стори 06 (решение PO 2026-07-29), `kShipPartCount` из него — живой.
 - `kShipPartCount` (`ship.dart`) — **`final`, выводится из `RoninParts.parts.length`** (= 15,
   было `ShipParts.parts.length` = 7 до Ронин-1/01 T3). Единый источник «N деталей ↔ N уровней».
   Не `const` — только рантайм. Форма деталей живёт в `game_engine/data/ronin_parts`.
@@ -82,8 +84,9 @@
 
 ## От него зависят
 
-- `presentation/screens` — `game_screen` (`PackingPainter`, эпик «Укладка» Стори 02 T2),
-  `ship_screen` (`ship_painter`).
+- `presentation/screens` — `game_screen` (`PackingPainter`, эпик «Укладка» Стори 02 T2;
+  `kShipPartCount`), `cheat_menu` (`kShipPartCount`). `ship_screen` от `widgets` больше не
+  зависит (Ронин-1/02 T2).
 
 ## Инварианты
 
@@ -96,5 +99,5 @@
 
 ## Как проверить
 
-`flutter test test/presentation/ship_screen_test.dart test/game_engine/data/ronin_parts_test.dart
-test/presentation/packing_painter_test.dart`.
+`flutter test test/game_engine/data/ronin_parts_test.dart test/presentation/packing_painter_test.dart`
+(`ShipPainter` тестами больше не покрыт — выведен из употребления, Ронин-1/02 T2).
