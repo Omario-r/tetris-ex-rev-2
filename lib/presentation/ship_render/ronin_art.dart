@@ -7,8 +7,9 @@ import 'ship_art.dart';
 
 /// Параметры формы предмета слоя 1 (канон — поле `object` в
 /// `docs/design/ronin-parts.js`; геометрия — `docs/design/ronin-objects.js`).
-/// [x], [y] — центр в клетках рисунка (для `rcs`), [flip] — сторона бокового
-/// сопла (`1` — вправо, `-1` — влево).
+/// [x], [y] — центр в клетках рисунка (для `rcs`), [flip] — сторона: бокового
+/// сопла у `rcs`, половина у `visor` (`half`), сторона люка у `hatch` (`side`);
+/// `1` — вправо, `-1` — влево.
 class ShipObject {
   final String kind;
   final double x, y;
@@ -21,6 +22,10 @@ const Map<String, ShipObject> roninObjects = {
   'sensor': ShipObject('sensor'),
   'rcs_fr': ShipObject('rcs', x: 12, y: 4.5, flip: 1),
   'rcs_fl': ShipObject('rcs', x: 3, y: 4.5, flip: -1),
+  'visor_l': ShipObject('visor', flip: -1),
+  'visor_r': ShipObject('visor', flip: 1),
+  'hatch_l': ShipObject('hatch', flip: -1),
+  'hatch_r': ShipObject('hatch', flip: 1),
 };
 
 const int _m32 = 0xFFFFFFFF;
@@ -238,7 +243,13 @@ class RoninArt implements ShipArt {
     if (o == null) {
       throw ArgumentError.value(partId, 'partId', 'не предмет «Ронина»');
     }
-    final parts = o.kind == 'sensor' ? _sensorShape() : _rcsShape(px(o.x), py(o.y), o.flip);
+    final parts = switch (o.kind) {
+      'sensor' => _sensorShape(),
+      'rcs' => _rcsShape(px(o.x), py(o.y), o.flip),
+      'visor' => _visorShape(o.flip),
+      'hatch' => _hatchShape(o.flip),
+      _ => throw ArgumentError.value(o.kind, 'kind', 'неизвестный вид предмета'),
+    };
     return parts.reduce((a, b) => Path.combine(PathOperation.union, a, b));
   }
 
@@ -287,6 +298,24 @@ class RoninArt implements ShipArt {
       rot(0),
       rot(flip * math.pi / 2),
       rot(math.pi),
+    ];
+  }
+
+  /// Визор мостика половиной (`visor` в `ronin-objects.js`): [half] `-1` —
+  /// левая, `1` — правая.
+  static List<Path> _visorShape(int half) {
+    final vx = px(4.65), vy = py(2.48), vw = 5.7 * cellPx, vh = .86 * cellPx;
+    return [
+      Path()..addRRect(_rr(half < 0 ? vx : vx + vw / 2, vy, vw / 2, vh, 4)),
+    ];
+  }
+
+  /// Торпедный люк с оранжевой полоской над ним (`hatch` в `ronin-objects.js`):
+  /// [side] `-1` — левый, `1` — правый.
+  static List<Path> _hatchShape(int side) {
+    final tx = cx + side * 1.45 * cellPx - .42 * cellPx, ty = py(5.95);
+    return [
+      Path()..addRRect(_rr(tx, ty - 2.6, .84 * cellPx, .66 * cellPx + 2.6, 3)),
     ];
   }
 

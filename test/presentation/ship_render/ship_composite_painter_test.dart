@@ -40,7 +40,7 @@ void main() {
     expect(f, Rect.fromLTRB(44, 26, RoninArt.width - 44, RoninArt.height - 14));
   });
 
-  for (final n in [0, 3, 15]) {
+  for (final n in [0, 3, RoninParts.parts.length]) {
     test('пейнт при $n собранных — без исключений', () async {
       final img = await _raster(
         ShipCompositePainter(art: art, collectedCount: n),
@@ -51,7 +51,7 @@ void main() {
   }
 
   test('собранное — из рисунка, несобранное — пусто (только контур)', () async {
-    // Середина носа (prow, order 1) и середина нижнего пояса (fwd2_cr, order 15).
+    // Середина носа (prow, order 1) и середина нижнего пояса (fwd2_cr, последняя деталь).
     final nose = onCanvas(7.5, 1.0);
     final belt = onCanvas(8.0, 7.5);
 
@@ -106,7 +106,7 @@ void main() {
     },
   );
 
-  test('collectedCount клампится 0..15, shouldRepaint по полям', () {
+  test('collectedCount клампится 0..N, shouldRepaint по полям', () {
     final a = ShipCompositePainter(art: art, collectedCount: 99);
     expect(a.collectedCount, RoninParts.parts.length);
     expect(
@@ -114,7 +114,9 @@ void main() {
       0,
     );
     expect(
-      a.shouldRepaint(ShipCompositePainter(art: art, collectedCount: 15)),
+      a.shouldRepaint(
+        ShipCompositePainter(art: art, collectedCount: RoninParts.parts.length),
+      ),
       isFalse,
     );
     expect(

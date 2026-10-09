@@ -59,3 +59,46 @@
   чёткая кромка собранной детали).
 
 ТЗ T1–T3 нарезаются после T0 — от канона v3.
+
+### T1 — данные разметки v3 в коде (+ формы новых предметов)
+
+- **Статус:** сделана (развилка по порядку люков снята, вариант (а)); ждёт коммита
+- **Рекомендованный агент:** Исполнитель · Claude (`ispolnitel`)
+- **Модули (≤ 3):** `lib/game_engine/data/` (`ronin_parts.dart`, паспорт),
+  `lib/presentation/ship_render/` (`ronin_art.dart` — только формы предметов,
+  паспорт); тесты `test/game_engine/`, `test/presentation/`.
+- **Что сделать:**
+  1. `ronin_parts.dart` — перенести `docs/design/ronin-parts.js` **v3** 1:1: 19 деталей
+     в порядке `order`, id, title, module, layer, section/origin (плиты), object
+     (`objectKind` = `sensor` / `rcs` / `visor` / `hatch`, `objectScale`, `objectX/Y` =
+     `origin` предмета), маски, `cells`, `seed` (все заданы). Секции без изменений.
+     Комментарий модуля — v3, ссылка на D-016.
+  2. `ronin_art.dart`: `roninObjects` — добавить `visor_l` / `visor_r` (`ShipObject('visor',
+     flip: -1 / 1)`, half = flip) и `hatch_l` / `hatch_r` (`ShipObject('hatch', flip:
+     -1 / 1)`, side = flip); `objectShape` — формы по `docs/design/ronin-objects.js`:
+     визор половиной `RRect` (`vx = px(4.65)`, `vy = py(2.48)`, `vw = 5.7C`,
+     `vh = .86C`, радиус 4; левая — от `vx`, правая — от `vx + vw/2`, ширина `vw/2`),
+     люк — `RRect(tx, ty − 2.6, .84C, .66C + 2.6, r 3)`, `tx = cx + side·1.45C − .42C`,
+     `ty = py(5.95)`. Рисунок слоёв **не менять** (это T2).
+  3. Тесты:
+     - `ronin_parts_test` — под v3: 19 деталей, 12 плит + 7 предметов; площадь плит
+       в клетках рисунка = 60 (без изменений); **новый** тест «нет одинарных шипов»:
+       ни у одной плиты нет клетки, у которой оба горизонтальных или оба
+       вертикальных соседа вне детали (кроме сторон на краю секции) — по сетке
+       секции, как в `docs/design/tools-smooth-plates.py` (`thin`);
+     - `ronin_packing_test`, `pack_slicer_test` (`_referenceSlices`),
+       `slice_config_test` (`_bigPiecesReference`) — эталонные нарезки канонных
+       seed снять заново для v3 и вписать (новый канон; инвариант «куски 5..12» на
+       канонных seed — зелёный);
+     - `start_metric_test` — полосы прежние, все 19 деталей в полосах; заголовок
+       группы — «разметка v3»;
+     - `ronin_art_test` — `objectShape` для `visor_l` содержит `toScene(5.5, 2.9)`,
+       `hatch_r` — `toScene(8.9, 6.2)`; неизвестный id — `ArgumentError`;
+     - всё, что считает детали числом 15, — на `RoninParts.parts.length`.
+- **Результат:** `flutter analyze` — 0; `flutter test` — зелёный.
+- **DoD:** паспорта `data`, `ship_render`; `system/AGENT.md` п. 5. Не коммитить.
+- **Заметки по выполнению:**
+  - Сделано: `ronin_parts.dart` — v3 1:1 из рабочей копии `ronin-parts.js` (19 деталей, seed все заданы, суммы `cells` сверены с масками скриптом); комментарии модуля — v3/D-016. `ronin_art.dart` — `visor_l/r`, `hatch_l/r` в `roninObjects`, формы в `objectShape` (рисунок слоёв не тронут). Тесты: `ronin_parts_test` (19 = 12 + 7, виды предметов, новый тест «нет одинарных шипов» по `thin` из `tools-smooth-plates.py` — зелёный), `ronin_art_test` (визор/люки, 7 предметов), эталоны нарезок `pack_slicer_test` / `slice_config_test` сняты заново для v3, `start_metric_test` / `ronin_packing_test` — зелёные на 19 деталях без правок логики. Захардкоженные «15» в `ship_screen_test`, `ship_composite_painter_test` (и названиях `cheat_menu_test`, `win_flow_test`) заменены на `RoninParts.parts.length`. Паспорта `game_engine/data`, `presentation/ship_render` обновлены.
+  - **Развилка (стоп).** Тест `ronin_parts_test` «каждый предмет перекрывается или касается плиты с меньшим order» (и та же фраза в шапке `ronin-parts.js`: «предмет идёт после плиты, на которой лежит») красный на каноне v3: `hatch_l` (order 9) и `hatch_r` (order 11) геометрически лежат только на нижних плитах пояса `fwd2_cl` (order 18) и `fwd2_cr` (order 19); от верхних плит `fwd1_cl` / `fwd1_cr` их маски отстоят на 0,1 клетки рисунка (маска люка начинается с y = 5,85, нижний край верхних плит в этих колонках y = 5,75). Остальные предметы проходят (sensor на prow, visor на bridge_c/l/r, rcs на fwd1_r/fwd1_l). Тест не ослаблял и порядок деталей не менял: это решение Постановщика/Дизайнера. Варианты: (а) поднять `hatch_l/r` в каноне после `fwd2_cl/cr` (порядок и мокап меняются; эталоны нарезок ключуются по id и от порядка не зависят); (б) оставить порядок канона и ослабить инвариант (предмет касается плиты своей секции пояса либо допуск зазора до 0,1 клетки); (в) подогнать маску/положение люка. Остальное в T1 от решения не зависит. Итог на момент стопа: `flutter analyze` — 0; `flutter test` — зелёный, кроме этого одного теста.
+  - **Развилка снята (решение Постановщика, вариант (а)).** Порядок из поправленного канона перенесён в `ronin_parts.dart` (`order` и позиции в списке): 1 prow, 2 sensor, 3 bridge_c, 4 bridge_l, 5 bridge_r, 6 visor_l, 7 visor_r, 8 fwd1_cl, 9 fwd1_cr, 10 fwd1_r, 11 rcs_fr, 12 fwd2_r, 13 fwd1_l, 14 rcs_fl, 15 fwd2_l, 16 fwd2_cl, 17 hatch_l, 18 fwd2_cr, 19 hatch_r. Маски, seed, формы прежние; инвариант-тест предметов зелёный, эталоны нарезок (по id) не менялись. Итог: `flutter analyze` — 0; `flutter test` — All tests passed (545).
+  - В рабочей копии до начала T1 уже были незакоммиченные правки `ronin-parts.js` (seed деталей) — перенесены как есть.

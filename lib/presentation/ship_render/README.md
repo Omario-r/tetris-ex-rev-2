@@ -16,18 +16,21 @@
   `toScene(x, y)` — клетка рисунка → px; `hullPicture` — слой 0, корпус без
   предметов; `objectsPicture` — слой 1, предметы; `outline` — контур борта +
   гондолы; `objectShape(partId)` — форма предмета (`'sensor'`, `'rcs_fl'`,
-  `'rcs_fr'`), px рисунка, иначе `ArgumentError`; `backdrop` — подложка клетки поля
+  `'rcs_fr'`, `'visor_l'`/`'visor_r'`, `'hatch_l'`/`'hatch_r'` — формы v3, D-016),
+  px рисунка, иначе `ArgumentError`; `backdrop` — подложка клетки поля
   там, где рисунка нет (фона в слоях нет; у «Ронина» `#070A11` — середина фона эталона).
 - `RoninArt implements ShipArt` (`ronin_art.dart`) — порт `ship-render.js` 1:1 в
   объёме «Ронина-1». `RoninArt.shared` — общий экземпляр на запуск (экран корабля и
   поле укладки). Статики: `cellPx` (`C=24`), `ox/oy`, `width/height`, `rows`,
   `px()/py()`, `cx`, `span`, `plates`. `mulberry32(seed)` — рандом эталона.
-  `ShipObject`, `roninObjects` — параметры форм предметов (в `RoninPartDef` их нет).
+  `ShipObject`, `roninObjects` — параметры форм предметов (в `RoninPartDef` их нет;
+  `flip` = сопло `rcs` / `half` визора / `side` люка). Рисунок слоёв пока v2 (плиты по
+  генератору, визор и люки в корпусе) — перенос на v3 в Ронин-1/10 T2.
 - `ShipCompositePainter({art, collectedCount, revealPartIndex?, revealProgress=1})`
   (`ship_composite_painter.dart`) — экран корабля по `ronin-ship.html`: кадр
   `frameOf(art)` = `x 44..W−44, y 26..H−14` вписан в `size` по центру (поля сцены
   обрезаны клипом кадра); контур `outline` штрихом `shipOutlineColor` 1 px экрана;
-  собранные (`order ≤ collectedCount`, клампится 0..15) — плиты: один клип
+  собранные (`order ≤ collectedCount`, клампится 0..N) — плиты: один клип
   (объединение клеток) + `hullPicture`, затем предметы: один клип (формы) +
   `objectsPicture`. Деталь `revealPartIndex` при `0 < revealProgress < 1` —
   отдельный клип/replay со scale от центра bbox детали; при 1 — в общем клипе.
@@ -68,4 +71,4 @@
 ## Как проверить
 
 `flutter test test/presentation/ship_render/` — эталоны, растр слоёв, контур,
-формы предметов, композит при 0/3/15, сэмплинг клетки и клеток поля.
+формы предметов, композит при 0/3/N, сэмплинг клетки и клеток поля.

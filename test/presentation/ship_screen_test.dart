@@ -45,11 +45,11 @@ void main() {
   tearDown(() => SharedPreferences.setMockInitialValues({}));
 
   group(
-    'ShipScreen — число деталей = getCollectedCount (0..15), счётчик «N / 15»',
+    'ShipScreen — число деталей = getCollectedCount (0..N), счётчик «k / N»',
     () {
-      // ProgressService клампит персист к 0..15 на чтении (число собранных,
-      // Ронин-1/05 T1; единый источник истины RoninParts.parts.length) —
-      // «сырые» значения >15 читаются как 15.
+      // ProgressService клампит персист к 0..N на чтении (число собранных,
+      // Ронин-1/05 T1; N = RoninParts.parts.length, единый источник истины) —
+      // «сырые» значения >N читаются как N.
       for (final entry in {
         0: 0,
         1: 1,
@@ -61,7 +61,9 @@ void main() {
         12: 12,
         14: 14,
         15: 15,
-        30: 15,
+        total - 1: total - 1,
+        total: total,
+        total + 11: total,
       }.entries) {
         final level = entry.key;
         final expected = entry.value;
@@ -297,7 +299,7 @@ void main() {
     });
 
     testWidgets(
-      'счётчик «N / 15», «Продолжить сборку» зовёт onContinue, без «Назад»',
+      'счётчик «N / всего», «Продолжить сборку» зовёт onContinue, без «Назад»',
       (tester) async {
         var continued = 0;
         await tester.pumpWidget(

@@ -349,8 +349,8 @@ const card = (title, an) => { const d = document.createElement('div'); d.classNa
 }
 {
   const byId = id => P.parts.find(p => p.id === id) || OBJ.find(o => o.id === id);
-  const order = ['prow','sensor','bridge_c','bridge_l','bridge_r','visor_l','visor_r','fwd1_cl','hatch_l','fwd1_cr','hatch_r',
-                 'fwd1_r','rcs_fr','fwd2_r','fwd1_l','rcs_fl','fwd2_l','fwd2_cl','fwd2_cr'];
+  const order = ['prow','sensor','bridge_c','bridge_l','bridge_r','visor_l','visor_r','fwd1_cl','fwd1_cr',
+                 'fwd1_r','rcs_fr','fwd2_r','fwd1_l','rcs_fl','fwd2_l','fwd2_cl','hatch_l','fwd2_cr','hatch_r'];  /* люки — после своих нижних плит */
   document.getElementById('order').innerHTML = order.map(id => { const p = byId(id);
     const t = id === 'bridge_c' ? 'Мостик, центр' : p.title, obj = p.layer === 1;
     return `<li>${obj ? '<b>' : ''}${t}${obj ? '</b>' : ''} — ${p.cells} кл.</li>`; }).join('');

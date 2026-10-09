@@ -79,8 +79,10 @@ void main() {
   final plates = parts.where((p) => p.isPlate).toList();
   final objects = parts.where((p) => !p.isPlate).toList();
 
-  test('разметка v2: ровно 15 деталей, 3 секции', () {
-    expect(parts.length, equals(15));
+  test('разметка v3: 19 деталей — 12 плит и 7 предметов, 3 секции', () {
+    expect(parts.length, equals(19));
+    expect(plates.length, equals(12));
+    expect(objects.length, equals(7));
     expect(RoninParts.sections.length, equals(3));
   });
 
@@ -89,10 +91,10 @@ void main() {
     expect(ids.length, equals(parts.length));
   });
 
-  test('order — 1..15 по индексу списка', () {
+  test('order — 1..N по индексу списка', () {
     final orders = parts.map((p) => p.order).toList();
-    expect(orders, equals(List<int>.generate(15, (i) => i + 1)),
-        reason: 'order по возрастанию 1..15 без пропусков, индекс == order-1');
+    expect(orders, equals(List<int>.generate(parts.length, (i) => i + 1)),
+        reason: 'order по возрастанию 1..N без пропусков, индекс == order-1');
   });
 
   test('layer ∈ {0, 1}', () {
@@ -191,6 +193,14 @@ void main() {
     expect(area, closeTo(60, _eps));
   });
 
+  test('предметы v3: датчик, визор ×2, люк ×2, RCS ×2', () {
+    final kinds = <String, int>{};
+    for (final part in objects) {
+      kinds.update(part.objectKind!, (n) => n + 1, ifAbsent: () => 1);
+    }
+    expect(kinds, equals({'sensor': 1, 'visor': 2, 'hatch': 2, 'rcs': 2}));
+  });
+
   test('предмет: objectKind, objectScale, objectX/Y заданы', () {
     expect(objects, isNotEmpty);
     for (final part in objects) {
@@ -198,6 +208,36 @@ void main() {
       expect(part.objectScale, isNotNull, reason: 'предмет ${part.id}');
       expect(part.objectX, isNotNull, reason: 'предмет ${part.id}');
       expect(part.objectY, isNotNull, reason: 'предмет ${part.id}');
+    }
+  });
+
+  test('нет одинарных шипов: у клетки плиты не бывает пустоты по обе стороны', () {
+    // Как `thin` в docs/design/tools-smooth-plates.py: по сетке секции; сторона
+    // за краем секции (край корпуса) шипом не считается.
+    for (final section in RoninParts.sections) {
+      final owner = <(int, int), String>{};
+      for (final part in plates.where((p) => p.sectionId == section.id)) {
+        for (final c in _sectionCells(part)) {
+          owner[c] = part.id;
+        }
+      }
+      bool inGrid(int c, int r) =>
+          c >= 0 && c < section.cols && r >= 0 && r < section.rows;
+      for (final e in owner.entries) {
+        final (c, r) = e.key;
+        final id = e.value;
+        bool other(int cc, int rr) => owner[(cc, rr)] != id;
+        final horizontal = inGrid(c - 1, r) &&
+            inGrid(c + 1, r) &&
+            other(c - 1, r) &&
+            other(c + 1, r);
+        final vertical = inGrid(c, r - 1) &&
+            inGrid(c, r + 1) &&
+            other(c, r - 1) &&
+            other(c, r + 1);
+        expect(horizontal || vertical, isFalse,
+            reason: 'плита $id: одинарный шип в клетке секции ${section.id} ($c, $r)');
+      }
     }
   });
 

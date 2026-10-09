@@ -36,7 +36,7 @@ void main() {
     });
   });
 
-  group('рамп сложности старта (разметка v2, канонные seed)', () {
+  group('рамп сложности старта (разметка v3, канонные seed)', () {
     for (final part in RoninParts.parts) {
       test('${part.id} (seed ${part.seed}) в полосе своей группы', () {
         final level = prepareLevel(part.mask, seed: part.seed);

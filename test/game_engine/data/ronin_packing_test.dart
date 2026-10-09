@@ -5,7 +5,7 @@ import 'package:explosive_tetris/game_engine/packing/pack_state.dart';
 import 'package:explosive_tetris/game_engine/packing/pack_slicer.dart';
 
 /// Доказывает «каждая деталь «Ронина-1» нарезается и укладывается новым
-/// ядром» (критерий приёмки Стори 01): для КАЖДОЙ из деталей разметки v2
+/// ядром» (критерий приёмки Стори 01): для КАЖДОЙ из деталей разметки v3
 /// `RoninParts.parts[i]` на её канонном `seed` — нарезка не бросает, куски валидны
 /// (размер 3..5, суммарная площадь == площадь маски), а эталонное решение
 /// (`slice.solution`) укладывается через `PackController.place` до

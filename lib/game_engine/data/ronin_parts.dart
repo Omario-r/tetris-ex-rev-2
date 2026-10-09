@@ -27,9 +27,10 @@ class RoninSection {
   });
 }
 
-/// Деталь «Ронина» разметки v2: форма ([mask]) + место на корабле + метаданные
+/// Деталь «Ронина» разметки v3: форма ([mask]) + место на корабле + метаданные
 /// сборки/укладки. Два вида: плита обшивки ([layer] 0, участок сетки секции) и
-/// предмет поверх ([layer] 1, свой масштаб и место на корабле; D-010…D-012).
+/// предмет поверх ([layer] 1, свой масштаб и место на корабле; D-010…D-012,
+/// D-016).
 ///
 /// Источник — `docs/design/ronin-parts.js` (канон Дизайнера): переносится
 /// ровно то, что там лежит. Смысл `origin` в каноне разный: у секции и у
@@ -39,8 +40,8 @@ class RoninPartDef {
   /// Стабильный идентификатор детали (`'prow'`, `'fwd1_cl'` и т.п.).
   final String id;
 
-  /// Порядок сборки на корабле, 1..15 без пропусков; уровень N ↔ деталь с
-  /// `order == N`.
+  /// Порядок сборки на корабле, 1..N (N = `RoninParts.parts.length`) без
+  /// пропусков; уровень N ↔ деталь с `order == N`.
   final int order;
 
   /// Слой: 0 — плита обшивки, 1 — предмет поверх (D-011).
@@ -55,7 +56,8 @@ class RoninPartDef {
   /// Число клеток детали (бюджет уровня, ≤ 80).
   final int cells;
 
-  /// Канонный seed нарезки детали на куски (подобран Продюсером, Стори 04).
+  /// Канонный seed нарезки детали на куски (подбор по метрике старта: Стори 04;
+  /// детали, чья форма изменилась в v3, — 2026-10-09, рамп D-009).
   final int seed;
 
   /// bbox-маска детали, `#` — клетка детали.
@@ -66,7 +68,7 @@ class RoninPartDef {
   final int sectionCol;
   final int sectionRow;
 
-  /// Предмет: вид (`'sensor'` | `'rcs'`), масштаб и левый-верх маски на
+  /// Предмет: вид (`'sensor'` | `'rcs'` | `'visor'` | `'hatch'`), масштаб и левый-верх маски на
   /// корабле в клетках рисунка (дробные).
   final String? objectKind;
   final double? objectScale;
@@ -113,9 +115,10 @@ class RoninPartDef {
       (x: shipX + c / scale, y: shipY + r / scale, size: 1 / scale);
 }
 
-/// Разметка «Ронина-1» v2: 15 деталей — плиты обшивки по трём секциям (нос,
-/// мостик, носовой пояс) и предметы поверх (канон Дизайнера,
-/// `docs/design/ronin-parts.js`, D-010…D-012).
+/// Разметка «Ронина-1» v3: 19 деталей — 12 плит обшивки по трём секциям (нос,
+/// мостик, носовой пояс) и 7 предметов поверх: датчик, визор половинами, два
+/// торпедных люка, два RCS-квада (канон Дизайнера,
+/// `docs/design/ronin-parts.js`, D-010…D-012, D-016).
 class RoninParts {
   /// Секции обшивки: нос `s = 2`, мостик `s = 3`, носовой пояс `s = 4`.
   static const List<RoninSection> sections = [
@@ -124,7 +127,7 @@ class RoninParts {
     RoninSection(id: 'fwd', scale: 4, originX: 3, originY: 4, cols: 36, rows: 16),
   ];
 
-  /// 15 деталей, отсортированы по [RoninPartDef.order] по возрастанию:
+  /// 19 деталей, отсортированы по [RoninPartDef.order] по возрастанию:
   /// индекс == `order - 1`.
   static const List<RoninPartDef> parts = [
     RoninPartDef(
@@ -133,8 +136,8 @@ class RoninParts {
       layer: 0,
       module: 'prow',
       title: 'Нос',
-      cells: 44,
-      seed: 1,
+      cells: 40,
+      seed: 4,
       sectionId: 'prow',
       sectionCol: 0,
       sectionRow: 0,
@@ -143,8 +146,6 @@ class RoninParts {
         '##########',
         '##########',
         '##########',
-        '..##......',
-        '..##......',
       ]),
     ),
     RoninPartDef(
@@ -176,19 +177,19 @@ class RoninParts {
       order: 3,
       layer: 0,
       module: 'bridge',
-      title: 'Мостик, визор',
-      cells: 36,
+      title: 'Мостик, центр',
+      cells: 44,
       seed: 0,
       sectionId: 'bridge',
       sectionCol: 5,
       sectionRow: 0,
       mask: TargetMask(rows: [
-        '....#####.',
-        '....####..',
-        '#...####..',
-        '##########',
-        '..#######.',
-        '...#####..',
+        '.########',
+        '.#######.',
+        '########.',
+        '#########',
+        '..#######',
+        '...#####.',
       ]),
     ),
     RoninPartDef(
@@ -217,8 +218,8 @@ class RoninParts {
       layer: 0,
       module: 'bridge',
       title: 'Мостик, правый борт',
-      cells: 44,
-      seed: 0,
+      cells: 45,
+      seed: 14,
       sectionId: 'bridge',
       sectionCol: 13,
       sectionRow: 0,
@@ -226,14 +227,50 @@ class RoninParts {
         '.#######',
         '########',
         '########',
-        '..######',
+        '.#######',
         '.#######',
         '########',
       ]),
     ),
     RoninPartDef(
-      id: 'fwd1_cl',
+      id: 'visor_l',
       order: 6,
+      layer: 1,
+      module: 'bridge',
+      title: 'Визор, левая половина',
+      cells: 30,
+      seed: 12,
+      objectKind: 'visor',
+      objectScale: 3.5,
+      objectX: 4.655,
+      objectY: 2.484,
+      mask: TargetMask(rows: [
+        '##########',
+        '##########',
+        '##########',
+      ]),
+    ),
+    RoninPartDef(
+      id: 'visor_r',
+      order: 7,
+      layer: 1,
+      module: 'bridge',
+      title: 'Визор, правая половина',
+      cells: 30,
+      seed: 6,
+      objectKind: 'visor',
+      objectScale: 3.5,
+      objectX: 7.488,
+      objectY: 2.484,
+      mask: TargetMask(rows: [
+        '##########',
+        '##########',
+        '##########',
+      ]),
+    ),
+    RoninPartDef(
+      id: 'fwd1_cl',
+      order: 8,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, верх — левее киля',
@@ -255,7 +292,7 @@ class RoninParts {
     ),
     RoninPartDef(
       id: 'fwd1_cr',
-      order: 7,
+      order: 9,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, верх — правее киля',
@@ -276,11 +313,11 @@ class RoninParts {
     ),
     RoninPartDef(
       id: 'fwd1_r',
-      order: 8,
+      order: 10,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, верх — правая скула',
-      cells: 68,
+      cells: 69,
       seed: 4,
       sectionId: 'fwd',
       sectionCol: 27,
@@ -293,13 +330,13 @@ class RoninParts {
         '#########',
         '.########',
         '.########',
-        '.####....',
+        '#####....',
         '#####....',
       ]),
     ),
     RoninPartDef(
       id: 'rcs_fr',
-      order: 9,
+      order: 11,
       layer: 1,
       module: 'fwd',
       title: 'RCS-квад, нос справа',
@@ -323,11 +360,11 @@ class RoninParts {
     ),
     RoninPartDef(
       id: 'fwd2_r',
-      order: 10,
+      order: 12,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, низ — правая скула',
-      cells: 70,
+      cells: 66,
       seed: 0,
       sectionId: 'fwd',
       sectionCol: 27,
@@ -335,18 +372,18 @@ class RoninParts {
       mask: TargetMask(rows: [
         '.....####',
         '.....####',
-        '#########',
-        '#########',
+        '.########',
         '.########',
         '#########',
         '#########',
-        '#########',
-        '#########',
+        '.########',
+        '.########',
+        '.########',
       ]),
     ),
     RoninPartDef(
       id: 'fwd1_l',
-      order: 11,
+      order: 13,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, верх — левая скула',
@@ -368,7 +405,7 @@ class RoninParts {
     ),
     RoninPartDef(
       id: 'rcs_fl',
-      order: 12,
+      order: 14,
       layer: 1,
       module: 'fwd',
       title: 'RCS-квад, нос слева',
@@ -392,12 +429,12 @@ class RoninParts {
     ),
     RoninPartDef(
       id: 'fwd2_l',
-      order: 13,
+      order: 15,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, низ — левая скула',
-      cells: 76,
-      seed: 5,
+      cells: 80,
+      seed: 1,
       sectionId: 'fwd',
       sectionCol: 0,
       sectionRow: 7,
@@ -405,40 +442,61 @@ class RoninParts {
         '###.......',
         '#########.',
         '##########',
+        '##########',
+        '##########',
         '#########.',
         '#########.',
-        '#########.',
-        '#########.',
-        '#########.',
-        '#########.',
+        '##########',
+        '##########',
       ]),
     ),
     RoninPartDef(
       id: 'fwd2_cl',
-      order: 14,
+      order: 16,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, низ — левее киля',
-      cells: 80,
-      seed: 4,
+      cells: 79,
+      seed: 5,
       sectionId: 'fwd',
       sectionCol: 9,
       sectionRow: 7,
       mask: TargetMask(rows: [
         '#######...',
         '##########',
+        '.#########',
         '.########.',
-        '#########.',
-        '#########.',
+        '.########.',
         '##########',
-        '#########.',
-        '#########.',
-        '#########.',
+        '##########',
+        '.#########',
+        '.########.',
+      ]),
+    ),
+    RoninPartDef(
+      id: 'hatch_l',
+      order: 17,
+      layer: 1,
+      module: 'fwd',
+      title: 'Торпедный люк, левый',
+      cells: 42,
+      seed: 12,
+      objectKind: 'hatch',
+      objectScale: 8,
+      objectX: 5.615,
+      objectY: 5.85,
+      mask: TargetMask(rows: [
+        '#######',
+        '#######',
+        '#######',
+        '#######',
+        '#######',
+        '#######',
       ]),
     ),
     RoninPartDef(
       id: 'fwd2_cr',
-      order: 15,
+      order: 18,
       layer: 0,
       module: 'fwd',
       title: 'Носовой пояс, низ — правее киля',
@@ -448,15 +506,36 @@ class RoninParts {
       sectionCol: 18,
       sectionRow: 7,
       mask: TargetMask(rows: [
+        '.########.',
+        '.########.',
         '.#########',
-        '.########.',
-        '#########.',
-        '#########.',
         '##########',
+        '#########.',
         '.########.',
-        '#########.',
-        '#########.',
-        '#########.',
+        '.#########',
+        '.#########',
+        '##########',
+      ]),
+    ),
+    RoninPartDef(
+      id: 'hatch_r',
+      order: 19,
+      layer: 1,
+      module: 'fwd',
+      title: 'Торпедный люк, правый',
+      cells: 42,
+      seed: 0,
+      objectKind: 'hatch',
+      objectScale: 8,
+      objectX: 8.51,
+      objectY: 5.85,
+      mask: TargetMask(rows: [
+        '#######',
+        '#######',
+        '#######',
+        '#######',
+        '#######',
+        '#######',
       ]),
     ),
   ];
@@ -467,7 +546,7 @@ class RoninParts {
         orElse: () => throw ArgumentError('Неизвестный id секции: $id'),
       );
 
-  /// Деталь по порядку сборки ([order] 1..15).
+  /// Деталь по порядку сборки ([order] 1..`parts.length`).
   static RoninPartDef partAtOrder(int order) => parts[order - 1];
 
   /// Деталь по [id]; неизвестный id — [ArgumentError].

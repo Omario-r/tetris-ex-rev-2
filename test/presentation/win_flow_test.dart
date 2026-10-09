@@ -45,7 +45,7 @@ void main() {
   testWidgets(
     'полный прогон: все уровни укладкой (solve-хук) → пауза → чётные через '
     '«Следующая деталь», нечётные через «К кораблю» + «Продолжить сборку» → '
-    'финал 15/15 «продолжение следует», прогресс остаётся 15',
+    'финал N/N «продолжение следует», прогресс остаётся N',
     (t) async {
       bigView(t);
       SharedPreferences.setMockInitialValues({'current_level': 0});
@@ -90,7 +90,7 @@ void main() {
         expect(await ProgressService().getCollectedCount(), level + 1);
       }
 
-      // Финал: экран корабля 15/15, «продолжение следует», без кнопок и сброса.
+      // Финал: экран корабля N/N, «продолжение следует», без кнопок и сброса.
       expect(find.byType(ShipScreen), findsOneWidget);
       expect(find.byType(GameScreen), findsNothing);
       expect(find.text('$total / $total'), findsOneWidget);

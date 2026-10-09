@@ -103,7 +103,7 @@ void main() {
     expect(_shipPainter(tester).collectedCount, 2);
   });
 
-  testWidgets('Чит «состояние корабля»: N=15 → собрано 15 → корабль 15/15',
+  testWidgets('Чит «состояние корабля»: N=все детали → собрано все → корабль N/N',
       (tester) async {
     await pumpGame(tester);
 

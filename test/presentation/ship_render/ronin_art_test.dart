@@ -216,8 +216,29 @@ void main() {
       expect(() => art.objectShape('nope'), throwsArgumentError);
     });
 
-    test('roninObjects — три предмета «Ронина-1»', () {
-      expect(roninObjects.keys.toSet(), {'sensor', 'rcs_fl', 'rcs_fr'});
+    test('objectShape v3: визор половинами и торпедные люки', () {
+      final vl = art.objectShape('visor_l'), vr = art.objectShape('visor_r');
+      expect(vl.contains(art.toScene(5.5, 2.9)), isTrue);
+      expect(vl.contains(art.toScene(8.5, 2.9)), isFalse);
+      expect(vr.contains(art.toScene(8.5, 2.9)), isTrue);
+      expect(vr.contains(art.toScene(5.5, 2.9)), isFalse);
+      final hl = art.objectShape('hatch_l'), hr = art.objectShape('hatch_r');
+      expect(hr.contains(art.toScene(8.9, 6.2)), isTrue);
+      expect(hr.contains(art.toScene(6.1, 6.2)), isFalse);
+      expect(hl.contains(art.toScene(6.1, 6.2)), isTrue);
+      expect(hl.contains(art.toScene(8.9, 6.2)), isFalse);
+    });
+
+    test('roninObjects — семь предметов «Ронина-1» v3', () {
+      expect(roninObjects.keys.toSet(), {
+        'sensor',
+        'rcs_fl',
+        'rcs_fr',
+        'visor_l',
+        'visor_r',
+        'hatch_l',
+        'hatch_r',
+      });
     });
   });
 }
