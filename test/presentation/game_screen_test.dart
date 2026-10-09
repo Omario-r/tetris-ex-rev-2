@@ -7,6 +7,8 @@ import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
 import 'package:explosive_tetris/presentation/screens/game_screen.dart';
 import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
+import 'package:explosive_tetris/presentation/ship_render/ronin_art.dart';
+import 'package:explosive_tetris/presentation/ship_render/ship_cell_sampler.dart';
 import 'package:explosive_tetris/presentation/theme/block_material.dart';
 import 'package:explosive_tetris/presentation/widgets/packing_painter.dart';
 
@@ -111,10 +113,10 @@ void main() {
           reason: 'кусочки нарезки должны лежать в лотке');
     });
 
-    testWidgets('швы между клетками: на укладке есть, на паузе нет (seamless)',
-        (tester) async {
+    testWidgets('поле: в укладке плитки (assembled: false), на паузе — '
+        'собранная деталь (assembled: true)', (tester) async {
       await pumpGame(tester);
-      expect(packingPainter(tester).seamless, isFalse);
+      expect(packingPainter(tester).assembled, isFalse);
       final trayHeight =
           tester.getSize(find.byKey(const Key('packing_tray'))).height;
 
@@ -124,12 +126,27 @@ void main() {
       await _pumpFrames(tester);
 
       expect(find.byKey(const Key('packing_complete')), findsOneWidget);
-      expect(packingPainter(tester).seamless, isTrue);
+      expect(packingPainter(tester).assembled, isTrue);
       // Кнопки паузы занимают ту же высоту, что и лоток.
       expect(
         tester.getSize(find.byKey(const Key('done_buttons'))).height,
         trayHeight,
       );
+    });
+
+    testWidgets('цвета клеток детали приходят в painter после загрузки',
+        (tester) async {
+      // Растр цветов — настоящий async (Picture.toImage): считаем вне
+      // fake-async, экран берёт готовое из кеша ship_render.
+      final part = RoninParts.parts[0];
+      final colors = await tester
+          .runAsync(() => partCellColors(RoninArt.shared, part));
+      expect(colors, isNotNull);
+
+      await pumpGame(tester);
+      await tester.pump();
+
+      expect(packingPainter(tester).cellColors, same(colors));
     });
 
     testWidgets('прогресс-бар: подпись «уложено 0 / M кусков» на старте',

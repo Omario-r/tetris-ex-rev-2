@@ -74,6 +74,29 @@ Future<void> _expectCellsMatchSingle(
   single.dispose();
 }
 
+int _sum(List<int> p) => p[0] + p[1] + p[2];
+
+double _lum(Color k) => 0.2126 * k.r + 0.7152 * k.g + 0.0722 * k.b;
+
+/// Рисунок [pic] в раскладке поля детали [part]: клетка маски (0, 0) → (0, 0),
+/// клетка [u] px — эталон «под клеткой» без плиток и кромок.
+Future<ui.Image> _fieldRef(
+  RoninArt art,
+  RoninPartDef part,
+  ui.Picture pic,
+  double u,
+) {
+  final src = shipCellRect(art, part, 0, 0);
+  return _raster(
+    (part.mask.width * u).ceil(),
+    (part.mask.height * u).ceil(),
+    (g) => g
+      ..scale(u / src.width)
+      ..translate(-src.left, -src.top)
+      ..drawPicture(pic),
+  );
+}
+
 void main() {
   final art = RoninArt();
   const c = RoninArt.cellPx;
@@ -211,5 +234,164 @@ void main() {
       expect(data.buffer.asUint8List().every((b) => b == 0), isTrue);
       img.dispose();
     });
+  });
+
+  group('partCellColors — преобладающий цвет клетки (D-016)', () {
+    testWidgets('плита prow: шеврон оранжевый, клетка без шеврона — цвет '
+        'плиты и тёмная; кеш — тот же объект', (tester) async {
+      final prow = RoninParts.byId('prow');
+      await tester.runAsync(() async {
+        final colors = await partCellColors(art, prow);
+        expect(colors.width, prow.mask.width);
+        expect(colors.height, prow.mask.height);
+
+        final chevron = colors.colorAt(7, 2);
+        expect(
+          chevron.r * 255,
+          greaterThan(chevron.g * 255 + 40),
+          reason: 'клетка (7, 2) — шеврон: $chevron',
+        );
+
+        // (0, 3) — левый-нижний угол носа, шеврона нет.
+        final plain = colors.colorAt(0, 3);
+        final ref = await _fieldRef(art, prow, art.fieldBuildPicture, 8);
+        final p = await _rgba(ref, 4, 3 * 8 + 4);
+        ref.dispose();
+        for (final (got, want) in [
+          (plain.r, p[0]),
+          (plain.g, p[1]),
+          (plain.b, p[2]),
+        ]) {
+          expect((got * 255 - want).abs(), lessThanOrEqualTo(4));
+        }
+        expect(colors.isDark(0, 3), isTrue, reason: 'нос — DARK: $plain');
+        expect(colors.isDark(7, 2), isFalse);
+
+        expect(identical(await partCellColors(art, prow), colors), isTrue);
+      });
+    });
+
+    testWidgets('предмет visor_l: стекло среднего ряда светлое, рама тёмная', (
+      tester,
+    ) async {
+      final visor = RoninParts.byId('visor_l');
+      await tester.runAsync(() async {
+        final colors = await partCellColors(art, visor);
+        expect(_lum(colors.colorAt(2, 1)), greaterThan(.5));
+        expect(colors.isDark(2, 0), isTrue, reason: '${colors.colorAt(2, 0)}');
+      });
+    });
+  });
+
+  group('paintPartCells — плитка в сборке и деталь целиком (D-016)', () {
+    const u = 34.0;
+    final part = RoninParts.byId('fwd1_cl');
+    final w = part.mask.width * 34, h = part.mask.height * 34;
+
+    Future<ui.Image> field({required bool assembled}) => _raster(
+      w,
+      h,
+      (g) => paintPartCells(
+        g,
+        art,
+        part,
+        part.mask.cells,
+        origin: Offset.zero,
+        cellSize: u,
+        assembled: assembled,
+      ),
+    );
+
+    test('сборка: центр клетки = fieldBuildPicture, угол прозрачен, '
+        'заклёпка темнее центра', () async {
+      final img = await field(assembled: false);
+      final ref = await _fieldRef(art, part, art.fieldBuildPicture, u);
+      // клетка (3, 3): x, y 102..136
+      final center = await _rgba(img, 119, 119);
+      final want = await _rgba(ref, 119, 119);
+      for (var k = 0; k < 4; k++) {
+        expect((center[k] - want[k]).abs(), lessThanOrEqualTo(2));
+      }
+      expect(await _alpha(img, 102, 102), 0, reason: 'угол вне скругления');
+      // заклёпка: внутренний прямоугольник с 103, центр в 103 + 4
+      final rivet = await _rgba(img, 106, 106);
+      expect(_sum(rivet), lessThan(_sum(center) - 20));
+      img.dispose();
+      ref.dispose();
+    });
+
+    test('собрано: центр = fieldDonePicture, граница клеток внутри детали не '
+        'темнее центра, внешний край темнее', () async {
+      final img = await field(assembled: true);
+      final ref = await _fieldRef(art, part, art.fieldDonePicture, u);
+      final center = await _rgba(img, 119, 119);
+      final want = await _rgba(ref, 119, 119);
+      for (var k = 0; k < 4; k++) {
+        expect((center[k] - want[k]).abs(), lessThanOrEqualTo(2));
+      }
+      // граница (3, 3) | (4, 3): столбец 136
+      for (final x in const [135, 136]) {
+        final border = await _rgba(img, x, 119);
+        expect(_sum(border), greaterThanOrEqualTo(_sum(center) - 6));
+        expect(border[3], 255);
+      }
+      // (4, 0): сверху соседа в маске нет — кромка
+      final edge = await _rgba(img, 153, 0);
+      final mid = await _rgba(img, 153, 17);
+      expect(_sum(edge), lessThan(_sum(mid) - 30));
+      img.dispose();
+      ref.dispose();
+    });
+
+    test(
+      'paintPartCell в обеих фазах = paintPartCells для одной клетки',
+      () async {
+        for (final assembled in const [false, true]) {
+          final one = await _raster(
+            w,
+            h,
+            (g) => paintPartCells(
+              g,
+              art,
+              part,
+              const [(x: 4, y: 0)],
+              origin: Offset.zero,
+              cellSize: u,
+              assembled: assembled,
+            ),
+          );
+          final single = await _raster(
+            w,
+            h,
+            (g) => paintPartCell(
+              g,
+              art,
+              part,
+              4,
+              0,
+              const Rect.fromLTWH(4 * u, 0, u, u),
+              assembled: assembled,
+            ),
+          );
+          for (final (x, y) in const [
+            (153, 0),
+            (153, 17),
+            (137, 1),
+            (168, 33),
+          ]) {
+            final a = await _rgba(one, x, y), b = await _rgba(single, x, y);
+            for (var k = 0; k < 4; k++) {
+              expect(
+                (a[k] - b[k]).abs(),
+                lessThanOrEqualTo(2),
+                reason: '$assembled ($x, $y)',
+              );
+            }
+          }
+          one.dispose();
+          single.dispose();
+        }
+      },
+    );
   });
 }

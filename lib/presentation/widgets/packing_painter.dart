@@ -12,8 +12,9 @@ import '../theme/block_theme.dart';
 /// Рисует укладку (эпик «Укладка», Стори 01 T3, канон утверждён Стори 02 T1):
 /// силуэт (ghost для незаполненных клеток S, канон [BlockTheme.ghostTarget])
 /// + уложенные клетки — каждая свой кусок рисунка корабля в масштабе детали
-/// (канон `el-cell-filled`, Ронин-1/03: [paintPartCells]) + [seam] по границе
-/// каждой уложенной клетки + живое снап-превью драга
+/// (канон `el-cell-filled`, Ронин-1/03: [paintPartCells]): во время сборки —
+/// плитка с рельефом, собранная деталь ([assembled]) — рисунок целиком с
+/// чёткой кромкой (D-016, Ронин-1/10) + живое снап-превью драга
 /// (`el-drop-ok`/`el-drop-bad`, [dragPreview]).
 ///
 /// Только вид — без игровой логики (инвариант модуля `widgets`): не мутирует
@@ -29,7 +30,8 @@ class PackingPainter extends CustomPainter {
     required this.targetY,
     this.excludePieceId,
     this.dragPreview,
-    this.seamless = false,
+    this.assembled = false,
+    this.cellColors,
   });
 
   /// Текущий снапшот укладки (силуэт + размещённые кусочки).
@@ -62,10 +64,15 @@ class PackingPainter extends CustomPainter {
   /// (Стори 02 T1).
   final PackDragPreview? dragPreview;
 
-  /// `true` — швы [seam] между уложенными клетками не рисуются: собранная деталь
-  /// видна сплошным куском рисунка (пауза «ДЕТАЛЬ СОБРАНА», Ронин-1/09 T1).
-  /// Во время укладки — `false`, швы как обычно.
-  final bool seamless;
+  /// `true` — деталь собрана (пауза «ДЕТАЛЬ СОБРАНА»): рисунок целиком, без
+  /// плиток и рельефа, у плиты — чёткая кромка (D-016). `false` — сборка:
+  /// каждая уложенная клетка — плитка с рельефом и заклёпками.
+  final bool assembled;
+
+  /// Преобладающие цвета клеток детали ([partCellColors]): заливка клетки
+  /// предмета и тон заклёпок в сборке. `null` — ещё не посчитаны (предмет —
+  /// рисунком под клеткой, заклёпки 45 %).
+  final PartCellColors? cellColors;
 
   /// boardBg token (`docs/DESIGN.md`) — тот же фон, что у игрового поля
   /// (`BoardPainter`).
@@ -90,10 +97,6 @@ class PackingPainter extends CustomPainter {
   /// doneGlow token (`docs/DESIGN.md`): тёплый ободок собранной детали
   /// (пульс, канон `board.complete`).
   static const Color doneGlow = Color(0x8CE09952);
-
-  /// seam token (`docs/DESIGN.md`, `hsla(220 14% 4% / 55%)`): разделитель
-  /// уложенных клеток — только на поле укладки (на корабле швы даёт рисунок).
-  static const Color seam = Color(0x8C090A0C);
 
   /// Рисует один кусочек [piece] с левым-верхним углом в пиксельной точке
   /// [originPx] — «сырой» вид кусочка вне поля (лоток и кусок в руке,
@@ -165,6 +168,7 @@ class PackingPainter extends CustomPainter {
     // вызовом, один клип и один replay на слой. Клетка поля (x, y) ↔ клетка
     // маски (x − targetX, y − targetY); маска (0, 0) ложится в клетку поля
     // (targetX, targetY), поэтому кусок попадает ровно в свой прямоугольник.
+    // Швов `seam` нет (D-016): в сборке клетки делит рельеф плитки.
     paintPartCells(
       canvas,
       art,
@@ -172,32 +176,9 @@ class PackingPainter extends CustomPainter {
       [for (final f in occupied) (x: f.x - targetX, y: f.y - targetY)],
       origin: Offset(targetX * cellSize, targetY * cellSize),
       cellSize: cellSize,
+      assembled: assembled,
+      colors: cellColors,
     );
-
-    // seam по границе каждой уложенной клетки (на паузе [seamless] — без швов;
-    // мокап `renderPlaced`:
-    // `strokeRect(c*CELL+.5, r*CELL+.5, CELL, CELL)`, 1 px). Один путь —
-    // общая граница соседних клеток ложится одной линией, не двойной.
-    if (!seamless && occupied.isNotEmpty) {
-      final seams = Path();
-      for (final f in occupied) {
-        seams.addRect(
-          Rect.fromLTWH(
-            f.x * cellSize + 0.5,
-            f.y * cellSize + 0.5,
-            cellSize,
-            cellSize,
-          ),
-        );
-      }
-      canvas.drawPath(
-        seams,
-        Paint()
-          ..color = seam
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.0,
-      );
-    }
 
     // Снап-превью драга (el-drop-ok / el-drop-bad) — поверх ghost и уложенных
     // клеток, только клетки в границах поля. Канон мокапа (`.gcell.ok/.bad
@@ -240,7 +221,8 @@ class PackingPainter extends CustomPainter {
         targetY != oldDelegate.targetY ||
         excludePieceId != oldDelegate.excludePieceId ||
         dragPreview != oldDelegate.dragPreview ||
-        seamless != oldDelegate.seamless;
+        assembled != oldDelegate.assembled ||
+        cellColors != oldDelegate.cellColors;
   }
 }
 

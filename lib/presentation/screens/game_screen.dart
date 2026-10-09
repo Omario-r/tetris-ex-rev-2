@@ -13,6 +13,7 @@ import '../../game_engine/packing/pack_piece.dart';
 import '../../game_engine/packing/slice_config.dart';
 import '../../game_engine/packing/pack_state.dart';
 import '../ship_render/ronin_art.dart';
+import '../ship_render/ship_cell_sampler.dart';
 import '../theme/block_material.dart';
 import '../widgets/packing_painter.dart';
 import 'cheat_menu.dart';
@@ -94,6 +95,11 @@ class _GameScreenState extends State<GameScreen>
   /// по нему уложенная клетка поля находит свой кусок рисунка.
   late int _targetX, _targetY;
   late int _fragmentIndex;
+
+  /// Преобладающие цвета клеток детали уровня (`partCellColors`, D-016) —
+  /// приходят асинхронно после сборки уровня; до того `null` (поле рисует
+  /// плитки без них).
+  PartCellColors? _cellColors;
 
   /// Клетка лотка (и ширина клетки): `min(32, 160 / h)`, `h` — наибольшая
   /// высота куска уровня в клетках; считается один раз при (пере)сборке уровня.
@@ -195,6 +201,16 @@ class _GameScreenState extends State<GameScreen>
     // Пересборка уровня (дев-читы нарезки) снимает паузу: деталь снова не
     // собрана; прогресс уже засчитан, повторное засчитывание идемпотентно.
     _done = false;
+    if (_cellColors == null) _loadCellColors(part);
+  }
+
+  /// Считает цвета клеток детали [part] (кеш — в `ship_render`) и по
+  /// готовности отдаёт их полю, если экран жив и уровень тот же.
+  void _loadCellColors(RoninPartDef part) {
+    partCellColors(RoninArt.shared, part).then((colors) {
+      if (!mounted || RoninParts.parts[_fragmentIndex].id != part.id) return;
+      setState(() => _cellColors = colors);
+    });
   }
 
   @override
@@ -866,7 +882,8 @@ class _GameScreenState extends State<GameScreen>
             targetY: _targetY,
             excludePieceId: _dragFromTray ? null : _dragPieceId,
             dragPreview: preview,
-            seamless: _done,
+            assembled: _done,
+            cellColors: _cellColors,
           ),
         ),
       ),

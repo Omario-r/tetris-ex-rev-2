@@ -41,14 +41,32 @@
   (объединение клеток) + `hullPicture`, затем предметы: один клип (формы) +
   `objectsPicture`. Деталь `revealPartIndex` при `0 < revealProgress < 1` —
   отдельный клип/replay со scale от центра bbox детали; при 1 — в общем клипе.
-- `paintPartCell(canvas, art, part, c, r, dst)` (`ship_cell_sampler.dart`) — одна
-  клетка маски детали → `dst` (клип `dst`, подложка `backdrop`, масштаб + сдвиг);
-  плита — `hullPicture`, предмет — `hullPicture` + `objectsPicture`.
-  `shipCellRect(art, part, c, r)` — та же клетка в px рисунка (источник сэмплинга).
-- `paintPartCells(canvas, art, part, cells, {origin, cellSize})` — точка входа поля
-  укладки (Ронин-1/03): клетки маски `cells` → `origin + (c, r) * cellSize`; один клип
-  (объединение клеток) → `backdrop` → один replay на слой. Растр клетки = `paintPartCell`
-  в том же прямоугольнике (тест). Пустой `cells` — ничего не рисует.
+- `paintPartCells(canvas, art, part, cells, {origin, cellSize, assembled = false,
+  colors})` (`ship_cell_sampler.dart`) — точка входа поля укладки (D-016, порт
+  `drawCell`/`tileRelief`/`rivets`/`crispEdge` из `ronin-draw.js`): клетки маски
+  `cells` → `origin + (c, r) * cellSize`, рисунок в масштабе детали. **Сборка**
+  (`assembled: false`): плитки — один клип из `RRect` клеток (отступ `s = cellSize/34`,
+  радиус `3s`); плита — один replay `fieldBuildPicture`, предмет — плоский
+  `colors.colorAt` клетки (нет `colors` — `backdrop` + `objectsPicture`); рельеф ×1,4
+  (полосы `3s`: верх белый 12,6 %, низ чёрный 49 %, лево белый 5,6 %, право чёрный
+  25,2 %), после клипа 4 заклёпки `r = 1,5s` в `4s` от углов — чёрные 85 % при
+  `colors.isDark`, иначе 45 %. **Собрано** (`assembled: true`): один клип
+  (объединение клеток), один replay — плита `fieldDonePicture`, предмет
+  `objectsPicture` (фон не заливается); у плиты — чёткая кромка по сторонам без соседа
+  в маске, в px поля (верх белая 2 px 14 % на 1,5 + тёмная 1 px 55 % по краю; лево
+  белая 7 %, низ тёмная 35 %, право тёмная 22 %, каждая + 1 px 55 %). Пустой `cells` —
+  ничего не рисует.
+- `paintPartCell(canvas, art, part, c, r, dst, {assembled, colors})` — одна клетка в
+  квадрат `dst`: делегирует `paintPartCells` с одной клеткой (вид совпадает в обеих
+  фазах). `shipCellRect(art, part, c, r)` — клетка в px рисунка (источник).
+- `Future<PartCellColors> partCellColors(art, part)` — преобладающий цвет каждой клетки
+  маски (`domColor`): корзины 4 бита на канал, пиксели альфы < 128 не считаются, итог —
+  средний цвет победившей корзины (нет пикселей — `#171A1E` эталона); источник плиты —
+  `fieldBuildPicture`, предмета — `objectsPicture`; деталь растрируется целиком один раз
+  (8 px на клетку, `toImage` + `toByteData`, premultiplied → straight). Кеш результата
+  по `part.id` на запуск (второй вызов — тот же объект). `PartCellColors({width,
+  height, colors})` — неизменяемый: `colorAt(c, r)`, `isDark(c, r)` = яркость
+  `0.2126R + 0.7152G + 0.0722B < 0.2` (0..1).
 
 ## Зависит от
 
@@ -58,8 +76,9 @@
 ## От него зависят
 
 - `presentation/screens` — `ship_screen` (`ShipCompositePainter`, `RoninArt.shared`),
-  `game_screen` (`RoninArt.shared` → `PackingPainter`).
-- `presentation/widgets` — `PackingPainter` (`ShipArt`, `paintPartCells`; Ронин-1/03).
+  `game_screen` (`RoninArt.shared` → `PackingPainter`, `partCellColors` — Ронин-1/10).
+- `presentation/widgets` — `PackingPainter` (`ShipArt`, `paintPartCells`,
+  `PartCellColors`; Ронин-1/03, 1/10).
 
 ## Инварианты
 
@@ -73,8 +92,12 @@
 - Картинки записываются один раз на экземпляр (`late final`); экраны берут один
   общий `RoninArt.shared` на запуск. Собранное и уложенное на поле = один клип-путь
   на слой, не по клетке.
-- Клетка поля и клетка корабля сэмплируют одно и то же: под рисунком — `backdrop`
-  в обеих точках входа (`paintPartCell`/`paintPartCells`), иначе вид разъедется.
+- Клетка поля: плита — без подложки (её клетки рисунок заливает целиком), предмет в
+  сборке без `colors` — на `backdrop`; собранный предмет — без подложки (виден фон
+  поля, как в эталоне). `paintPartCell` = `paintPartCells` одной клетки (делегирование).
+- `partCellColors` кеширует только готовый результат (не незавершённый `Future`):
+  в widget-тестах `toImage` вне `runAsync` не завершается, такой `Future` в кеше
+  подвесил бы последующих ждущих.
 - `objectsPicture` — только под клипом `objectShape(id)` или поверх `hullPicture`;
   предметы лежат поверх контура корпуса (повтора контура в слое 1 нет, v3).
 - Не переносится (Ронин-2): фон, «РОНИН», люк, гондолы-объёмы, радиатор, корма.
@@ -84,4 +107,5 @@
 
 `flutter test test/presentation/ship_render/` — эталоны, растр слоёв (плиты по
 деталям, визор/люк вне корпуса, щель-огонь и кромки в `field*Picture`), контур,
-формы предметов, композит при 0/3/N, сэмплинг клетки и клеток поля.
+формы предметов, композит при 0/3/N, клетка поля (плитка/собрано, кромка),
+`partCellColors` (шеврон, стекло/рама визора, `isDark`, кеш).

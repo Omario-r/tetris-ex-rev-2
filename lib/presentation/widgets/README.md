@@ -18,18 +18,20 @@
 ## Публичный интерфейс
 
 - `PackingPainter({state, cellSize, art, part, targetX, targetY, excludePieceId, dragPreview,
-  seamless = false})` —
+  assembled = false, cellColors})` —
   `CustomPainter` укладки (эпик «Укладка», Стори 01 T3, канон утверждён эпик «Укладка» Стори 02
   T1). Порядок: фон `boardBg` (`#16191D`) → ghost незаполненных клеток силуэта
   (`BlockTheme.ghostTarget`, канон `GhostTargetOverlay`/токен `ghostTarget`) → **уложенные клетки
   — куски рисунка корабля** (канон `el-cell-filled`, Ронин-1/03): все клетки
   `occupiedCellsExcluding` одним вызовом `ship_render/paintPartCells` (`art` — `ShipArt`, `part` —
   `RoninPartDef` уровня; клетка поля (x, y) ↔ клетка маски (x − `targetX`, y − `targetY`),
-  `origin = (targetX, targetY) * cellSize`; `targetX/Y` = `PreparedLevel.targetX/Y`) → `seam`
-  (при `seamless: true` — пауза «деталь собрана», Ронин-1/09 T1 — швы не рисуются, деталь
-  сплошным куском рисунка; `PackingPainter.seam`, токен `hsla(220 14% 4% / 55%)`) — 1 px по прямоугольнику каждой
-  уложенной клетки со сдвигом +0.5 (как `strokeRect` мокапа), все — одним путём (общая граница
-  соседей — одна линия) → снап-превью. Плоского материала на поле нет. `excludePieceId` —
+  `origin = (targetX, targetY) * cellSize`; `targetX/Y` = `PreparedLevel.targetX/Y`;
+  `assembled`, `cellColors` передаются как есть — D-016, Ронин-1/10): при `assembled: false`
+  (укладка) каждая клетка — плитка с рельефом Б и заклёпками (`cellColors` —
+  `PartCellColors?` детали: заливка клетки предмета и тон заклёпок; `null` — ещё не
+  посчитаны), при `assembled: true` (пауза «деталь собрана») — рисунок целиком с чёткой
+  кромкой плиты → снап-превью. Швов `seam` больше нет (снят в Ронин-1/10, D-016: клетки
+  делит рельеф). Плоского материала на поле нет. `excludePieceId` —
   пропустить отрисовку уложенного кусочка (экран рисует его отдельно как floating drag-фидбэк,
   чтобы не дублировать). `dragPreview` (`PackDragPreview?`, эпик «Укладка» Стори 02 T1) —
   снап-превью текущего драга: если задан, поверх ghost/уложенных клеток рисуется по каждой клетке
@@ -59,7 +61,8 @@
 
 - `game_engine/data` — `RoninPartDef` — деталь уровня в `PackingPainter` (Ронин-1/03).
 - `game_engine/packing` (`PackPiece`, `PackState`) — `packing_painter`.
-- `presentation/ship_render` — `ShipArt`, `paintPartCells` (`packing_painter`, Ронин-1/03).
+- `presentation/ship_render` — `ShipArt`, `paintPartCells`, `PartCellColors` (`packing_painter`,
+  Ронин-1/03, 1/10).
 - `presentation/theme` — `BlockMaterial`, `BlockTheme`, `BlockPaintUtils`, оверлей
   `GhostTargetOverlay`. `game_engine/game`,
   `game_engine/models`, `ScrapBlockSkin`, `CanisterChargePainter`/`ChargeIconState`,
@@ -76,8 +79,10 @@
 - Только вид: пейнтеры не содержат игровой логики.
 - `shouldRepaint` завязан на `state`/анимацию; мутабельное состояние в пейнтере не хранить.
   `PackingPainter.shouldRepaint` — по `state`, `cellSize`, `art`, `part`, `targetX/Y`,
-  `excludePieceId`, `dragPreview`, `seamless`.
-- Поле: уложенное — рисунок корабля + `seam`; лоток и кусок в руке — сырой графит
+  `excludePieceId`, `dragPreview`, `assembled`, `cellColors` (по идентичности —
+  `partCellColors` кеширует объект).
+- Поле: уложенное — рисунок корабля (плитки в сборке, деталь целиком на паузе); лоток и
+  кусок в руке — сырой графит
   (`paintPiece`). Контраст «сырьё → корабль» — канон, не смешивать.
 
 ## Как проверить

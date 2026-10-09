@@ -21,7 +21,9 @@
   клетки — куски рисунка (Ронин-1/03): `_rebuild` запоминает `_targetX/_targetY`
   (`prepared.targetX/targetY`, сдвиг маски в поле), `PackingPainter` получает
   `art: RoninArt.shared`, `part: RoninParts.parts[_fragmentIndex]`, `targetX/targetY`;
-  материала детали у экрана нет. Нарезка (`prepared.slice`) →
+  материала детали у экрана нет. Цвета клеток (Ронин-1/10, D-016): `_rebuild` (пока
+  `_cellColors == null`) запускает `partCellColors(RoninArt.shared, part)`; по готовности —
+  `setState` (только если `mounted` и деталь уровня та же) → `PackingPainter.cellColors`. Нарезка (`prepared.slice`) →
   `PackController`/`PackState`
   (весь набор в лотке). Игрок тянет кусочки из лотка в силуэт; заполнил без дыр
   (`PackState.isComplete`) → **деталь собрана** → пауза с выбором маршрута (Ронин-1/05 T1,
@@ -117,9 +119,9 @@
   GameScreen(levelIndex+1))`; на последней → `ShipScreen.finale()`. Пересборка уровня
   дев-читами нарезки снимает паузу. Solve-хук `_solveAll()`
   (раскладка по `PackSlice.solution`) — дев-кнопка `Key('cheat_solve')` И programmatic-хук
-  для тестов (доводит до `isComplete` без симуляции drag). На паузе поле рисуется
-  `PackingPainter(seamless: _done)` — собранная деталь без швов `seam`, сплошным куском
-  рисунка (во время укладки швы есть).
+  для тестов (доводит до `isComplete` без симуляции drag). Поле рисуется
+  `PackingPainter(assembled: _done)`: в укладке — плитки, на паузе — собранная деталь
+  целиком с чёткой кромкой (Ронин-1/10, D-016).
 - `ShipScreen({art})` — ручной экран корабля-композит (канон `docs/design/ronin-ship.html`,
   Ронин-1/02 T2): фон `spaceBg`, без `AppBar`. Верх `.dtop` (поля 16, отступ 4, высота 38):
   слева `Key('ship_back_button')` 34×34 (`matteBlack`/`gunmetal`/глиф `hudIcon`, `pop`),
@@ -163,7 +165,8 @@
   `application` (`ProgressService`), `presentation/theme` (`BlockMaterial`),
   `presentation/widgets` (`PackingPainter`),
   `presentation/ship_render` (`ship_screen`: `ShipCompositePainter`,
-  `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03). `GameScreen` больше НЕ зависит от
+  `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03;
+  `partCellColors`/`PartCellColors`, Ронин-1/10). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
   `theme/level_skin` (пересадка на укладку, Стори 02 T2).
 - `ship_screen.dart` ↔ `game_screen.dart` — взаимный импорт (Ронин-1/05 T1): игра открывает

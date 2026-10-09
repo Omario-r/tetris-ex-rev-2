@@ -132,7 +132,10 @@ void main() {
       );
 
       /// Эталон клетки поля [f]: её клетка маски через `paintPartCell`.
-      Future<ByteData> paintReferenceCell(({int x, int y}) f) => _rasterBytes(
+      Future<ByteData> paintReferenceCell(
+        ({int x, int y}) f, {
+        bool assembled = false,
+      }) => _rasterBytes(
         fieldW,
         fieldH,
         (g) => paintPartCell(
@@ -142,6 +145,7 @@ void main() {
           f.x - prepared.targetX,
           f.y - prepared.targetY,
           Rect.fromLTWH(f.x * cs, f.y * cs, cs, cs),
+          assembled: assembled,
         ),
       );
 
@@ -160,6 +164,7 @@ void main() {
 
       test('уложенная клетка — кусок рисунка своей клетки маски: '
           '≠ графит, ≠ boardBg, = paintPartCell (центр клетки)', () async {
+        // Центр плитки рельефом не задет (полосы — по краям 3s).
         final field = await paintField();
         final graphite = _rgbaOf(BlockMaterial.graphite.color);
         final board = _rgbaOf(PackingPainter.boardBg);
@@ -200,33 +205,23 @@ void main() {
         }
       });
 
-      test('seam: граница уложенной клетки темнее её центра и того же '
-          'пикселя рисунка без seam', () async {
+      test('сборка: уложенная клетка — плитка, угол клетки прозрачен до фона '
+          'поля, швов seam нет', () async {
         final field = await paintField();
-        final f = occupied.first;
-        final ref = await paintReferenceCell(f);
-        // Штрих 1 px по `x * cs + .5` закрывает столбец пикселей `x * cs`.
-        final ex = (f.x * cs).floor(), ey = ((f.y + 0.5) * cs).floor();
-        final cx = ((f.x + 0.5) * cs).floor();
-        final edge = _px(field, fieldW, ex, ey);
-        expect(
-          _sum(edge),
-          lessThan(_sum(_px(ref, fieldW, ex, ey))),
-          reason: 'seam затемняет рисунок на границе клетки',
-        );
-        expect(
-          _sum(edge),
-          lessThan(_sum(_px(field, fieldW, cx, ey))),
-          reason: 'граница клетки темнее её центра',
-        );
+        final board = _rgbaOf(PackingPainter.boardBg);
+        for (final f in occupied) {
+          final x = (f.x * cs).floor(), y = (f.y * cs).floor();
+          expect(
+            _close(_px(field, fieldW, x, y), board),
+            isTrue,
+            reason: 'угол клетки $f — фон поля (вне скругления плитки)',
+          );
+        }
       });
 
-      test('seamless: швов нет — граница клетки = эталон paintPartCell, '
-          'а при seamless: false она темнее', () async {
-        final f = occupied.first;
-        final ref = await paintReferenceCell(f);
-        final ex = (f.x * cs).floor(), ey = ((f.y + 0.5) * cs).floor();
-        final seamless = await _rasterBytes(
+      test('assembled: деталь целиком — граница клеток внутри детали не '
+          'темнее центра, внешний край темнее (чёткая кромка)', () async {
+        final done = await _rasterBytes(
           fieldW,
           fieldH,
           (g) => PackingPainter(
@@ -236,21 +231,44 @@ void main() {
             part: part,
             targetX: prepared.targetX,
             targetY: prepared.targetY,
-            seamless: true,
+            assembled: true,
           ).paint(g, const Size(340, 476)),
         );
-        final withSeam = await paintField();
-        // Эквивалент «граница не темнее центра»: сам рисунок может быть темнее
-        // на краю, поэтому сравниваем с эталоном той же клетки.
+        final build = await paintField();
+        // Клетка с соседом справа в той же уложенной группе — граница внутри.
+        final f = occupied.firstWhere(
+          (c) => occupied.contains((x: c.x + 1, y: c.y)),
+        );
+        final ex = ((f.x + 1) * cs).floor(), ey = ((f.y + 0.5) * cs).floor();
+        final cx = ((f.x + 0.5) * cs).floor();
         expect(
-          _close(_px(seamless, fieldW, ex, ey), _px(ref, fieldW, ex, ey)),
+          _close(_px(done, fieldW, ex, ey), _px(done, fieldW, cx, ey), 12),
           isTrue,
-          reason: 'без seam граница клетки = рисунок клетки как есть',
+          reason: 'собрано: граница клеток = центр клетки (плиток нет)',
         );
         expect(
-          _sum(_px(withSeam, fieldW, ex, ey)),
-          lessThan(_sum(_px(seamless, fieldW, ex, ey))),
-          reason: 'со швом граница темнее, чем без шва',
+          _sum(_px(build, fieldW, ex, ey)),
+          lessThan(_sum(_px(done, fieldW, ex, ey))),
+          reason: 'в сборке между плитками — зазор (фон поля)',
+        );
+        // Внешний край детали: верхняя клетка без соседа сверху в маске.
+        final top = occupied.firstWhere(
+          (c) => !part.mask.contains(
+            c.x - prepared.targetX,
+            c.y - prepared.targetY - 1,
+          ),
+        );
+        final tx = ((top.x + 0.5) * cs).floor(), ty = (top.y * cs).floor();
+        final ref = await paintReferenceCell(top, assembled: true);
+        expect(
+          _sum(_px(done, fieldW, tx, ty)),
+          lessThan(_sum(_px(done, fieldW, tx, ((top.y + 0.5) * cs).floor()))),
+          reason: 'кромка: внешний край темнее центра клетки',
+        );
+        expect(
+          _close(_px(done, fieldW, tx, ty), _px(ref, fieldW, tx, ty)),
+          isTrue,
+          reason: 'кромка поля = кромка paintPartCell той же клетки',
         );
       });
 
@@ -279,16 +297,35 @@ void main() {
         );
         expect(other.shouldRepaint(base), isTrue);
         expect(same.shouldRepaint(base), isFalse);
-        final seamless = PackingPainter(
+        final assembled = PackingPainter(
           state: state,
           cellSize: cs,
           art: RoninArt.shared,
           part: part,
           targetX: prepared.targetX,
           targetY: prepared.targetY,
-          seamless: true,
+          assembled: true,
         );
-        expect(seamless.shouldRepaint(base), isTrue);
+        expect(assembled.shouldRepaint(base), isTrue);
+        final colors = PartCellColors(
+          width: part.mask.width,
+          height: part.mask.height,
+          colors: List.filled(
+            part.mask.width * part.mask.height,
+            const Color(0xFF404040),
+          ),
+        );
+        PackingPainter withColors() => PackingPainter(
+          state: state,
+          cellSize: cs,
+          art: RoninArt.shared,
+          part: part,
+          targetX: prepared.targetX,
+          targetY: prepared.targetY,
+          cellColors: colors,
+        );
+        expect(withColors().shouldRepaint(base), isTrue);
+        expect(withColors().shouldRepaint(withColors()), isFalse);
       });
     },
   );
