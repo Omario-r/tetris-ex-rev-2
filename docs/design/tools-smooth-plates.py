@@ -71,6 +71,13 @@ for sec,g in grids.items():
                 if not connected(g,a): g[r][c]=a; continue
                 changed=True
         if not changed: break
+# 2. двойные и тройные уступы на вертикальных стыках нижних плит пояса (после
+#    сглаживания они стали почти прямоугольными): левая плита заходит в правую
+#    выступом глубиной 1 и высотой 2–3 строки; направление одно — ширина ≤ 10
+gf=grids['fwd']
+TABS={9:('fwd2_l',[9,10,11,14,15]), 18:('fwd2_cl',[8,9,12,13,14]), 27:('fwd2_cr',[9,10,13,14,15])}
+for col,(left,rows) in TABS.items():
+    for r in rows: gf[r][col]=left
 out={}
 for p in parts:
     g=grids[p['sec']]
