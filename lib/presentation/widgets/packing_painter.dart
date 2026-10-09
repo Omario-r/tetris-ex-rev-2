@@ -29,6 +29,7 @@ class PackingPainter extends CustomPainter {
     required this.targetY,
     this.excludePieceId,
     this.dragPreview,
+    this.seamless = false,
   });
 
   /// Текущий снапшот укладки (силуэт + размещённые кусочки).
@@ -60,6 +61,11 @@ class PackingPainter extends CustomPainter {
   /// текущем якоре, + валидность). `null` — драга нет, превью не рисуется
   /// (Стори 02 T1).
   final PackDragPreview? dragPreview;
+
+  /// `true` — швы [seam] между уложенными клетками не рисуются: собранная деталь
+  /// видна сплошным куском рисунка (пауза «ДЕТАЛЬ СОБРАНА», Ронин-1/09 T1).
+  /// Во время укладки — `false`, швы как обычно.
+  final bool seamless;
 
   /// boardBg token (`docs/DESIGN.md`) — тот же фон, что у игрового поля
   /// (`BoardPainter`).
@@ -168,10 +174,11 @@ class PackingPainter extends CustomPainter {
       cellSize: cellSize,
     );
 
-    // seam по границе каждой уложенной клетки (мокап `renderPlaced`:
+    // seam по границе каждой уложенной клетки (на паузе [seamless] — без швов;
+    // мокап `renderPlaced`:
     // `strokeRect(c*CELL+.5, r*CELL+.5, CELL, CELL)`, 1 px). Один путь —
     // общая граница соседних клеток ложится одной линией, не двойной.
-    if (occupied.isNotEmpty) {
+    if (!seamless && occupied.isNotEmpty) {
       final seams = Path();
       for (final f in occupied) {
         seams.addRect(
@@ -232,7 +239,8 @@ class PackingPainter extends CustomPainter {
         targetX != oldDelegate.targetX ||
         targetY != oldDelegate.targetY ||
         excludePieceId != oldDelegate.excludePieceId ||
-        dragPreview != oldDelegate.dragPreview;
+        dragPreview != oldDelegate.dragPreview ||
+        seamless != oldDelegate.seamless;
   }
 }
 

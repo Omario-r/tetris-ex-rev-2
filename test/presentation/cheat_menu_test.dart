@@ -155,28 +155,17 @@ void main() {
     expect(find.text('ДЕТАЛЬ 3 / $_partCount'), findsOneWidget);
   });
 
-  testWidgets(
-      'Тумблер подачи: feed_tray3 → в лотке максимум 3 кусочка; feed_full → всё',
+  testWidgets('Чит-меню без секции «Подача» и режима «Лоток-3» (D-015)',
       (tester) async {
-    // Уровень 1 (12 клеток) режется на 3 куска — есть что показать тумблеру.
     await pumpGame(tester, level: 1);
-
     expect(_trayPieceCount(), greaterThan(0));
 
     await tester.tap(find.byKey(const Key('cheat_button')));
     await _pumpFrames(tester);
 
-    expect(find.byKey(const Key('feed_full')), findsOneWidget);
-    expect(find.byKey(const Key('feed_tray3')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('feed_tray3')));
-    await _pumpFrames(tester);
-    // Закрыть sheet, чтобы считать только лоток экрана.
-    await tester.tapAt(const Offset(20, 20));
-    await _pumpFrames(tester);
-
-    expect(_trayPieceCount(), lessThanOrEqualTo(3));
-    expect(find.text('ЛОТОК · ПОРЦИЯ-3'), findsOneWidget);
+    expect(find.text('Выбор уровня'), findsOneWidget);
+    expect(find.text('Подача'), findsNothing);
+    expect(find.text('Лоток-3'), findsNothing);
   });
 
   testWidgets('Чит «Пересобрать нарезку» не роняет экран', (tester) async {

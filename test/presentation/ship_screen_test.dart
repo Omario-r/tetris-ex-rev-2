@@ -190,6 +190,43 @@ void main() {
   });
 
   group('После сборки (afterWin)', () {
+    testWidgets('пауза kRevealDelay: сначала корабль без новой детали, затем '
+        'деталь въезжает', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ShipScreen.afterWin(collectedCount: 2, onContinue: () {}),
+        ),
+      );
+      await tester.pump();
+      expect(_shipPainter(tester).revealProgress, 0.0);
+
+      // Почти вся пауза прошла — детали всё ещё нет.
+      await tester.pump(
+        ShipScreen.kRevealDelay - const Duration(milliseconds: 50),
+      );
+      expect(_shipPainter(tester).revealProgress, 0.0);
+
+      // Пауза + въезд — деталь на месте.
+      await tester.pump(
+        ShipScreen.kRevealDuration + const Duration(milliseconds: 100),
+      );
+      expect(_shipPainter(tester).revealProgress, 1.0);
+    });
+
+    testWidgets('уход с экрана во время паузы не оставляет таймеров/вызовов', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ShipScreen.afterWin(collectedCount: 2, onContinue: () {}),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(ShipScreen.kRevealDelay * 2);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('заработанная деталь въезжает (revealProgress 0→1)', (
       tester,
     ) async {
@@ -252,7 +289,7 @@ void main() {
         final p0 = _shipPainter(tester);
         expect(p0.collectedCount, total);
         expect(p0.revealPartIndex, total - 1);
-        expect(p0.revealProgress, lessThan(1.0));
+        expect(p0.revealProgress, 0.0); // пауза kRevealDelay
 
         await tester.pumpAndSettle();
         expect(_shipPainter(tester).revealProgress, 1.0);

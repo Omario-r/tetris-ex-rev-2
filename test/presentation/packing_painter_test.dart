@@ -221,6 +221,39 @@ void main() {
         );
       });
 
+      test('seamless: швов нет — граница клетки = эталон paintPartCell, '
+          'а при seamless: false она темнее', () async {
+        final f = occupied.first;
+        final ref = await paintReferenceCell(f);
+        final ex = (f.x * cs).floor(), ey = ((f.y + 0.5) * cs).floor();
+        final seamless = await _rasterBytes(
+          fieldW,
+          fieldH,
+          (g) => PackingPainter(
+            state: state,
+            cellSize: cs,
+            art: RoninArt.shared,
+            part: part,
+            targetX: prepared.targetX,
+            targetY: prepared.targetY,
+            seamless: true,
+          ).paint(g, const Size(340, 476)),
+        );
+        final withSeam = await paintField();
+        // Эквивалент «граница не темнее центра»: сам рисунок может быть темнее
+        // на краю, поэтому сравниваем с эталоном той же клетки.
+        expect(
+          _close(_px(seamless, fieldW, ex, ey), _px(ref, fieldW, ex, ey)),
+          isTrue,
+          reason: 'без seam граница клетки = рисунок клетки как есть',
+        );
+        expect(
+          _sum(_px(withSeam, fieldW, ex, ey)),
+          lessThan(_sum(_px(seamless, fieldW, ex, ey))),
+          reason: 'со швом граница темнее, чем без шва',
+        );
+      });
+
       test('excludePieceId — клетки поднятого куска снова ghost', () async {
         final field = await paintField(excludePieceId: placedId);
         final f = occupied.first;
@@ -246,6 +279,16 @@ void main() {
         );
         expect(other.shouldRepaint(base), isTrue);
         expect(same.shouldRepaint(base), isFalse);
+        final seamless = PackingPainter(
+          state: state,
+          cellSize: cs,
+          art: RoninArt.shared,
+          part: part,
+          targetX: prepared.targetX,
+          targetY: prepared.targetY,
+          seamless: true,
+        );
+        expect(seamless.shouldRepaint(base), isTrue);
       });
     },
   );

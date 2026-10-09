@@ -42,7 +42,9 @@
   уровня, D-007), не порядок id.
 - Лоток фиксированного размера (Ронин-1/08 T2): `Key('packing_tray')`, ширина — вся
   (с внешними отступами 12), высота `_trayZoneHeight` = 2·1 рамка + 2·12 паддинг + 160 ряд
-  кусков (`_trayRowMaxHeight`) + 6 зазор + 14 подпись (`_trayLabelHeight`) = **206**; ряд
+  кусков (`_trayRowMaxHeight`) + 20 пустой отступ снизу (`_trayBottomSpace`; на месте снятой
+  подписи лотка, Ронин-1/09 T1 — подписи «ЛОТОК · …» нет) = **206**; лоток всегда показывает
+  `state.trayOrder` целиком (режима «Лоток-3» нет, D-015); ряд
   кусков — `SizedBox(160)` с горизонтальным скроллом, куски по центру по вертикали. Лоток не
   сжимается по мере опустения — поле над ним не прыгает. Та же `_trayZoneHeight` уходит в
   расчёт клетки поля.
@@ -104,7 +106,7 @@
   нет. На паузе: строка над полем — `Key('packing_complete')` «ДЕТАЛЬ СОБРАНА» (по центру,
   `hazardOrange` 12 px, .24em, тень `doneGlow` blur 12; «Очистить поле» скрыта); пульс-ободок
   `doneGlow` на поле; зона лотка заменена `Key('done_buttons')` той же высоты 206 (ряд кнопок
-  сверху, отступы 14/10/10, зазор 10, подпись лотка — пустое место): слева
+  сверху, отступы 14/10/10, зазор 10): слева
   `Key('done_to_ship_button')` «К кораблю» (`gunmetal`/`matteBlack`/`#cbd2d9`), справа
   `Key('done_next_button')` «Следующая деталь» (основная: рамка 2 `hazardOrange`, `#f0d6c2`),
   высота 44, радиус 10, 12 px .05em (`_DoneButton`). На последней детали — одна «К кораблю»
@@ -115,8 +117,9 @@
   GameScreen(levelIndex+1))`; на последней → `ShipScreen.finale()`. Пересборка уровня
   дев-читами нарезки снимает паузу. Solve-хук `_solveAll()`
   (раскладка по `PackSlice.solution`) — дев-кнопка `Key('cheat_solve')` И programmatic-хук
-  для тестов (доводит до `isComplete` без симуляции drag). `FeedMode {fullSet, tray3}`
-  объявлен в `game_screen.dart` (в `tray3` в лотке первые 3 из `trayOrder` + индикатор «+N»).
+  для тестов (доводит до `isComplete` без симуляции drag). На паузе поле рисуется
+  `PackingPainter(seamless: _done)` — собранная деталь без швов `seam`, сплошным куском
+  рисунка (во время укладки швы есть).
 - `ShipScreen({art})` — ручной экран корабля-композит (канон `docs/design/ronin-ship.html`,
   Ронин-1/02 T2): фон `spaceBg`, без `AppBar`. Верх `.dtop` (поля 16, отступ 4, высота 38):
   слева `Key('ship_back_button')` 34×34 (`matteBlack`/`gunmetal`/глиф `hudIcon`, `pop`),
@@ -130,20 +133,22 @@
   `Key('ship_button')` на `GameScreen`.
 - `ShipScreen.afterWin({required collectedCount, required onContinue, art})` — маршрут
   «К кораблю» с паузы (Ронин-1/05 T1): тот же макет, деталь `collectedCount-1` въезжает
-  scale-in (400 мс, easeOut), без «Назад» (слева пустое место 34), «Продолжить сборку»
+  scale-in (`kRevealDuration` 400 мс, easeOut) после паузы `ShipScreen.kRevealDelay`
+  (600 мс; до неё `revealProgress = 0`, новой детали не видно; один `AnimationController`
+  на паузу + въезд, отдельного таймера нет — гасится в `dispose`; тот же порядок у `finale`
+  при `animateLast`; Ронин-1/09 T1), без «Назад» (слева пустое место 34), «Продолжить сборку»
   (`ship_continue_button`) → `onContinue`. Прогресс не читает и не пишет.
 - `ShipScreen.finale({art, animateLast = true})` — финал «Ронина-1»: собрано N (15 / 15),
   последняя деталь въезжает при `animateLast`; ни «Назад», ни кнопок; на месте кнопки
   (высота 44) — `Key('ship_finale_text')` «ПРОДОЛЖЕНИЕ СЛЕДУЕТ» (стиль «ДЕТАЛЬ СОБРАНА»);
   только в `kDebugMode` под ней `TextButton` `Key('ship_dev_reset')` «Сброс прогресса (dev)» →
   `ProgressService.reset()` → `pushReplacement(GameScreen(0))`. Прогресс финал не трогает.
-- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts, feedMode, onSetFeedMode,
+- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts,
   onReshuffle, onSolve, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
   Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
   `kDebugMode`. Секции: выбор уровня (прогресс не меняет), мгновенная победа (пауза
   «деталь собрана», `_markDone`), состояние корабля (N=0..`RoninParts.parts.length`, пишет
-  `setCollectedCount(N)` — «15» даёт 15 / 15), **подача** (`Key('feed_full')`/`Key('feed_tray3')`
-  — тумблер `FeedMode`), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
+  `setCollectedCount(N)` — «15» даёт 15 / 15), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
   — solve-хук). Зарядов взрыва и «Прототипа укладки» больше нет (выпил в Стори 02).
   `levelCount` по умолчанию `null` → `RoninParts.parts.length` уровней.
 
@@ -158,8 +163,6 @@
   `ShipArt`, `RoninArt.shared`; `game_screen`: `RoninArt.shared` для поля, Ронин-1/03). `GameScreen` больше НЕ зависит от
   `game_engine/game`, `game_engine/rules`, `widgets/board_painter`, `widgets/hud`,
   `theme/level_skin` (пересадка на укладку, Стори 02 T2).
-- `cheat_menu.dart` импортирует `FeedMode` из `game_screen.dart` (взаимный импорт —
-  допустим в Dart; enum живёт у экрана, меню лишь типизирует параметр).
 - `ship_screen.dart` ↔ `game_screen.dart` — взаимный импорт (Ронин-1/05 T1): игра открывает
   корабль, финал (дев-сброс) возвращает в `GameScreen(0)`; `afterWin` возвращает в игру
   колбэком `onContinue` от `GameScreen`.

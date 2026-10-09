@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../game_engine/data/ronin_parts.dart';
-import 'game_screen.dart' show FeedMode;
 
 /// Оверлей чит-меню для дев-сборки: минимальный список кнопок.
 ///
@@ -17,12 +16,6 @@ class CheatMenu extends StatelessWidget {
 
   /// Задать «собрано N деталей» (N = 0..`RoninParts.parts.length`).
   final void Function(int parts) onSetShipParts;
-
-  /// Текущий режим подачи лотка (для секции «Подача»).
-  final FeedMode feedMode;
-
-  /// Переключить режим подачи лотка (`fullSet` / `tray3`).
-  final ValueChanged<FeedMode> onSetFeedMode;
 
   /// Пересобрать нарезку текущего уровня (новый seed).
   final VoidCallback onReshuffle;
@@ -40,8 +33,6 @@ class CheatMenu extends StatelessWidget {
     required this.onSelectLevel,
     required this.onInstantWin,
     required this.onSetShipParts,
-    required this.feedMode,
-    required this.onSetFeedMode,
     required this.onReshuffle,
     required this.onSolve,
     this.levelCount,
@@ -63,7 +54,11 @@ class CheatMenu extends StatelessWidget {
               ),
               const SizedBox(height: 16),
               _section(context, 'Выбор уровня', [
-                for (int i = 0; i < (levelCount ?? RoninParts.parts.length); i++)
+                for (
+                  int i = 0;
+                  i < (levelCount ?? RoninParts.parts.length);
+                  i++
+                )
                   ElevatedButton(
                     key: Key('cheat_level_$i'),
                     onPressed: () => onSelectLevel(i),
@@ -84,18 +79,6 @@ class CheatMenu extends StatelessWidget {
                     onPressed: () => onSetShipParts(n),
                     child: Text('$n'),
                   ),
-              ]),
-              _section(context, 'Подача', [
-                ElevatedButton(
-                  key: const Key('feed_full'),
-                  onPressed: () => onSetFeedMode(FeedMode.fullSet),
-                  child: const Text('Полный набор'),
-                ),
-                ElevatedButton(
-                  key: const Key('feed_tray3'),
-                  onPressed: () => onSetFeedMode(FeedMode.tray3),
-                  child: const Text('Лоток-3'),
-                ),
               ]),
               _section(context, 'Нарезка (dev)', [
                 ElevatedButton(
@@ -137,8 +120,6 @@ Future<void> showCheatMenu(
   required void Function(int levelIndex) onSelectLevel,
   required VoidCallback onInstantWin,
   required void Function(int parts) onSetShipParts,
-  required FeedMode feedMode,
-  required ValueChanged<FeedMode> onSetFeedMode,
   required VoidCallback onReshuffle,
   required VoidCallback onSolve,
 }) {
@@ -149,8 +130,6 @@ Future<void> showCheatMenu(
       onSelectLevel: onSelectLevel,
       onInstantWin: onInstantWin,
       onSetShipParts: onSetShipParts,
-      feedMode: feedMode,
-      onSetFeedMode: onSetFeedMode,
       onReshuffle: onReshuffle,
       onSolve: onSolve,
     ),

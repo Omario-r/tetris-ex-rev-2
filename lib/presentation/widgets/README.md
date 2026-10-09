@@ -17,7 +17,8 @@
 
 ## Публичный интерфейс
 
-- `PackingPainter({state, cellSize, art, part, targetX, targetY, excludePieceId, dragPreview})` —
+- `PackingPainter({state, cellSize, art, part, targetX, targetY, excludePieceId, dragPreview,
+  seamless = false})` —
   `CustomPainter` укладки (эпик «Укладка», Стори 01 T3, канон утверждён эпик «Укладка» Стори 02
   T1). Порядок: фон `boardBg` (`#16191D`) → ghost незаполненных клеток силуэта
   (`BlockTheme.ghostTarget`, канон `GhostTargetOverlay`/токен `ghostTarget`) → **уложенные клетки
@@ -25,7 +26,8 @@
   `occupiedCellsExcluding` одним вызовом `ship_render/paintPartCells` (`art` — `ShipArt`, `part` —
   `RoninPartDef` уровня; клетка поля (x, y) ↔ клетка маски (x − `targetX`, y − `targetY`),
   `origin = (targetX, targetY) * cellSize`; `targetX/Y` = `PreparedLevel.targetX/Y`) → `seam`
-  (`PackingPainter.seam`, токен `hsla(220 14% 4% / 55%)`) — 1 px по прямоугольнику каждой
+  (при `seamless: true` — пауза «деталь собрана», Ронин-1/09 T1 — швы не рисуются, деталь
+  сплошным куском рисунка; `PackingPainter.seam`, токен `hsla(220 14% 4% / 55%)`) — 1 px по прямоугольнику каждой
   уложенной клетки со сдвигом +0.5 (как `strokeRect` мокапа), все — одним путём (общая граница
   соседей — одна линия) → снап-превью. Плоского материала на поле нет. `excludePieceId` —
   пропустить отрисовку уложенного кусочка (экран рисует его отдельно как floating drag-фидбэк,
@@ -74,7 +76,7 @@
 - Только вид: пейнтеры не содержат игровой логики.
 - `shouldRepaint` завязан на `state`/анимацию; мутабельное состояние в пейнтере не хранить.
   `PackingPainter.shouldRepaint` — по `state`, `cellSize`, `art`, `part`, `targetX/Y`,
-  `excludePieceId`, `dragPreview`.
+  `excludePieceId`, `dragPreview`, `seamless`.
 - Поле: уложенное — рисунок корабля + `seam`; лоток и кусок в руке — сырой графит
   (`paintPiece`). Контраст «сырьё → корабль» — канон, не смешивать.
 

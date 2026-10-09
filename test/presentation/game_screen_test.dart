@@ -92,11 +92,13 @@ void main() {
       }
     });
 
-    testWidgets('лоток: подпись «ЛОТОК · ПОЛНЫЙ НАБОР» + кусочки в ряду',
+    testWidgets('лоток: подписи нет, кусочки в ряду, высота зоны прежняя',
         (tester) async {
       await pumpGame(tester);
 
-      expect(find.text('ЛОТОК · ПОЛНЫЙ НАБОР'), findsOneWidget);
+      expect(find.textContaining('ЛОТОК'), findsNothing);
+      // Зона лотка 2·1 + 2·12 + 160 + 20 = 206: поле не сдвинулось.
+      expect(tester.getSize(find.byKey(const Key('packing_tray'))).height, 206.0);
 
       // Стартовая нарезка кладёт весь набор в лоток — есть tray_piece_* виджеты.
       final trayPieces = find
@@ -107,6 +109,27 @@ void main() {
           .length;
       expect(trayPieces, greaterThan(0),
           reason: 'кусочки нарезки должны лежать в лотке');
+    });
+
+    testWidgets('швы между клетками: на укладке есть, на паузе нет (seamless)',
+        (tester) async {
+      await pumpGame(tester);
+      expect(packingPainter(tester).seamless, isFalse);
+      final trayHeight =
+          tester.getSize(find.byKey(const Key('packing_tray'))).height;
+
+      await tester.tap(find.byKey(const Key('cheat_button')));
+      await _pumpFrames(tester);
+      await tester.tap(find.byKey(const Key('cheat_solve')));
+      await _pumpFrames(tester);
+
+      expect(find.byKey(const Key('packing_complete')), findsOneWidget);
+      expect(packingPainter(tester).seamless, isTrue);
+      // Кнопки паузы занимают ту же высоту, что и лоток.
+      expect(
+        tester.getSize(find.byKey(const Key('done_buttons'))).height,
+        trayHeight,
+      );
     });
 
     testWidgets('прогресс-бар: подпись «уложено 0 / M кусков» на старте',

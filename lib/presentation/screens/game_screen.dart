@@ -21,11 +21,6 @@ import 'ship_screen.dart';
 /// Токен `hudIcon` `hsl(215 9% 72%)` — глиф dev-кнопок топбара.
 const Color _hudIconColor = Color(0xFFB1B7BE);
 
-/// Режим подачи кусочков (эпик «Укладка»): весь набор сразу (`fullSet`) или
-/// порционный лоток (`tray3` — 3 кусочка на виду + индикатор «+N» на остаток).
-/// Переключается из чит-меню; хранится в состоянии `GameScreen`.
-enum FeedMode { fullSet, tray3 }
-
 /// Основной игровой экран — ядро укладки (эпик «Укладка», Стори 02).
 ///
 /// Игрок перетаскивает кусочки-полиомино из лотка в силуэт детали корабля,
@@ -55,20 +50,20 @@ class _GameScreenState extends State<GameScreen>
 
   /// Габариты лотка (фиксированные — поле не прыгает, когда лоток пустеет):
   /// внешний контейнер = рамка 1+1, вертикальный паддинг 12+12, ряд кусков
-  /// [_trayRowMaxHeight], зазор 6, подпись [_trayLabelHeight].
+  /// [_trayRowMaxHeight], пустой отступ снизу [_trayBottomSpace] (на месте
+  /// снятой подписи лотка — Ронин-1/09 T1: высота зоны прежняя, поле не
+  /// сдвигается).
   static const double _trayBorderWidth = 1.0;
   static const double _trayPaddingV = 12.0;
-  static const double _trayLabelGap = 6.0;
-  static const double _trayLabelHeight = 14.0;
+  static const double _trayBottomSpace = 20.0; // было зазор 6 + подпись 14
 
-  /// Высота зоны лотка: 2·1 + 2·12 + 160 + 6 + 14 = 206. Её же вычитает расчёт
+  /// Высота зоны лотка: 2·1 + 2·12 + 160 + 20 = 206. Её же вычитает расчёт
   /// клетки поля ([_computeCellSize]).
   static const double _trayZoneHeight =
       2 * _trayBorderWidth +
       2 * _trayPaddingV +
       _trayRowMaxHeight +
-      _trayLabelGap +
-      _trayLabelHeight;
+      _trayBottomSpace;
 
   /// Зона нажатия «ОЧИСТИТЬ ПОЛЕ» (не меньше 40×32); живёт поверх строки
   /// прогресса и строку не раздвигает.
@@ -111,9 +106,6 @@ class _GameScreenState extends State<GameScreen>
 
   /// Эталонная раскладка последней нарезки — solve-хук (дев + тесты).
   late Map<int, ({int x, int y})> _solution;
-
-  /// Режим подачи лотка (тумблер чит-меню). Дефолт — полный набор.
-  FeedMode _feedMode = FeedMode.fullSet;
 
   // --- Деталь собрана: пауза (Ронин-1/05 T1) ---
   /// Пауза «деталь собрана»: поле и лоток касаний не принимают, на месте
@@ -274,8 +266,6 @@ class _GameScreenState extends State<GameScreen>
       onSelectLevel: _cheatSelectLevel,
       onInstantWin: _cheatInstantWin,
       onSetShipParts: _cheatSetShipParts,
-      feedMode: _feedMode,
-      onSetFeedMode: _cheatSetFeedMode,
       onReshuffle: _cheatReshuffle,
       onSolve: _cheatSolve,
     );
@@ -305,12 +295,6 @@ class _GameScreenState extends State<GameScreen>
         duration: const Duration(seconds: 1),
       ),
     );
-  }
-
-  /// Чит «тумблер подачи»: переключает `fullSet` / `tray3`. Sheet не
-  /// закрываем — PO может переключать без перезахода.
-  void _cheatSetFeedMode(FeedMode mode) {
-    setState(() => _feedMode = mode);
   }
 
   /// Дев-чит «Пересобрать нарезку»: новый сдвиг seed → новая нарезка той же детали.
@@ -354,13 +338,6 @@ class _GameScreenState extends State<GameScreen>
   }
 
   // --- Drag-and-drop (перенос эталонной логики прототипа) ---
-
-  List<int> _visibleTray(PackState state) {
-    if (_feedMode == FeedMode.tray3) {
-      return state.trayOrder.take(3).toList();
-    }
-    return state.trayOrder;
-  }
 
   PackPiece _pieceById(int id) {
     return _controller.state.pieces.firstWhere((p) => p.id == id);
@@ -889,6 +866,7 @@ class _GameScreenState extends State<GameScreen>
             targetY: _targetY,
             excludePieceId: _dragFromTray ? null : _dragPieceId,
             dragPreview: preview,
+            seamless: _done,
           ),
         ),
       ),
@@ -896,13 +874,7 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildTray(PackState state) {
-    final visible = _visibleTray(state);
-    final rest = _feedMode == FeedMode.tray3
-        ? state.trayOrder.length - visible.length
-        : 0;
-    final label = _feedMode == FeedMode.tray3
-        ? 'ЛОТОК · ПОРЦИЯ-3'
-        : 'ЛОТОК · ПОЛНЫЙ НАБОР';
+    final visible = state.trayOrder;
 
     // Контейнер лотка фиксирован по размеру ([_trayZoneHeight], во всю ширину):
     // по мере опустения лоток не сжимается, поле над ним не прыгает.
@@ -954,33 +926,11 @@ class _GameScreenState extends State<GameScreen>
                           ),
                         ),
                       ),
-                  if (rest > 0)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 4.0),
-                      child: Text(
-                        '+$rest',
-                        style: const TextStyle(
-                          color: Color(0xFF8B949E),
-                          fontSize: 11.0,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ),
           ),
-          const SizedBox(height: _trayLabelGap),
-          SizedBox(
-            height: _trayLabelHeight,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Color(0xFF6C747D),
-                fontSize: 10.0,
-                letterSpacing: 1.0, // .1em @ 10px
-              ),
-            ),
-          ),
+          const SizedBox(height: _trayBottomSpace),
         ],
       ),
     );
@@ -1012,8 +962,7 @@ class _GameScreenState extends State<GameScreen>
 
   /// Пауза «деталь собрана» на месте лотка (канон `.donebtns` мокапа
   /// `ukladka-field.html`): та же высота [_trayZoneHeight] (поле не прыгает),
-  /// ряд кнопок сверху (отступы 14/10/10, зазор 10), подпись лотка скрыта —
-  /// её место остаётся пустым. Слева «К кораблю», справа основная «Следующая
+  /// ряд кнопок сверху (отступы 14/10/10, зазор 10). Слева «К кораблю», справа основная «Следующая
   /// деталь»; на последней детали — одна «К кораблю» в основном стиле.
   Widget _buildDoneButtons() {
     return SizedBox(

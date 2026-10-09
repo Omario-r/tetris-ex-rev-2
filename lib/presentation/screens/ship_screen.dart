@@ -41,6 +41,14 @@ class ShipScreen extends StatefulWidget {
   /// Рисунок корабля; `null` — общий экземпляр [RoninArt].
   final ShipArt? art;
 
+  /// Пауза перед въездом детали (`afterWin`, `finale` с [animateLast]): сначала
+  /// корабль без новой детали, затем деталь въезжает scale-in
+  /// ([kRevealDuration]). Одно число для подстройки на устройстве.
+  static const Duration kRevealDelay = Duration(milliseconds: 600);
+
+  /// Длительность самого въезда детали (scale-in).
+  static const Duration kRevealDuration = Duration(milliseconds: 400);
+
   /// Ручной экран корабля: собранное к моменту, «Назад» и «Продолжить сборку».
   const ShipScreen({super.key, this.art})
     : _mode = _ShipMode.manual,
@@ -103,12 +111,21 @@ class _ShipScreenState extends State<ShipScreen>
       _ShipMode.finale => widget.animateLast,
     };
     if (animate) {
-      final c = AnimationController(
-        vsync: this,
-        duration: const Duration(milliseconds: 400),
-      );
+      // Один контроллер на паузу + въезд: пауза — начальный отрезок кривой
+      // (прогресс 0, деталь не видна). Отдельного таймера нет — контроллер
+      // гасится в dispose вместе с экраном.
+      final delay = ShipScreen.kRevealDelay;
+      final total = delay + ShipScreen.kRevealDuration;
+      final c = AnimationController(vsync: this, duration: total);
       _revealController = c;
-      _revealAnim = CurvedAnimation(parent: c, curve: Curves.easeOut);
+      _revealAnim = CurvedAnimation(
+        parent: c,
+        curve: Interval(
+          delay.inMilliseconds / total.inMilliseconds,
+          1.0,
+          curve: Curves.easeOut,
+        ),
+      );
       c.forward();
     }
     if (widget._mode == _ShipMode.manual) {
