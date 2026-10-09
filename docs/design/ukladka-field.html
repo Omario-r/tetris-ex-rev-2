@@ -264,9 +264,9 @@
     <div class="el" id="el-cell-filled">
       <div class="frame"><canvas id="elFilled" width="68" height="68"></canvas></div>
       <div class="name">el-cell-filled</div>
-      <div class="an"><b>Кусок оригинала</b>, а не плоский материал: клетка показывает
-         свой квадрат рисунка корабля. По границе — <code>seam</code>; каждая четвёртая
-         совпадает со швом плиты, остальные швами не притворяются.</div>
+      <div class="an"><b>Плитка с рисунком корабля</b> (D-016): рельеф и заклёпки как у
+         куска в лотке, окраска — свой квадрат рисунка детали; край детали и щели-огни
+         не видны до конца сборки, клетка предмета — преобладающий цвет.</div>
     </div>
 
     <div class="el" id="el-piece-tray">
@@ -314,8 +314,9 @@
       <div class="name">el-field-partial</div>
       <div class="an">Поле в середине сборки — состояние, в котором игрок проводит
          почти всё время. Читать по нему три правила:<br>
-         · <b>seam только по уложенным клеткам.</b> Пустые мишени сеткой не расчерчены,
-           фон поля тоже — линия появляется вместе с кусочком.<br>
+         · <b>плитки только у уложенных клеток.</b> Пустые мишени сеткой не расчерчены,
+           фон поля тоже — плитка появляется вместе с кусочком; собранная деталь — целиком,
+           без плиток (D-016).<br>
          · <b>граница уложенного идёт по кускам, а не по рисунку:</b> кусок обрывается
            посреди плиты, и это нормально — рисунок «проявляется», а не выкладывается плитками.<br>
          · <b>уложенная клетка теряет пунктир</b> (<code>el-cell-target</code> →
@@ -327,13 +328,11 @@
 
 <div id="dragLayer"></div>
 
-<script>window.__SHIP_RES = 6; window.__SHIP_NO_OBJECTS = true;</script>
-<script src="ship-render.js?hull"></script>
-<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
-<script src="ship-render.js?full"></script>
-<script src="ronin-parts.js?v=2"></script>
-<script src="ronin-objects.js?v=2"></script>
-<script src="ronin-draw.js?v=2"></script>
+<script src="ronin-parts.js?v=3"></script>
+<script>window.__SHIP_RES = 4;</script>
+<script src="ship-render.js?v=3"></script>
+<script src="ronin-objects.js?v=3"></script>
+<script src="ronin-draw.js?v=3"></script>
 <script>
 /* ================= ИНТЕРАКТИВ МОКАПА (иллюстрация, не прод-код) ================= */
 "use strict";
@@ -452,17 +451,18 @@ const cellAt = (c,r) => grid.querySelector(`.gcell[data-c="${c}"][data-r="${r}"]
 function renderPlaced(){
   gfill.clearRect(0, 0, FW*CELL, FH*CELL);
   grid.querySelectorAll('.hit').forEach(e => e.remove());
+  const done = Object.values(placedCells).reduce((n, cs) => n + cs.length, 0) === targetSet.size;
   for (const id in placedCells){
     for (const k of placedCells[id]){
       const [c, r] = k.split(',').map(Number);
-      D.drawCell(gfill, part, c - offC, r - offR, c*CELL, r*CELL, CELL);   // кусок оригинала в масштабе детали
-      gfill.strokeStyle = 'hsla(220,14%,4%,.55)'; gfill.lineWidth = 1;   /* seam */
-      gfill.strokeRect(c*CELL+.5, r*CELL+.5, CELL, CELL);
+      /* D-016: во время сборки — плитка (рельеф Б), собрана — рисунок целиком */
+      D.drawCell(gfill, part, c - offC, r - offR, c*CELL, r*CELL, CELL, done ? 'done' : 'build');
       const hit = document.createElement('div');                  // хит-зона для подъёма
       hit.className = 'hit'; hit.dataset.pid = id;
       hit.style.cssText = `left:${c*CELL}px;top:${r*CELL}px;width:${CELL}px;height:${CELL}px`;
       grid.appendChild(hit);
     }
+    if (done && part.layer === 0) D.crispEdge(gfill, part, CELL, offC, offR);
     // клетка уложена — пунктир мишени снимаем
     for (const k of placedCells[id]){
       const [c, r] = k.split(',').map(Number);
@@ -630,9 +630,7 @@ loadPart(P.parts[0].id);
   g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, FW*u, FH*u);          /* boardBg */
   for (const k of placed){                                                 /* el-cell-filled */
     const [c, r] = k.split(',').map(Number);
-    D.drawCell(g, p, c - oc, r - or, c*u, r*u, u);
-    g.strokeStyle = 'hsla(220,14%,4%,.55)'; g.lineWidth = 1;               /* seam */
-    g.strokeRect(c*u+.5, r*u+.5, u, u);
+    D.drawCell(g, p, c - oc, r - or, c*u, r*u, u, 'build');                 /* плитка, D-016 */
   }
   g.setLineDash([3.5, 2.5]); g.lineWidth = 1.2;                            /* el-cell-target */
   g.strokeStyle = 'hsla(23,62%,55%,.55)'; g.fillStyle = 'hsla(23,62%,46%,.05)';
@@ -649,8 +647,7 @@ loadPart(P.parts[0].id);
 (function(){
   const g = document.getElementById('elFilled').getContext('2d');
   const bc = P.parts.find(p => p.id === 'bridge_c');
-  D.drawCell(g, bc, 5, 3, 0, 0, 68);
-  g.strokeStyle = 'hsla(220,14%,4%,.55)'; g.lineWidth = 2; g.strokeRect(1, 1, 66, 66);
+  D.drawCell(g, bc, 5, 3, 0, 0, 68, 'build');
 })();
 </script>
 

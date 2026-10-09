@@ -8,6 +8,7 @@
   docs/design/ (вырез предмета на корабле) и при новой разметке (Ронин-2).
 
   Требует подключённого ship-render.js (window.__SHIP).
+  v3 (D-016): добавлены визор половинами и торпедные люки.
 */
 window.RONIN_OBJECTS = (function(){
 "use strict";
@@ -32,6 +33,17 @@ const SHAPES = {
     const up = [[-5.2,-.56*C],[5.2,-.56*C],[3.4,-.3*C],[-3.4,-.3*C]];
     const rot = (a) => poly(up.map(([u, v]) => [X + u*Math.cos(a) - v*Math.sin(a), Y + u*Math.sin(a) + v*Math.cos(a)]));
     return [rrect(X-.3*C, Y-.3*C, .6*C, .6*C, 3), rot(0), rot(flip*Math.PI/2), rot(Math.PI)];
+  },
+  /* визор мостика половиной (v3, D-016): half -1 — левая, 1 — правая; геометрия как
+     в ship-render.js (vx=px(4.65), vy=py(2.48), vw=5.7C, vh=.86C) */
+  visor: ({half}) => {
+    const vx = px(4.65), vy = py(2.48), vw = 5.7*C, vh = .86*C;
+    return [rrect(half < 0 ? vx : vx + vw/2, vy, vw/2, vh, 4)];
+  },
+  /* торпедный люк с оранжевой полоской над ним (v3): side -1 — левый, 1 — правый */
+  hatch: ({side}) => {
+    const tx = cx + side*1.45*C - .42*C, ty = py(5.95);
+    return [rrect(tx, ty - 2.6, .84*C, .66*C + 2.6, 3)];
   },
 };
 const shape = (obj) => SHAPES[obj.kind](obj);

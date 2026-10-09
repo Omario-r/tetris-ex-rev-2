@@ -8,7 +8,22 @@
   колонки span[y][0]..span[y][1].
 
   Потребители: ship_ronin_v4.html (референс), ronin-grid.html, ronin-ship.html,
-  ronin-parts-catalog.html. Разметка деталей — ronin-parts.js.
+  ronin-parts-catalog.html, ukladka-field.html (через ronin-draw.js).
+
+  v3 (D-016, решение PO 2026-10-09): плиты строк 0..7 («Ронин-1») рисуются ровно
+  по логическим деталям из ronin-parts.js — ПОДКЛЮЧИТЬ ЕГО РАНЬШЕ этого файла.
+  Швы — тонкие и мягкие, тонкой воксельной сетки там нет. Визор (выше канона v2:
+  три ряда клеток), торпедные люки, датчик и RCS — предметы слоя 1. Остальной
+  корабль (строки 8+) — прежний генератор плит, раскладка не изменилась.
+
+  render(opt) — рисует сцену в новую offscreen-канву и возвращает её:
+    res    — разрешение (по умолчанию 2);
+    layer  — 'all' (с фоном) | 'hull' (обшивка и покраска, без фона и предметов)
+             | 'objects' (только предметы слоя 1, прозрачный фон);
+    edges  — false: без кромок деталей и контура корпуса (поле укладки);
+    lights — false: без щелей-огней (поле укладки во время сборки).
+  window.__SHIP.off — рисунок по window.__SHIP_RES / window.__SHIP_NO_OBJECTS
+  (совместимость со страницами v2).
 */
 window.__SHIP = (function(){
 "use strict";
@@ -102,18 +117,35 @@ function hullPath(g){
 function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
 function glowDot(g,x,y,r,col){const gr=g.createRadialGradient(x,y,0,x,y,r*4);gr.addColorStop(0,col);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(x,y,r*4,0,7);g.fill();g.fillStyle=col;g.beginPath();g.arc(x,y,r,0,7);g.fill();}
 
+/* ---------- v3: плиты «Ронина-1» = логические детали (ronin-parts.js) ---------- */
+const PARTS=window.RONIN_PARTS;
+if(!PARTS) throw new Error('ship-render.js: сначала подключите ronin-parts.js (v3, D-016)');
+const PLATE_MAT={prow:M.DARK, bridge:M.GRAF2, fwd:M.GRAF};
+const PLATE_JL=[-2,1.5,-1,2.5,0,-2.5,1,-1.5,3,-3,2,-.5];
+const partPlates=PARTS.parts.filter(p=>p.layer===0).map((p,i)=>{
+  const sec=PARTS.sections.find(q=>q.id===p.section), cs=C/sec.s, cells=[];
+  p.mask.forEach((l,r)=>{for(let c=0;c<l.length;c++)if(l[c]==='#')cells.push([c,r]);});
+  const on=(c,r)=>r>=0&&r<p.mask.length&&c>=0&&p.mask[r][c]==='#';
+  const x0=px(sec.origin[0]+p.origin[0]/sec.s), y0=py(sec.origin[1]+p.origin[1]/sec.s);
+  return {m:PLATE_MAT[p.section], jl:PLATE_JL[i%PLATE_JL.length], cs, on,
+          cells:cells.map(([c,r])=>[c,r,x0+c*cs,y0+r*cs])};
+});
+const RONIN1_ROWS=8;   /* строки рисунка, которые размечены деталями */
+
 /* ================================================================
    РЕНДЕР ВСЕЙ СЦЕНЫ в offscreen 2x
 ================================================================ */
-/* разрешение offscreen: по умолчанию 2x; страница может заказать крупнее,
-   задав window.__SHIP_RES до подключения файла (рисунок не меняется).
-   window.__SHIP_NO_OBJECTS = true — корпус без предметов слоя 1 (датчик, RCS). */
-const RES=window.__SHIP_RES||2;
+function render(opt){
+opt=opt||{};
+const RES=opt.res||2, LAYER=opt.layer||'all';
+const BG=LAYER==='all', HULL=LAYER!=='objects', OBJ=LAYER!=='hull';
+const EDGES=opt.edges!==false, LIGHTS=opt.lights!==false;
 const off=document.createElement('canvas'); off.width=W*RES; off.height=H*RES;
 const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 
 /* --- фон: космос --- */
 (function(){
+  if(!BG) return;
   const bg=g.createLinearGradient(0,0,0,H);
   bg.addColorStop(0,'#05070d'); bg.addColorStop(.6,'#080b13'); bg.addColorStop(1,'#0d0a08');
   g.fillStyle=bg; g.fillRect(0,0,W,H);
@@ -124,6 +156,7 @@ const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 
 /* --- планета (тёплый Марс внизу-справа) --- */
 (function(){
+  if(!BG) return;
   const pcx=W*.74, pcy=H*1.72, pr=H*.95;
   g.save();
   const atm=g.createRadialGradient(pcx,pcy,pr*.92,pcx,pcy,pr*1.06);
@@ -144,6 +177,7 @@ const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 
 /* --- ореол факела за кораблём (до корпуса) --- */
 (function(){
+  if(!BG) return;
   const gy=py(30.8);
   const halo=g.createRadialGradient(cx,gy,0,cx,gy,6.4*C);
   halo.addColorStop(0,'rgba(140,215,255,.34)');halo.addColorStop(.5,'rgba(120,200,255,.13)');halo.addColorStop(1,'rgba(120,200,255,0)');
@@ -153,7 +187,25 @@ const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 /* ================================================================
    КОРПУС
 ================================================================ */
+if(HULL){
+/* строки 0..7 — плиты по логическим деталям (v3) */
+for(const pl of partPlates){
+  g.fillStyle=hsl(pl.m,pl.jl);
+  for(const [,,x,y] of pl.cells) g.fillRect(x-.3,y-.3,pl.cs+.6,pl.cs+.6);
+}
+if(EDGES) for(const pl of partPlates){
+  const lt=hsl(pl.m,pl.jl+6,.55), dk=hsl(pl.m,pl.jl-6,.6), sm='rgba(0,0,0,.32)', cs=pl.cs;
+  const seg=(x1,y1,x2,y2,col,w)=>{g.strokeStyle=col;g.lineWidth=w;g.beginPath();g.moveTo(x1,y1);g.lineTo(x2,y2);g.stroke();};
+  for(const [c,r,x,y] of pl.cells){
+    if(!pl.on(c,r-1)){seg(x,y+1,x+cs,y+1,lt,1);       seg(x,y+.3,x+cs,y+.3,sm,.8);}
+    if(!pl.on(c-1,r)){seg(x+1,y,x+1,y+cs,lt,1);       seg(x+.3,y,x+.3,y+cs,sm,.8);}
+    if(!pl.on(c,r+1)){seg(x,y+cs-1,x+cs,y+cs-1,dk,1); seg(x,y+cs-.3,x+cs,y+cs-.3,sm,.8);}
+    if(!pl.on(c+1,r)){seg(x+cs-1,y,x+cs-1,y+cs,dk,1); seg(x+cs-.3,y,x+cs-.3,y+cs,sm,.8);}
+  }
+}
+/* строки 8+ — прежний генератор */
 for(const p of plates){
+  if(p.y<RONIN1_ROWS) continue;
   const m=plateMat(p);
   const X=px(p.x),Y=py(p.y),Wd=p.w*C,Hd=p.h*C;
   g.fillStyle=hsl(m,p.jl);
@@ -165,15 +217,15 @@ for(const p of plates){
   g.strokeStyle='rgba(0,0,0,.4)'; g.lineWidth=1.5;
   g.strokeRect(X+.75,Y+.75,Wd-1.5,Hd-1.5);
 }
-/* лёгкая воксельная сетка */
-g.save(); hullPath(g); g.clip();
+/* лёгкая воксельная сетка — только строки 8+ (в «Ронине-1» её нет, D-016) */
+g.save(); hullPath(g); g.clip(); g.beginPath(); g.rect(0,py(RONIN1_ROWS),W,H); g.clip();
 g.strokeStyle='rgba(255,255,255,.045)'; g.lineWidth=1;
 for(let x=0;x<=GW;x++){g.beginPath();g.moveTo(px(x),py(0));g.lineTo(px(x),py(ROWS));g.stroke();}
 for(let y=0;y<=ROWS;y++){g.beginPath();g.moveTo(px(0),py(y));g.lineTo(px(GW),py(y));g.stroke();}
 g.restore();
 
 /* швы между поясами */
-for(const yb of [2,4,8,13,18,21,25]){
+for(const yb of [8,13,18,21,25]){   /* швы 2 и 4 — кромки деталей (v3) */
   const s0=Math.max(span[yb][0],span[yb-1][0]), s1=Math.min(span[yb][1],span[yb-1][1]);
   g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=2.5;
   g.beginPath();g.moveTo(px(s0),py(yb));g.lineTo(px(s1+1),py(yb));g.stroke();
@@ -194,9 +246,12 @@ const warm=g.createRadialGradient(px(13.5),py(28),0,px(13.5),py(28),13*C);
 warm.addColorStop(0,'rgba(255,130,50,.14)');warm.addColorStop(1,'rgba(255,130,50,0)');
 g.fillStyle=warm; g.fillRect(px(-1),py(10),17*C,18*C);
 const wr=mulberry32(9);
-for(let i=0;i<9;i++){const wx=px(3+wr()*9),wy=py(4+wr()*20),wl=(.5+wr()*1.4)*C;
-  g.fillStyle=`rgba(0,0,0,${.05+wr()*.04})`;g.fillRect(wx,wy,2,wl);}
+/* потёки — только строки 8+ (клетки «Ронина-1» однородные), ГСЧ расходуется как раньше */
+for(let i=0;i<9;i++){const wx=px(3+wr()*9),wy=py(4+wr()*20),wl=(.5+wr()*1.4)*C, a=.05+wr()*.04;
+  if(wy<py(RONIN1_ROWS)) continue;
+  g.fillStyle=`rgba(0,0,0,${a})`;g.fillRect(wx,wy,2,wl);}
 for(let i=0;i<5;i++){const wx=px(3+wr()*9),wy=py(4+wr()*20);
+  if(wy<py(RONIN1_ROWS)) continue;
   g.fillStyle='rgba(255,255,255,.04)';g.fillRect(wx,wy,3.5,.35*C);}
 g.restore();
 
@@ -214,48 +269,12 @@ g.lineTo(cx,py(1.38));g.lineTo(cx+2.1*C,py(.38));g.lineTo(cx+2.1*C,py(.9));g.clo
 g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;
 g.beginPath();g.moveTo(cx-2.1*C,py(.24));g.lineTo(cx,py(1.22));g.lineTo(cx+2.1*C,py(.24));g.stroke();
 g.restore();
-/* датчик-блок на носу (предмет слоя 1, D-011) */
-const NO_OBJ=!!window.__SHIP_NO_OBJECTS;   /* страница может заказать корпус без предметов слоя 1 */
-if(!NO_OBJ){
-g.fillStyle=hsl(M.DARK,-2);
-g.fillRect(cx-.5*C,py(-.55),1*C,.6*C);
-g.fillStyle=hsl(M.GUN,6);
-g.fillRect(cx-.26*C,py(-.95),.52*C,.42*C);
-g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;
-g.strokeRect(cx-.5*C,py(-.55),1*C,.6*C); g.strokeRect(cx-.26*C,py(-.95),.52*C,.42*C);
-g.fillStyle='rgba(180,220,255,.9)'; g.fillRect(cx-.18*C,py(-.78),.36*C,2.2);
-glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
-}
 
-/* --- мостик: визор со щелями --- */
-(function(){
-  const vx=px(4.65),vy=py(2.62),vw=5.7*C,vh=.58*C;
-  rr(g,vx,vy,vw,vh,4); g.fillStyle='#101318'; g.fill();
-  g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1.5; g.stroke();
-  const sl=[[5.0,1.0],[6.4,1.0],[7.8,1.0],[9.2,.85]];
-  g.save(); g.shadowColor='rgba(150,210,255,.9)'; g.shadowBlur=9;
-  for(const [sx,sw] of sl){
-    const gr=g.createLinearGradient(px(sx),0,px(sx+sw),0);
-    gr.addColorStop(0,'#8fc6ee');gr.addColorStop(.5,'#e8f6ff');gr.addColorStop(1,'#79b6e2');
-    g.fillStyle=gr; rr(g,px(sx),vy+.16*C,sw*C,.26*C,2.5); g.fill();
-  }
-  g.restore();
-})();
 /* номер борта */
 g.font='bold 12px "Arial Narrow","DejaVu Sans",sans-serif';
 g.textAlign='center'; g.textBaseline='middle';
 g.fillStyle='rgba(223,230,236,.85)';
 g.fillText('V V - 7 7', cx, py(4.62));
-/* торпедные люки на носовой секции */
-for(const s of [-1,1]){
-  const tx=cx+s*1.45*C-.42*C, ty=py(5.95);
-  g.save(); g.shadowColor='rgba(0,0,0,.5)'; g.shadowBlur=5;
-  g.fillStyle=hsl(M.DARK,-1); rr(g,tx,ty,.84*C,.66*C,3); g.fill(); g.restore();
-  g.strokeStyle='rgba(0,0,0,.65)';g.lineWidth=1.6; rr(g,tx,ty,.84*C,.66*C,3); g.stroke();
-  g.strokeStyle='rgba(255,255,255,.14)';g.lineWidth=1;
-  g.beginPath();g.moveTo(tx+.42*C,ty+3);g.lineTo(tx+.42*C,ty+.66*C-3);g.stroke();
-  g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2);
-}
 
 /* трафарет «77» на носовой секции (как бортовые надписи референса) */
 g.save();
@@ -303,6 +322,7 @@ g.restore();
 
 /* --- бортовые огни-иллюминаторы (щели) --- */
 (function(){
+  if(!LIGHTS) return;
   const ws=[[4.0,5.45,'c'],[10.2,5.45,'c'],[3.6,10.42,'w'],[9.9,9.42,'w'],[3.7,13.42,'c'],[10.5,13.42,'c'],[3.6,19.42,'w'],[9.9,19.42,'w']];
   for(const [x,y,k] of ws){
     g.save(); g.shadowBlur=7;
@@ -354,24 +374,6 @@ function pod(side){
 }
 pod(-1); pod(1);
 
-/* --- RCS-квады --- */
-function rcs(X,Y,flip){
-  g.fillStyle=hsl(M.GUN,10);
-  rr(g,X-.3*C,Y-.3*C,.6*C,.6*C,3); g.fill();
-  g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;g.stroke();
-  const noz=(a)=>{
-    g.save(); g.translate(X,Y); g.rotate(a);
-    g.fillStyle='#101215';
-    g.beginPath();g.moveTo(-3.4,-.3*C);g.lineTo(3.4,-.3*C);g.lineTo(5.2,-.56*C);g.lineTo(-5.2,-.56*C);g.closePath();g.fill();
-    g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=1;g.stroke();
-    g.restore();
-  };
-  noz(0); noz(flip*Math.PI/2); noz(Math.PI);
-}
-if(!NO_OBJ){                                     /* RCS-квады — предметы слоя 1 */
-rcs(px(3),py(4.5),-1); rcs(px(12),py(4.5),1);
-rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
-}
 
 /* --- грузовой люк (лево) и шлюз (право) --- */
 (function(){
@@ -589,7 +591,74 @@ for(const s of [-1,1]){
 })();
 
 /* --- контур корпуса --- */
-hullPath(g); g.strokeStyle='#07090c'; g.lineWidth=2.4; g.stroke();
+if(EDGES){ hullPath(g); g.strokeStyle='#07090c'; g.lineWidth=2.4; g.stroke(); }
+}   /* /HULL */
 
-return {off, RES, W, H, C, OX, OY, px, py, cx, span, ROWS, M, hsl};
+/* ================================================================
+   ПРЕДМЕТЫ СЛОЯ 1 (D-011, D-016): поверх корпуса
+================================================================ */
+if(OBJ){
+/* датчик-блок на носу (предмет слоя 1, D-011) */
+{
+g.fillStyle=hsl(M.DARK,-2);
+g.fillRect(cx-.5*C,py(-.55),1*C,.6*C);
+g.fillStyle=hsl(M.GUN,6);
+g.fillRect(cx-.26*C,py(-.95),.52*C,.42*C);
+g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;
+g.strokeRect(cx-.5*C,py(-.55),1*C,.6*C); g.strokeRect(cx-.26*C,py(-.95),.52*C,.42*C);
+g.fillStyle='rgba(180,220,255,.9)'; g.fillRect(cx-.18*C,py(-.78),.36*C,2.2);
+glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
+}
+
+/* --- мостик: визор со щелями --- */
+(function(){
+  const vx=px(4.65),vy=py(2.48),vw=5.7*C,vh=.86*C;   /* v3: выше v2 (.58) — три ряда клеток, средний стекло */
+  rr(g,vx,vy,vw,vh,4); g.fillStyle='#101318'; g.fill();
+  g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1.5; g.stroke();
+  const sl=[[5.0,1.0],[6.4,1.0],[7.8,1.0],[9.2,.85]];
+  g.save(); g.shadowColor='rgba(150,210,255,.9)'; g.shadowBlur=9;
+  for(const [sx,sw] of sl){
+    const gr=g.createLinearGradient(px(sx),0,px(sx+sw),0);
+    gr.addColorStop(0,'#8fc6ee');gr.addColorStop(.5,'#e8f6ff');gr.addColorStop(1,'#79b6e2');
+    g.fillStyle=gr; rr(g,px(sx),vy+.28*C,sw*C,.30*C,2.5); g.fill();
+  }
+  g.restore();
+})();
+
+/* торпедные люки на носовой секции */
+for(const s of [-1,1]){
+  const tx=cx+s*1.45*C-.42*C, ty=py(5.95);
+  g.save(); g.shadowColor='rgba(0,0,0,.5)'; g.shadowBlur=5;
+  g.fillStyle=hsl(M.DARK,-1); rr(g,tx,ty,.84*C,.66*C,3); g.fill(); g.restore();
+  g.strokeStyle='rgba(0,0,0,.65)';g.lineWidth=1.6; rr(g,tx,ty,.84*C,.66*C,3); g.stroke();
+  g.strokeStyle='rgba(255,255,255,.14)';g.lineWidth=1;
+  g.beginPath();g.moveTo(tx+.42*C,ty+3);g.lineTo(tx+.42*C,ty+.66*C-3);g.stroke();
+  g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2);
+}
+
+/* --- RCS-квады --- */
+function rcs(X,Y,flip){
+  g.fillStyle=hsl(M.GUN,10);
+  rr(g,X-.3*C,Y-.3*C,.6*C,.6*C,3); g.fill();
+  g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;g.stroke();
+  const noz=(a)=>{
+    g.save(); g.translate(X,Y); g.rotate(a);
+    g.fillStyle='#101215';
+    g.beginPath();g.moveTo(-3.4,-.3*C);g.lineTo(3.4,-.3*C);g.lineTo(5.2,-.56*C);g.lineTo(-5.2,-.56*C);g.closePath();g.fill();
+    g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=1;g.stroke();
+    g.restore();
+  };
+  noz(0); noz(flip*Math.PI/2); noz(Math.PI);
+}
+{
+rcs(px(3),py(4.5),-1); rcs(px(12),py(4.5),1);
+rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
+}
+}
+return off;
+}   /* /render */
+
+const RES0=window.__SHIP_RES||2;
+const off=render({res:RES0, layer:window.__SHIP_NO_OBJECTS?'hull':'all'});
+return {off, RES:RES0, render, W, H, C, OX, OY, px, py, cx, span, ROWS, M, hsl};
 })();

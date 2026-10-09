@@ -58,13 +58,11 @@
 
 <div class="grid" id="cat"></div>
 
-<script>window.__SHIP_RES = 6; window.__SHIP_NO_OBJECTS = true;</script>
-<script src="ship-render.js?hull"></script>
-<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
-<script src="ship-render.js?full"></script>
-<script src="ronin-parts.js?v=2"></script>
-<script src="ronin-objects.js?v=2"></script>
-<script src="ronin-draw.js?v=2"></script>
+<script src="ronin-parts.js?v=3"></script>
+<script>window.__SHIP_RES = 4;</script>
+<script src="ship-render.js?v=3"></script>
+<script src="ronin-objects.js?v=3"></script>
+<script src="ronin-draw.js?v=3"></script>
 <script>
 (function(){
 "use strict";
@@ -97,8 +95,7 @@ P.parts.forEach(part => {
   g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
   for (let c = 0; c <= FW; c++){ g.beginPath(); g.moveTo(c*u+.5, 0); g.lineTo(c*u+.5, FH*u); g.stroke(); }
   for (let r = 0; r <= FH; r++){ g.beginPath(); g.moveTo(0, r*u+.5); g.lineTo(FW*u, r*u+.5); g.stroke(); }
-  D.drawField(g, part, u, oc, or);                                  // кусок оригинала
-  D.drawSeams(g, part, u, oc, or, 'hsla(220,14%,4%,.55)');          // seam — только на поле
+  D.drawField(g, part, u, oc, or, 'done');                          // собранная деталь: рисунок + чёткая кромка (D-016)
   D.strokeOutline(g, part, u, oc, or, 'hsla(23,62%,55%,.55)', 2);   // ghostTarget
 
   /* локатор: верх корабля бледно, деталь — в полном свете */
