@@ -20,6 +20,9 @@ flutter doctor
 flutter devices
 ```
 
+iPhone PO — id `00008101-000538EA0C84001E`; он подставлен в iOS-команды ниже.
+Другое устройство — свой id из `flutter devices`.
+
 ---
 
 ## iOS (free-signing через личный Apple ID)
@@ -43,8 +46,10 @@ flutter devices
 5. Подключи iPhone кабелем к маку. На самом iPhone — «Доверять этому компьютеру»
    при запросе.
 6. Запусти сборку одним из двух способов:
-   - из терминала: `flutter run --release -d <device-id>` (id смотри в
-     `flutter devices`);
+   - из терминала:
+     ```
+     flutter run --release -d 00008101-000538EA0C84001E
+     ```
    - из Xcode: выбери устройство в шапке (вместо симулятора) → кнопка ▶ Run.
 7. При первом запуске на самом iPhone игра не откроется сразу — появится
    «Untrusted Developer». Иди в **Настройки → Основные → VPN и управление
@@ -70,8 +75,10 @@ flutter devices
 Контрольные точки, где нужно переключать что-то в чит-меню, ставь так:
 
 1. Подготовка — шаги 1–5 раздела «iOS» выше (подпись, кабель, доверие).
-2. `flutter devices` → id телефона, затем `flutter run -d <device-id>`
-   (без `--release` — это debug).
+2. Запуск debug (без `--release`):
+   ```
+   flutter run -d 00008101-000538EA0C84001E
+   ```
 3. **Особенность iOS:** debug-сборку нельзя запустить иконкой с домашнего
    экрана — она стартует только из `flutter run` (или ▶ Run в Xcode). Играй
    в сессии, которую открыл `flutter run`. Можно отключить кабель после
@@ -79,7 +86,8 @@ flutter devices
    телефон, но игра осталась, нажми в нём `d`.
 4. Debug заметно медленнее release на старте и анимациях — это не дефект
    игры.
-5. Нужна игра с иконки (без чит-меню) — `flutter run --release -d <device-id>`.
+5. Нужна игра с иконки (без чит-меню) —
+   `flutter run --release -d 00008101-000538EA0C84001E`.
    Схему Runner в Xcode на Release **не переключай**: с ней перестаёт
    собираться симулятор (см. «Симулятор iOS» ниже).
 
@@ -112,7 +120,7 @@ Device) — значит, в схеме Runner действие **Run** пере
 шаблону Flutter `SUPPORTED_PLATFORMS = iphoneos` — Xcode отбрасывает
 симуляторы. Верни Run → Debug (Xcode: Product → Scheme → Edit Scheme… → Run →
 Build Configuration). Release-сборку на телефон делай через
-`flutter run --release -d <device-id>`, схему под это не переключай (а если
+`flutter run --release -d 00008101-000538EA0C84001E`, схему под это не переключай (а если
 переключил в Xcode — не коммить).
 
 ---
