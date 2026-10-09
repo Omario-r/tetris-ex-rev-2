@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Рельефные клетки — варианты</title>
+<style>
+  :root {
+    --spaceBg: hsl(220 14% 7%);
+    --boardBg: hsl(219 13% 10%);
+    --gunmetal: hsl(220 10% 22%);
+    --hazard: hsl(23 62% 46%);
+    --text: #cfd4da; --muted: #8b949e;
+  }
+  body { margin:0; background:#0f1216; color:var(--text); font:13px/1.55 system-ui,sans-serif; padding:22px; }
+  h1 { font-size:18px; margin:0 0 6px; color:#e6eaee; }
+  .lead { color:var(--muted); max-width:860px; margin:0 0 18px; }
+  .row { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start; }
+  .card { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:14px; }
+  .card h2 { font-size:13px; margin:0 0 4px; color:var(--hazard); letter-spacing:.04em; }
+  .card .an { color:var(--muted); font-size:12px; max-width:340px; margin:6px 0 0; }
+  .board { background:var(--boardBg); border:1px solid var(--gunmetal); border-radius:10px; padding:7px; display:inline-block; }
+  canvas { display:block; }
+  .pair { display:flex; gap:12px; align-items:flex-end; margin-top:10px; }
+  .pair .lbl { font-size:11px; color:var(--muted); text-align:center; margin-top:4px; }
+  .sect { margin:26px 0 10px; font-size:12px; letter-spacing:.12em; color:#7c848d; text-transform:uppercase; }
+  .ctl { margin:0 0 14px; color:var(--muted); }
+  select { background:#1d2025; color:var(--text); border:1px solid var(--gunmetal); border-radius:6px; padding:3px 6px; }
+  @media (max-width:640px){ body{padding:16px} }
+</style>
+</head>
+<body>
+
+<h1>Рельефные клетки — варианты (стори 10, замечание PO на КТ-2)</h1>
+<p class="lead">Уложенная клетка сейчас — плоский кусок рисунка, а кусок в лотке — рельефный
+графит. Варианты ниже убирают этот разрыв: клетка остаётся куском «Ронина», но получает
+рельеф как у куска. Поле в середине сборки, клетка 34 px (как на телефоне). Внизу —
+эталоны: графитовый кусок из лотка и собранная деталь целиком без сетки (стори 09).</p>
+
+<div class="ctl">Деталь: <select id="partSel"></select></div>
+
+<div class="sect">Поле в середине сборки</div>
+<div class="row" id="variants"></div>
+
+<div class="sect">Крупно: середина детали, 3×2 клетки (×2)</div>
+<div class="row" id="closeups"></div>
+
+<div class="sect">Эталоны</div>
+<div class="row">
+  <div class="card">
+    <h2>Кусок в лотке (графит, как в игре)</h2>
+    <div class="board"><canvas id="trayRef"></canvas></div>
+    <p class="an"><code>paintElBlock</code>: фаска сверху светлая, снизу и справа тёмная,
+      скругление 3, заклёпки по углам, зазор между клетками.</p>
+  </div>
+  <div class="card">
+    <h2>Деталь собрана — целиком, без сетки</h2>
+    <div class="board"><canvas id="doneRef"></canvas></div>
+    <p class="an">Пауза «ДЕТАЛЬ СОБРАНА» (стори 09): рельеф и швы уходят, деталь видна
+      сплошным рисунком — «проявилась».</p>
+  </div>
+</div>
+
+<script>window.__SHIP_RES = 6; window.__SHIP_NO_OBJECTS = true;</script>
+<script src="ship-render.js?hull"></script>
+<script>window.__SHIP_HULL = window.__SHIP; window.__SHIP_NO_OBJECTS = false;</script>
+<script src="ship-render.js?full"></script>
+<script src="ronin-parts.js?v=2"></script>
+<script src="ronin-objects.js?v=2"></script>
+<script src="ronin-draw.js?v=2"></script>
+<script>
+"use strict";
+/* Иллюстрация, не прод-код. Нарезка — упрощённый генератор мокапа (куски 4/5/3),
+   в игре куски крупнее (5–12): для сравнения рельефа это не важно. */
+const P = window.RONIN_PARTS, D = window.RONIN_DRAW;
+const CELL = 34, FW = 10, FH = 14;
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function slice(cells, seed){
+  const rnd = mulberry32(seed), rest = new Set(cells), out = [];
+  const nb = k => { const [c,r] = k.split(',').map(Number);
+    return [(c+1)+','+r,(c-1)+','+r,c+','+(r+1),c+','+(r-1)]; };
+  function grow(anchor, size){
+    const res = [], seen = new Set();
+    (function g(cur, fr){
+      if (cur.length === size){ const k=[...cur].sort().join('|'); if(!seen.has(k)){seen.add(k);res.push([...cur]);} return; }
+      for (const f of fr){ if (cur.includes(f)) continue; g([...cur,f],[...fr,...nb(f).filter(n=>rest.has(n))]); }
+    })([anchor], nb(anchor).filter(n=>rest.has(n)));
+    return res;
+  }
+  let guard = 40000;
+  (function solve(){
+    if (!rest.size) return true;
+    if (--guard < 0) return false;
+    const a = [...rest].sort((x,y)=>{const[xc,xr]=x.split(',').map(Number),[yc,yr]=y.split(',').map(Number);return xr-yr||xc-yc;})[0];
+    for (const size of [5,4,6,3]){
+      const cs = grow(a, size);
+      for (let i=cs.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[cs[i],cs[j]]=[cs[j],cs[i]];}
+      for (const c of cs){ c.forEach(k=>rest.delete(k)); out.push(c); if (solve()) return true; out.pop(); c.forEach(k=>rest.add(k)); }
+    }
+    return false;
+  })();
+  return out;
+}
+
+/* ---------- рельеф (как paintElBlock, s = u/34) ---------- */
+function rrectPath(x, y, w, h, r){
+  const p = new Path2D(); p.moveTo(x+r,y); p.arcTo(x+w,y,x+w,y+h,r); p.arcTo(x+w,y+h,x,y+h,r);
+  p.arcTo(x,y+h,x,y,r); p.arcTo(x,y,x+w,y,r); p.closePath(); return p;
+}
+function bands(g, x, y, w, h, s, k, sides){            /* k — сила рельефа (1 = как у куска) */
+  const b = 3*s;
+  const on = sides || {t:1,b:1,l:1,r:1};
+  if (on.t){ g.fillStyle = `rgba(255,255,255,${.09*k})`; g.fillRect(x, y, w, b); }
+  if (on.b){ g.fillStyle = `rgba(0,0,0,${.35*k})`;       g.fillRect(x, y+h-b, w, b); }
+  if (on.l){ g.fillStyle = `rgba(255,255,255,${.04*k})`; g.fillRect(x, y, b, h); }
+  if (on.r){ g.fillStyle = `rgba(0,0,0,${.18*k})`;       g.fillRect(x+w-b, y, b, h); }
+}
+function rivets(g, x, y, w, h, s){
+  g.fillStyle = 'rgba(0,0,0,.45)';
+  for (const [cx, cy] of [[x+4*s,y+4*s],[x+w-4*s,y+4*s],[x+4*s,y+h-4*s],[x+w-4*s,y+h-4*s]]){
+    g.beginPath(); g.arc(cx, cy, 1.5*s, 0, 7); g.fill();
+  }
+}
+
+/* клетка поля (c,r) детали p со сдвигом (oc,or) в прямоугольник (x,y,u) */
+const VARIANTS = [
+  { id:'A', name:'А · Лёгкая фаска по клетке',
+    an:'Каждая клетка — отдельный блок с фаской куска, без заклёпок; зазор между клетками. Рисунок читается почти целиком, рельеф — тонкая рамка.',
+    cell(g, p, c, r, oc, or, x, y, u){
+      const s = u/34, i = 1*s, path = rrectPath(x+i, y+i, u-2*i, u-2*i, 3*s);
+      g.save(); g.clip(path); D.drawCell(g, p, c-oc, r-or, x, y, u);
+      bands(g, x+i, y+i, u-2*i, u-2*i, s, 1); g.restore();
+    }},
+  { id:'B', name:'Б · Как кусок: фаска + заклёпки',
+    an:'Ровно как графитовый кусок из лотка, только окрашен рисунком: фаска, заклёпки по углам, зазор. Максимальная связь «кусок лёг на место»; рисунок сильнее дробится.',
+    cell(g, p, c, r, oc, or, x, y, u){
+      const s = u/34, i = 1*s, path = rrectPath(x+i, y+i, u-2*i, u-2*i, 3*s);
+      g.save(); g.clip(path); D.drawCell(g, p, c-oc, r-or, x, y, u);
+      bands(g, x+i, y+i, u-2*i, u-2*i, s, 1.4); g.restore();
+      rivets(g, x+i, y+i, u-2*i, u-2*i, s);
+    }},
+  { id:'C', name:'В · Плитка-кусок: фаска по контуру куска',
+    an:'Рельеф по границе всего куска, внутри куска клетки слиты (тонкий шов). Видно, какие куски уложены, рисунок внутри куска цельный. Ближе к «детали из плит».',
+    perPiece: true },
+];
+
+function fieldOf(p){
+  const w = p.mask[0].length, h = p.mask.length;
+  const oc = Math.floor((FW-w)/2), or = Math.floor((FH-h)/2);
+  const target = [];
+  p.mask.forEach((line, dr) => { for (let dc = 0; dc < line.length; dc++) if (line[dc] === '#') target.push((dc+oc)+','+(dr+or)); });
+  const pieces = slice(target, p.seed ?? 7);
+  return { oc, or, w, h, target, pieces };
+}
+
+/* кадр: только строки детали ±1, чтобы поле не было пустым */
+function frameRows(f){ return { r0: Math.max(0, f.or-1), r1: Math.min(FH, f.or+f.h+1) }; }
+
+function drawGhost(g, k, u){
+  const [c, r] = k.split(',').map(Number);
+  g.setLineDash([3.5*u/20, 2.5*u/20]); g.lineWidth = 1.5;
+  g.strokeStyle = 'hsla(23,62%,55%,.55)'; g.fillStyle = 'hsla(23,62%,46%,.05)';
+  g.fillRect(c*u+3, r*u+3, u-6, u-6); g.strokeRect(c*u+3.5, r*u+3.5, u-7, u-7); g.setLineDash([]);
+}
+
+function drawField(cv, p, f, variant, mode){
+  const u = CELL, {r0, r1} = frameRows(f);
+  const g = D.dpr(cv, FW*u, (r1-r0)*u);
+  g.translate(0, -r0*u);
+  g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, r0*u, FW*u, (r1-r0)*u);
+  const half = Math.ceil(f.pieces.length/2);
+  const placedPieces = mode === 'done' ? f.pieces : f.pieces.slice(0, half);
+  const placed = new Set(placedPieces.flat());
+  if (mode === 'done'){                                  /* целиком, без сетки */
+    for (const k of placed){ const [c, r] = k.split(',').map(Number); D.drawCell(g, p, c-f.oc, r-f.or, c*u, r*u, u); }
+    return;
+  }
+  if (variant.perPiece){
+    for (const piece of placedPieces){
+      const set = new Set(piece);
+      for (const k of piece){
+        const [c, r] = k.split(',').map(Number), x = c*u, y = r*u, s = u/34;
+        D.drawCell(g, p, c-f.oc, r-f.or, x, y, u);
+        const sides = { t:!set.has(c+','+(r-1)), b:!set.has(c+','+(r+1)), l:!set.has((c-1)+','+r), r:!set.has((c+1)+','+r) };
+        bands(g, x, y, u, u, s, 1.4, sides);
+        g.strokeStyle = 'hsla(220,14%,4%,.30)'; g.lineWidth = 1;          /* тонкий шов внутри куска */
+        if (!sides.r) { g.beginPath(); g.moveTo(x+u-.5, y); g.lineTo(x+u-.5, y+u); g.stroke(); }
+        if (!sides.b) { g.beginPath(); g.moveTo(x, y+u-.5); g.lineTo(x+u, y+u-.5); g.stroke(); }
+        g.strokeStyle = 'hsla(220,14%,3%,.85)'; g.lineWidth = 1.5;        /* граница куска */
+        g.beginPath();
+        if (sides.t){ g.moveTo(x, y+.75); g.lineTo(x+u, y+.75); }
+        if (sides.b){ g.moveTo(x, y+u-.75); g.lineTo(x+u, y+u-.75); }
+        if (sides.l){ g.moveTo(x+.75, y); g.lineTo(x+.75, y+u); }
+        if (sides.r){ g.moveTo(x+u-.75, y); g.lineTo(x+u-.75, y+u); }
+        g.stroke();
+      }
+    }
+  } else {
+    for (const k of placed){ const [c, r] = k.split(',').map(Number); variant.cell(g, p, c, r, f.oc, f.or, c*u, r*u, u); }
+  }
+  for (const k of f.target) if (!placed.has(k)) drawGhost(g, k, u);
+}
+
+function drawCloseup(cv, p, f, variant){
+  /* окно 3×2 клетки в середине детали (там у мостика визор), ×2; все клетки окна уложены */
+  const K = 2, u = CELL*K, g = D.dpr(cv, 3*u, 2*u);
+  const c0 = f.oc + Math.max(0, Math.floor(f.w/2) - 1), r0 = f.or + Math.max(0, Math.floor(f.h/2) - 1);
+  const pieceOf = k => f.pieces.findIndex(pc => pc.includes(k));
+  g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, 3*u, 2*u);
+  for (let dr = 0; dr < 2; dr++) for (let dc = 0; dc < 3; dc++){
+    const c = c0+dc, r = r0+dr, k = c+','+r;
+    if (!f.target.includes(k)) continue;
+    const x = dc*u, y = dr*u, s = u/34;
+    if (variant.perPiece){
+      D.drawCell(g, p, c-f.oc, r-f.or, x, y, u);
+      const pi = pieceOf(k), same = kk => pieceOf(kk) === pi;
+      bands(g, x, y, u, u, s, 1.4, { t:!same(c+','+(r-1)), b:!same(c+','+(r+1)), l:!same((c-1)+','+r), r:!same((c+1)+','+r) });
+    } else variant.cell(g, p, c, r, f.oc, f.or, x, y, u);
+  }
+}
+
+function drawTrayRef(){
+  const u = CELL, g = D.dpr(document.getElementById('trayRef'), 4*u, 3*u);
+  const cells = [[0,0],[1,0],[2,0],[1,1],[1,2],[2,2]];
+  for (const [c, r] of cells){
+    const s = 1, x = c*u, y = r*u, i = 1, path = rrectPath(x+i, y+i, u-2, u-2, 3);
+    g.save(); g.clip(path); g.fillStyle = '#484E56'; g.fillRect(x, y, u, u);
+    bands(g, x+i, y+i, u-2, u-2, s, 1); g.restore(); rivets(g, x+i, y+i, u-2, u-2, s);
+  }
+}
+
+function render(id){
+  const p = P.parts.find(x => x.id === id), f = fieldOf(p);
+  const vWrap = document.getElementById('variants'), cWrap = document.getElementById('closeups');
+  vWrap.innerHTML = ''; cWrap.innerHTML = '';
+  for (const v of VARIANTS){
+    const card = document.createElement('div'); card.className = 'card';
+    card.innerHTML = `<h2>${v.name}</h2><div class="board"><canvas></canvas></div><p class="an">${v.an}</p>`;
+    vWrap.appendChild(card); drawField(card.querySelector('canvas'), p, f, v, 'partial');
+    const cc = document.createElement('div'); cc.className = 'card';
+    cc.innerHTML = `<h2>${v.name}</h2><canvas></canvas>`;
+    cWrap.appendChild(cc); drawCloseup(cc.querySelector('canvas'), p, f, v);
+  }
+  drawField(document.getElementById('doneRef'), p, f, VARIANTS[0], 'done');
+}
+
+const sel = document.getElementById('partSel');
+sel.innerHTML = P.parts.map(p => `<option value="${p.id}">${p.order}. ${p.title}</option>`).join('');
+sel.value = 'bridge_c'; sel.onchange = () => render(sel.value);
+drawTrayRef(); render('bridge_c');
+</script>
+</body>
+</html>
