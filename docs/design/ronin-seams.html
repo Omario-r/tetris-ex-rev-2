@@ -30,7 +30,7 @@
 логическим деталям, поэтому внутри детали нет чужих швов. Всё, что стоит на корпусе как
 отдельная вещь (визор, торпедные люки, датчик, RCS-квады), — свои детали. Покраска (шеврон,
 «VV-77», «77») остаётся на плитах. Во время сборки клетки однородные: край детали, щели-огни
-и контур предмета появляются, когда деталь собрана. Рельеф клеток — вариант Б.</p>
+и контур предмета появляются, когда деталь собрана; клетка предмета — преобладающий цвет. Рельеф клеток — вариант Б.</p>
 <p class="lead">Мокап, не канон: канон рисунка `ship-render.js` не тронут.</p>
 
 <div class="sect">Экран корабля: было и стало</div>
@@ -91,7 +91,7 @@ function drawRcs(g,X,Y,flip){
     g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=1;g.stroke(); g.restore();
   }
 }
-const VIS = { x:px(4.65), y:py(2.62), w:5.7*C, h:.58*C };
+const VIS = { x:px(4.65), y:py(2.48), w:5.7*C, h:.86*C };   /* выше канона (.58): три ряда клеток при s=3.5, средний — стекло */
 function drawVisor(g, half){
   g.save();
   if (half) { g.beginPath(); g.rect(half<0 ? VIS.x-4 : VIS.x+VIS.w/2, VIS.y-8, VIS.w/2+4, VIS.h+16); g.clip(); }
@@ -101,7 +101,7 @@ function drawVisor(g, half){
   for (const [sx,sw] of [[5.0,1.0],[6.4,1.0],[7.8,1.0],[9.2,.85]]){
     const gr=g.createLinearGradient(px(sx),0,px(sx+sw),0);
     gr.addColorStop(0,'#8fc6ee');gr.addColorStop(.5,'#e8f6ff');gr.addColorStop(1,'#79b6e2');
-    g.fillStyle=gr; rr(g,px(sx),VIS.y+.16*C,sw*C,.26*C,2.5); g.fill();
+    g.fillStyle=gr; rr(g,px(sx),VIS.y+.28*C,sw*C,.30*C,2.5); g.fill();
   }
   g.restore(); g.restore();
 }
@@ -152,9 +152,6 @@ function drawHull(g, full){
     eachCell(pl, (c, r) => { const [x,y,cs] = cellRect(pl,c,r); g.fillRect(x-.3, y-.3, cs+.6, cs+.6); });
   }
   g.save(); g.clip(REGION);
-  g.strokeStyle='rgba(255,255,255,.045)'; g.lineWidth=1;     /* лёгкая воксельная сетка */
-  for (let x = 3; x <= 12; x++){ g.beginPath(); g.moveTo(px(x),py(0)); g.lineTo(px(x),py(8)); g.stroke(); }
-  for (let y = 0; y <= 8; y++){ g.beginPath(); g.moveTo(px(3),py(y)); g.lineTo(px(12),py(y)); g.stroke(); }
   const sh = g.createLinearGradient(px(0),0,px(15),0);        /* крупная светотень */
   sh.addColorStop(0,'rgba(255,255,255,.12)');sh.addColorStop(.4,'rgba(255,255,255,0)');
   sh.addColorStop(.62,'rgba(0,0,0,0)');sh.addColorStop(1,'rgba(0,0,0,.20)');
@@ -176,12 +173,12 @@ function drawHull(g, full){
   if (!full) return;
   for (const pl of plates){                                   /* кромки по границе детали = швы корабля */
     eachCell(pl, (c, r) => {
-      const [x,y,cs] = cellRect(pl,c,r), lt = hsl(pl.m, pl.jl+12, .8), dk = hsl(pl.m, pl.jl-12, .85);
+      const [x,y,cs] = cellRect(pl,c,r), lt = hsl(pl.m, pl.jl+6, .55), dk = hsl(pl.m, pl.jl-6, .6), sm = 'rgba(0,0,0,.32)';
       const seg = (x1,y1,x2,y2,col,w) => { g.strokeStyle=col; g.lineWidth=w; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); };
-      if (!on(pl,c,r-1)) { seg(x,y+1.2,x+cs,y+1.2,lt,2);       seg(x,y+.4,x+cs,y+.4,'rgba(0,0,0,.6)',1.6); }
-      if (!on(pl,c-1,r)) { seg(x+1.2,y,x+1.2,y+cs,lt,2);       seg(x+.4,y,x+.4,y+cs,'rgba(0,0,0,.6)',1.6); }
-      if (!on(pl,c,r+1)) { seg(x,y+cs-1.2,x+cs,y+cs-1.2,dk,2); seg(x,y+cs-.4,x+cs,y+cs-.4,'rgba(0,0,0,.6)',1.6); }
-      if (!on(pl,c+1,r)) { seg(x+cs-1.2,y,x+cs-1.2,y+cs,dk,2); seg(x+cs-.4,y,x+cs-.4,y+cs,'rgba(0,0,0,.6)',1.6); }
+      if (!on(pl,c,r-1)) { seg(x,y+1,x+cs,y+1,lt,1);       seg(x,y+.3,x+cs,y+.3,sm,.8); }
+      if (!on(pl,c-1,r)) { seg(x+1,y,x+1,y+cs,lt,1);       seg(x+.3,y,x+.3,y+cs,sm,.8); }
+      if (!on(pl,c,r+1)) { seg(x,y+cs-1,x+cs,y+cs-1,dk,1); seg(x,y+cs-.3,x+cs,y+cs-.3,sm,.8); }
+      if (!on(pl,c+1,r)) { seg(x+cs-1,y,x+cs-1,y+cs,dk,1); seg(x+cs-.3,y,x+cs-.3,y+cs,sm,.8); }
     });
   }
   for (const [x,y] of [[4.0,5.45],[10.2,5.45]]){              /* щели-огни — только собранная деталь */
@@ -207,11 +204,15 @@ function coverage(o, x, y, cs){
     if (o.paths.some(p => probe.isPointInPath(p, x+(i+.5)/N*cs, y+(j+.5)/N*cs))) hit++;
   return hit/(N*N);
 }
-function avgColor(cv, x, y, cs){
+function domColor(cv, x, y, cs){
+  /* преобладающий цвет клетки: самая частая корзина квантованного цвета (не среднее — стекло не смешивается с рамой) */
   const d = cv.getContext('2d').getImageData(Math.round(x*RES), Math.round(y*RES), Math.max(1,Math.round(cs*RES)), Math.max(1,Math.round(cs*RES))).data;
-  let R=0,G=0,B=0,n=0;
-  for (let i = 0; i < d.length; i += 4) if (d[i+3] > 128){ R+=d[i]; G+=d[i+1]; B+=d[i+2]; n++; }
-  return n ? `rgb(${R/n|0},${G/n|0},${B/n|0})` : 'hsl(219,13%,10%)';
+  const bins = new Map();
+  for (let i = 0; i < d.length; i += 4){ if (d[i+3] < 128) continue;
+    const k = (d[i]>>4)<<8 | (d[i+1]>>4)<<4 | (d[i+2]>>4), b = bins.get(k) || [0,0,0,0];
+    b[0]+=d[i]; b[1]+=d[i+1]; b[2]+=d[i+2]; b[3]++; bins.set(k, b); }
+  let best = null; for (const b of bins.values()) if (!best || b[3] > best[3]) best = b;
+  return best ? `rgb(${best[0]/best[3]|0},${best[1]/best[3]|0},${best[2]/best[3]|0})` : 'hsl(219,13%,10%)';
 }
 function bands(g, x, y, w, h, s, k){
   const b = 3*s;
@@ -229,8 +230,8 @@ function drawCell(g, part, c, r, X, Y, u, phase){
   const [x,y,cs] = cellRect(part, c, r);
   const src = part.layer === 1 ? OBJ_CV[part.id] : (phase === 'done' ? HULL_FULL : HULL_CLEAN);
   const paint = () => {
-    if (part.layer === 1 && phase === 'build' && coverage(part, x, y, cs) < .97){
-      g.fillStyle = avgColor(src, x, y, cs); g.fillRect(X, Y, u, u);
+    if (part.layer === 1 && phase === 'build'){
+      g.fillStyle = domColor(src, x, y, cs); g.fillRect(X, Y, u, u);
     } else g.drawImage(src, x*RES, y*RES, cs*RES, cs*RES, X, Y, u, u);
   };
   if (phase === 'done') { paint(); return; }
@@ -307,9 +308,9 @@ const card = (title, an) => { const d = document.createElement('div'); d.classNa
     [P.parts.find(p => p.id === 'bridge_c'), 'Плита: мостик, центр (бывший «визор»)', 'Визор снят на свою деталь — плита однородная. Во время сборки край детали не виден, кромка и контур корпуса появляются после сборки.'],
     [P.parts.find(p => p.id === 'fwd1_cl'),  'Плита: носовой пояс, левее киля', 'Покраска «VV-77» остаётся (надпись делят две детали). Щель-огонь и люк во время сборки не видны: люк — своя деталь, огонь проявится, когда деталь собрана.'],
     [P.parts.find(p => p.id === 'prow'),     'Плита: нос', 'Шеврон — покраска, читается с первых кусков.'],
-    [OBJ.find(o => o.id === 'visor_l'),      'Предмет: визор, левая половина', 'Визор длинный и тонкий: целиком в поле 10×14 он даст полосу 10×1. Половинами — по 20 клеток, лёгкий уровень. Краевые клетки однотонные (преобладающий цвет), контур — после сборки.'],
-    [OBJ.find(o => o.id === 'hatch_l'),      'Предмет: торпедный люк', 'Люк в масштабе 8. Во время сборки края однотонные, включая оранжевую полоску сверху; внутри — тёмная крышка люка.'],
-    [OBJ.find(o => o.id === 'sensor'),       'Предмет: датчик носа', 'Тот же датчик: краевые клетки однотонные, строб и контур — после сборки.'],
+    [OBJ.find(o => o.id === 'visor_l'),      'Предмет: визор, левая половина', 'Визор сделан выше канона, чтобы при масштабе 3,5 лечь в три ряда: верх и низ — рама, средний — стекло. Половинами — по ~30 клеток. Во время сборки каждая клетка — преобладающий цвет, контур и блики — после сборки.'],
+    [OBJ.find(o => o.id === 'hatch_l'),      'Предмет: торпедный люк', 'Люк в масштабе 8. Во время сборки каждая клетка — преобладающий цвет: оранжевая полоска сверху, тёмная крышка; разделитель и тень — после сборки.'],
+    [OBJ.find(o => o.id === 'sensor'),       'Предмет: датчик носа', 'Тот же датчик: каждая клетка — преобладающий цвет, строб и контур — после сборки.'],
   ];
   for (const [part, t, an] of show){
     const c = card(`${t} · ${part.cells} кл.`, an), pair = document.createElement('div'); pair.className = 'pair';
