@@ -231,23 +231,25 @@ function bands(g, x, y, w, h, s, k){
   g.fillStyle=`rgba(255,255,255,${.04*k})`; g.fillRect(x, y, b, h);
   g.fillStyle=`rgba(0,0,0,${.18*k})`;       g.fillRect(x+w-b, y, b, h);
 }
-function rivets(g, x, y, w, h, s){
-  g.fillStyle='rgba(0,0,0,.45)';
+function rivets(g, x, y, w, h, s, light){
+  g.fillStyle = light ? 'rgba(255,255,255,.32)' : 'rgba(0,0,0,.45)';   /* на тёмной клетке — светлые, иначе сливаются */
   for (const [a,b] of [[x+4*s,y+4*s],[x+w-4*s,y+4*s],[x+4*s,y+h-4*s],[x+w-4*s,y+h-4*s]]){ g.beginPath(); g.arc(a,b,1.5*s,0,7); g.fill(); }
 }
 /* build — во время сборки (рельеф Б, однородные края); done — собрана: настоящий рисунок, без сетки */
 function drawCell(g, part, c, r, X, Y, u, phase){
   const [x,y,cs] = cellRect(part, c, r);
   const src = part.layer === 1 ? OBJ_CV[part.id] : (phase === 'done' ? HULL_LIGHTS : HULL_CLEAN);
+  const dom = domColor(src, x, y, cs);
   const paint = () => {
     if (part.layer === 1 && phase === 'build'){
-      g.fillStyle = domColor(src, x, y, cs); g.fillRect(X, Y, u, u);
+      g.fillStyle = dom; g.fillRect(X, Y, u, u);
     } else g.drawImage(src, x*RES, y*RES, cs*RES, cs*RES, X, Y, u, u);
   };
   if (phase === 'done') { paint(); return; }
   const s = u/34, i = s, path = new Path2D(); path.addPath(rrPath(X+i, Y+i, u-2*i, u-2*i, 3*s));
   g.save(); g.clip(path); paint(); bands(g, X+i, Y+i, u-2*i, u-2*i, s, 1.4); g.restore();
-  rivets(g, X+i, Y+i, u-2*i, u-2*i, s);
+  const [cr, cg, cb] = dom.match(/\d+/g).map(Number);
+  rivets(g, X+i, Y+i, u-2*i, u-2*i, s, (0.2126*cr + 0.7152*cg + 0.0722*cb)/255 < 0.2);
 }
 
 /* ---------- нарезка (упрощённый генератор мокапа) ---------- */
