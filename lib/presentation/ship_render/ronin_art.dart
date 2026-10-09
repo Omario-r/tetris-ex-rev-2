@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/painting.dart';
 
+import '../../game_engine/data/ronin_parts.dart';
+import '../../game_engine/models/target_mask.dart';
 import 'ship_art.dart';
 
 /// Параметры формы предмета слоя 1 (канон — поле `object` в
@@ -73,6 +75,20 @@ class _Mat {
   const _Mat(this.h, this.s, this.l);
 }
 
+/// Плита «Ронина-1» v3 = плита-деталь `RoninParts` (`partPlates` эталона):
+/// материал секции [m], сдвиг светлоты [jl], сторона клетки [cs] (px рисунка),
+/// маска (соседство клеток для кромок) и клетки маски `(c, r, x, y)` с
+/// левым-верхом в px рисунка.
+class _PartPlate {
+  final _Mat m;
+  final double jl, cs;
+  final TargetMask mask;
+  final List<(int, int, double, double)> cells;
+  const _PartPlate(this.m, this.jl, this.cs, this.mask, this.cells);
+
+  bool on(int c, int r) => mask.contains(c, r);
+}
+
 const _graf = _Mat(215, 9, 31);
 const _graf2 = _Mat(215, 9, 26);
 const _dark = _Mat(216, 11, 17);
@@ -97,9 +113,11 @@ double _sigma(double blur) => blur / 4;
 /// (нормированные OS/2 typo-метрики 1491/431, как в Chromium).
 const double _middleAboveBaseline = 0.2757;
 
-/// «Ронин» — порт `docs/design/ship-render.js` 1:1 по константам и формулам в
-/// объёме эпика «Ронин-1»: корпус (плиты, сетка, швы, светотень, контур) и
-/// графика носа и мостика (слой 0), датчик-блок и RCS-квады (слой 1).
+/// «Ронин» — порт `docs/design/ship-render.js` v3 (D-016) 1:1 по константам и
+/// формулам в объёме эпика «Ронин-1»: корпус (строки 0..7 — плиты по деталям
+/// `RoninParts`, строки 8+ — генератор плит; сетка, швы, светотень, графика
+/// носа, щели-огни, контур) — слой 0; датчик-блок, визор, торпедные люки и
+/// RCS-квады — слой 1.
 class RoninArt implements ShipArt {
   RoninArt();
 
@@ -115,6 +133,10 @@ class RoninArt implements ShipArt {
 
   /// Воксельные строки корпуса 0..rows-1.
   static const int rows = 27;
+
+  /// Строки рисунка, размеченные деталями «Ронина-1» (`RONIN1_ROWS`): там
+  /// плиты = плиты `RoninParts`, без сетки и потёков (v3, D-016).
+  static const int ronin1Rows = 8;
 
   static double px(double x) => ox + x * cellPx;
   static double py(double y) => oy + y * cellPx;
@@ -176,6 +198,34 @@ class RoninArt implements ShipArt {
     return out;
   }
 
+  /// Материал плиты-детали по секции (`PLATE_MAT`).
+  static const Map<String, _Mat> _partPlateMat = {
+    'prow': _dark,
+    'bridge': _graf2,
+    'fwd': _graf,
+  };
+
+  /// Сдвиг светлоты плиты-детали по её индексу в списке плит (`PLATE_JL`).
+  static const List<double> _partPlateJl = [-2, 1.5, -1, 2.5, 0, -2.5, 1, -1.5, 3, -3, 2, -.5];
+
+  /// Плиты-детали (layer 0) в порядке `RoninParts.parts` (`partPlates`).
+  static final List<_PartPlate> _partPlates = List.unmodifiable(_buildPartPlates());
+
+  static List<_PartPlate> _buildPartPlates() {
+    final out = <_PartPlate>[];
+    for (final p in RoninParts.parts.where((p) => p.isPlate)) {
+      final i = out.length;
+      final cs = cellPx / p.scale;
+      final x0 = px(p.shipX), y0 = py(p.shipY);
+      out.add(
+        _PartPlate(_partPlateMat[p.sectionId]!, _partPlateJl[i % _partPlateJl.length], cs, p.mask, [
+          for (final q in p.mask.cells) (q.x, q.y, x0 + q.x * cs, y0 + q.y * cs),
+        ]),
+      );
+    }
+    return out;
+  }
+
   static _Mat _plateMat(RoninPlate p) {
     final inInset = p.x >= 6 && p.x + p.w <= 9 && p.y >= 9 && p.y + p.h <= 12;
     final inName = p.x <= 5 && p.y >= 8 && p.y < 13;
@@ -230,6 +280,14 @@ class RoninArt implements ShipArt {
 
   @override
   late final ui.Picture hullPicture = _record(_drawHull);
+
+  @override
+  late final ui.Picture fieldBuildPicture = _record(
+    (g) => _drawHull(g, edges: false, lights: false),
+  );
+
+  @override
+  late final ui.Picture fieldDonePicture = _record((g) => _drawHull(g, edges: false));
 
   @override
   late final ui.Picture objectsPicture = _record(_drawObjects);
@@ -388,12 +446,54 @@ class RoninArt implements ShipArt {
 
   // ---------- слой 0: корпус ----------
 
-  static void _drawHull(Canvas g) {
+  /// Корпус (блок `if(HULL)` эталона). [edges] — кромки плит-деталей и контур
+  /// корпуса, [lights] — щели-огни (`render({edges, lights})`).
+  static void _drawHull(Canvas g, {bool edges = true, bool lights = true}) {
     const c = cellPx;
     final hull = _hullPath();
 
-    // плиты
+    // строки 0..7 — плиты по логическим деталям (v3). Клетки плиты (расширены
+    // на .3 px, как в эталоне) — один путь на плиту: при replay в масштабе ≠ 1
+    // внутри плиты нет щелей сглаживания между клетками (при 1:1 = эталон).
+    for (final pl in _partPlates) {
+      final fill = Path();
+      for (final (_, _, x, y) in pl.cells) {
+        fill.addRect(Rect.fromLTWH(x - .3, y - .3, pl.cs + .6, pl.cs + .6));
+      }
+      g.drawPath(fill, _fill(_hsl(pl.m, pl.jl)));
+    }
+    if (edges) {
+      for (final pl in _partPlates) {
+        final lt = _stroke(_hsl(pl.m, pl.jl + 6, .55), 1);
+        final dk = _stroke(_hsl(pl.m, pl.jl - 6, .6), 1);
+        final sm = _stroke(_rgba(0, 0, 0, .32), .8);
+        final cs = pl.cs;
+        void seg(double x1, double y1, double x2, double y2, Paint paint) =>
+            g.drawLine(Offset(x1, y1), Offset(x2, y2), paint);
+        for (final (cc, r, x, y) in pl.cells) {
+          if (!pl.on(cc, r - 1)) {
+            seg(x, y + 1, x + cs, y + 1, lt);
+            seg(x, y + .3, x + cs, y + .3, sm);
+          }
+          if (!pl.on(cc - 1, r)) {
+            seg(x + 1, y, x + 1, y + cs, lt);
+            seg(x + .3, y, x + .3, y + cs, sm);
+          }
+          if (!pl.on(cc, r + 1)) {
+            seg(x, y + cs - 1, x + cs, y + cs - 1, dk);
+            seg(x, y + cs - .3, x + cs, y + cs - .3, sm);
+          }
+          if (!pl.on(cc + 1, r)) {
+            seg(x + cs - 1, y, x + cs - 1, y + cs, dk);
+            seg(x + cs - .3, y, x + cs - .3, y + cs, sm);
+          }
+        }
+      }
+    }
+
+    // строки 8+ — прежний генератор (плиты строк 0..7 сгенерированы, но не рисуются)
     for (final p in plates) {
+      if (p.y < ronin1Rows) continue;
       final m = _plateMat(p);
       final x = px(p.x.toDouble()), y = py(p.y.toDouble()), wd = p.w * c, hd = p.h * c;
       g.drawRect(Rect.fromLTWH(x, y, wd, hd), _fill(_hsl(m, p.jl)));
@@ -419,10 +519,11 @@ class RoninArt implements ShipArt {
       );
     }
 
-    // лёгкая воксельная сетка
+    // лёгкая воксельная сетка — только строки 8+ (в «Ронине-1» её нет, D-016)
     g
       ..save()
-      ..clipPath(hull);
+      ..clipPath(hull)
+      ..clipRect(Rect.fromLTWH(0, py(ronin1Rows.toDouble()), width, height));
     final grid = _stroke(_rgba(255, 255, 255, .045), 1);
     for (var x = 0; x <= gw; x++) {
       g.drawLine(
@@ -440,8 +541,8 @@ class RoninArt implements ShipArt {
     }
     g.restore();
 
-    // швы между поясами
-    for (final yb in const [2, 4, 8, 13, 18, 21, 25]) {
+    // швы между поясами (швы 2 и 4 — кромки деталей, v3)
+    for (final yb in const [8, 13, 18, 21, 25]) {
       final s0 = math.max(span[yb][0], span[yb - 1][0]).toDouble();
       final s1 = math.min(span[yb][1], span[yb - 1][1]).toDouble();
       final y = py(yb.toDouble());
@@ -488,13 +589,17 @@ class RoninArt implements ShipArt {
           _rgba(255, 130, 50, 0),
         ]),
     );
+    // потёки — только строки 8+, ГСЧ расходуется как раньше
     final wr = mulberry32(9);
     for (var i = 0; i < 9; i++) {
       final wx = px(3 + wr() * 9), wy = py(4 + wr() * 20), wl = (.5 + wr() * 1.4) * c;
-      g.drawRect(Rect.fromLTWH(wx, wy, 2, wl), _fill(_rgba(0, 0, 0, .05 + wr() * .04)));
+      final a = .05 + wr() * .04;
+      if (wy < py(ronin1Rows.toDouble())) continue;
+      g.drawRect(Rect.fromLTWH(wx, wy, 2, wl), _fill(_rgba(0, 0, 0, a)));
     }
     for (var i = 0; i < 5; i++) {
       final wx = px(3 + wr() * 9), wy = py(4 + wr() * 20);
+      if (wy < py(ronin1Rows.toDouble())) continue;
       g.drawRect(Rect.fromLTWH(wx, wy, 3.5, .35 * c), _fill(_rgba(255, 255, 255, .04)));
     }
     g.restore();
@@ -522,54 +627,22 @@ class RoninArt implements ShipArt {
     );
     g.restore();
 
-    // мостик: визор со щелями
-    final vx = px(4.65), vy = py(2.62), vw = 5.7 * c, vh = .58 * c;
-    final visor = _rr(vx, vy, vw, vh, 4);
-    g.drawRRect(visor, _fill(const Color(0xFF101318)));
-    g.drawRRect(visor, _stroke(_rgba(255, 255, 255, .18), 1.5));
-    for (final sl in const [
-      [5.0, 1.0],
-      [6.4, 1.0],
-      [7.8, 1.0],
-      [9.2, .85],
-    ]) {
-      final sx = sl[0], sw = sl[1];
-      _shadowed(
-        g,
-        Path()..addRRect(_rr(px(sx), vy + .16 * c, sw * c, .26 * c, 2.5)),
-        Paint()
-          ..shader = ui.Gradient.linear(
-            Offset(px(sx), 0),
-            Offset(px(sx + sw), 0),
-            const [Color(0xFF8FC6EE), Color(0xFFE8F6FF), Color(0xFF79B6E2)],
-            const [0, .5, 1],
-          ),
-        _rgba(150, 210, 255, .9),
-        9,
-      );
-    }
-
     // номер борта
     _text(g, 'V V - 7 7', 12, 38.291, _rgba(223, 230, 236, .85), cx, py(4.62));
-
-    // торпедные люки на носовой секции
-    for (final s in const [-1, 1]) {
-      final tx = cx + s * 1.45 * c - .42 * c, ty = py(5.95);
-      final hatch = _rr(tx, ty, .84 * c, .66 * c, 3);
-      _shadowed(g, Path()..addRRect(hatch), _fill(_hsl(_dark, -1)), _rgba(0, 0, 0, .5), 5);
-      g.drawRRect(hatch, _stroke(_rgba(0, 0, 0, .65), 1.6));
-      g.drawLine(
-        Offset(tx + .42 * c, ty + 3),
-        Offset(tx + .42 * c, ty + .66 * c - 3),
-        _stroke(_rgba(255, 255, 255, .14), 1),
-      );
-      g.drawRect(Rect.fromLTWH(tx + 2, ty - 2.6, .84 * c - 4, 2), _fill(_rgba(224, 131, 55, .85)));
-    }
 
     // трафарет «7 7»
     _text(g, '7 7', 26, 29.644, _rgba(228, 234, 240, .78), px(4.85), py(7.28));
 
     // бортовые огни-иллюминаторы (щели)
+    if (lights) _lights(g);
+
+    // контур корпуса
+    if (edges) g.drawPath(hull, _stroke(const Color(0xFF07090C), 2.4));
+  }
+
+  /// Бортовые огни-иллюминаторы — щели с подсветкой (только при `lights`).
+  static void _lights(Canvas g) {
+    const c = cellPx;
     for (final (x, y, warm) in const [
       (4.0, 5.45, false),
       (10.2, 5.45, false),
@@ -588,9 +661,6 @@ class RoninArt implements ShipArt {
         7,
       );
     }
-
-    // контур корпуса
-    g.drawPath(hull, _stroke(const Color(0xFF07090C), 2.4));
   }
 
   // ---------- слой 1: предметы ----------
@@ -612,15 +682,52 @@ class RoninArt implements ShipArt {
     );
     _glowDot(g, cx, py(-1.06), 2.2, _rgba(255, 255, 255, .95));
 
+    // мостик: визор со щелями (v3: выше v2 — три ряда клеток, средний стекло)
+    final vx = px(4.65), vy = py(2.48), vw = 5.7 * c, vh = .86 * c;
+    final visor = _rr(vx, vy, vw, vh, 4);
+    g.drawRRect(visor, _fill(const Color(0xFF101318)));
+    g.drawRRect(visor, _stroke(_rgba(255, 255, 255, .18), 1.5));
+    for (final sl in const [
+      [5.0, 1.0],
+      [6.4, 1.0],
+      [7.8, 1.0],
+      [9.2, .85],
+    ]) {
+      final sx = sl[0], sw = sl[1];
+      _shadowed(
+        g,
+        Path()..addRRect(_rr(px(sx), vy + .28 * c, sw * c, .30 * c, 2.5)),
+        Paint()
+          ..shader = ui.Gradient.linear(
+            Offset(px(sx), 0),
+            Offset(px(sx + sw), 0),
+            const [Color(0xFF8FC6EE), Color(0xFFE8F6FF), Color(0xFF79B6E2)],
+            const [0, .5, 1],
+          ),
+        _rgba(150, 210, 255, .9),
+        9,
+      );
+    }
+
+    // торпедные люки на носовой секции
+    for (final s in const [-1, 1]) {
+      final tx = cx + s * 1.45 * c - .42 * c, ty = py(5.95);
+      final hatch = _rr(tx, ty, .84 * c, .66 * c, 3);
+      _shadowed(g, Path()..addRRect(hatch), _fill(_hsl(_dark, -1)), _rgba(0, 0, 0, .5), 5);
+      g.drawRRect(hatch, _stroke(_rgba(0, 0, 0, .65), 1.6));
+      g.drawLine(
+        Offset(tx + .42 * c, ty + 3),
+        Offset(tx + .42 * c, ty + .66 * c - 3),
+        _stroke(_rgba(255, 255, 255, .14), 1),
+      );
+      g.drawRect(Rect.fromLTWH(tx + 2, ty - 2.6, .84 * c - 4, 2), _fill(_rgba(224, 131, 55, .85)));
+    }
+
     // RCS-квады — все четыре
     _rcs(g, px(3), py(4.5), -1);
     _rcs(g, px(12), py(4.5), 1);
     _rcs(g, px(3), py(20.5), -1);
     _rcs(g, px(12), py(20.5), 1);
-
-    // В эталоне контур корпуса рисуется последним, поверх предметов: повтор
-    // штриха, чтобы под клипом формы предмет выглядел как в полном рисунке.
-    g.drawPath(_hullPath(), _stroke(const Color(0xFF07090C), 2.4));
   }
 
   static void _rcs(Canvas g, double x, double y, int flip) {
