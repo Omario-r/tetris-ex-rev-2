@@ -43,7 +43,9 @@ class ShipScreen extends StatefulWidget {
 
   /// Пауза перед въездом детали (`afterWin`, `finale` с [animateLast]): сначала
   /// корабль без новой детали, затем деталь въезжает scale-in
-  /// ([kRevealDuration]). Одно число для подстройки на устройстве.
+  /// ([kRevealDuration]). Отсчёт — от конца анимации входа маршрута экрана
+  /// (нет маршрута или он уже открыт — от показа). Одно число для подстройки
+  /// на устройстве.
   static const Duration kRevealDelay = Duration(milliseconds: 600);
 
   /// Длительность самого въезда детали (scale-in).
@@ -102,6 +104,10 @@ class _ShipScreenState extends State<ShipScreen>
   Animation<double>? _revealAnim;
   late final Future<int> _collected;
 
+  /// Анимация входа маршрута, пока на неё висит слушатель старта въезда.
+  Animation<double>? _routeAnim;
+  bool _revealScheduled = false;
+
   @override
   void initState() {
     super.initState();
@@ -113,7 +119,8 @@ class _ShipScreenState extends State<ShipScreen>
     if (animate) {
       // Один контроллер на паузу + въезд: пауза — начальный отрезок кривой
       // (прогресс 0, деталь не видна). Отдельного таймера нет — контроллер
-      // гасится в dispose вместе с экраном.
+      // гасится в dispose вместе с экраном. Запуск — в didChangeDependencies,
+      // после перехода маршрута.
       final delay = ShipScreen.kRevealDelay;
       final total = delay + ShipScreen.kRevealDuration;
       final c = AnimationController(vsync: this, duration: total);
@@ -126,7 +133,6 @@ class _ShipScreenState extends State<ShipScreen>
           curve: Curves.easeOut,
         ),
       );
-      c.forward();
     }
     if (widget._mode == _ShipMode.manual) {
       _collected = ProgressService().getCollectedCount();
@@ -134,7 +140,45 @@ class _ShipScreenState extends State<ShipScreen>
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Маршрут доступен только здесь (не в initState). Старт — один раз.
+    if (_revealController != null && !_revealScheduled) {
+      _revealScheduled = true;
+      _startRevealAfterRoute();
+    }
+  }
+
+  /// Пауза [ShipScreen.kRevealDelay] отсчитывается от конца перехода экрана:
+  /// нет маршрута или он уже открыт — старт сразу, иначе по `completed`
+  /// анимации входа маршрута (слушатель снимается в [dispose]).
+  ///
+  /// Первый кадр push маршрут строится `offstage` (приём Hero): его анимация
+  /// тогда показывает `completed`, хотя переход ещё не начался, — в этом случае
+  /// ждём настоящего `completed` после выхода из `offstage`.
+  void _startRevealAfterRoute() {
+    final route = ModalRoute.of(context);
+    final routeAnim = route?.animation;
+    if (route == null ||
+        routeAnim == null ||
+        (!route.offstage && routeAnim.status == AnimationStatus.completed)) {
+      _revealController!.forward();
+      return;
+    }
+    _routeAnim = routeAnim;
+    routeAnim.addStatusListener(_onRouteStatus);
+  }
+
+  void _onRouteStatus(AnimationStatus status) {
+    if (status != AnimationStatus.completed) return;
+    _routeAnim?.removeStatusListener(_onRouteStatus);
+    _routeAnim = null;
+    if (mounted) _revealController!.forward();
+  }
+
+  @override
   void dispose() {
+    _routeAnim?.removeStatusListener(_onRouteStatus);
     _revealController?.dispose();
     super.dispose();
   }

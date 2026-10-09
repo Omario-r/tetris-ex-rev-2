@@ -213,6 +213,55 @@ void main() {
       expect(_shipPainter(tester).revealProgress, 1.0);
     });
 
+    testWidgets('через Navigator.push: пауза kRevealDelay идёт от конца '
+        'перехода маршрута', (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) => TextButton(
+              key: const Key('open'),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) =>
+                      ShipScreen.afterWin(collectedCount: 2, onContinue: () {}),
+                ),
+              ),
+              child: const Text('open'),
+            ),
+          ),
+        ),
+      );
+      await tester.tap(find.byKey(const Key('open')));
+      await tester.pump(); // маршрут построен, переход стартовал
+
+      // Переход идёт — отсчёт паузы не начат.
+      await tester.pump(const Duration(milliseconds: 150));
+      final transition = ModalRoute.of(
+        tester.element(find.byType(ShipScreen)),
+      )!.transitionDuration;
+      expect(transition, greaterThan(const Duration(milliseconds: 150)));
+      expect(_shipPainter(tester).revealProgress, 0.0);
+
+      // Конец перехода (статус `completed` приходит на кадре после последнего
+      // тика анимации): с этого кадра идёт пауза.
+      await tester.pump(transition - const Duration(milliseconds: 150));
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(_shipPainter(tester).revealProgress, 0.0);
+
+      // С открытия экрана уже > kRevealDelay, но от конца перехода пауза ещё
+      // не вышла — детали нет.
+      await tester.pump(
+        ShipScreen.kRevealDelay - const Duration(milliseconds: 50),
+      );
+      expect(_shipPainter(tester).revealProgress, 0.0);
+
+      // Пауза + въезд — деталь на месте.
+      await tester.pump(
+        ShipScreen.kRevealDuration + const Duration(milliseconds: 100),
+      );
+      expect(_shipPainter(tester).revealProgress, 1.0);
+    });
+
     testWidgets('уход с экрана во время паузы не оставляет таймеров/вызовов', (
       tester,
     ) async {

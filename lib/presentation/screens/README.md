@@ -136,7 +136,10 @@
   scale-in (`kRevealDuration` 400 мс, easeOut) после паузы `ShipScreen.kRevealDelay`
   (600 мс; до неё `revealProgress = 0`, новой детали не видно; один `AnimationController`
   на паузу + въезд, отдельного таймера нет — гасится в `dispose`; тот же порядок у `finale`
-  при `animateLast`; Ронин-1/09 T1), без «Назад» (слева пустое место 34), «Продолжить сборку»
+  при `animateLast`; Ронин-1/09 T1). Пауза отсчитывается от конца анимации входа маршрута
+  (`didChangeDependencies` → `ModalRoute.animation`, слушатель `completed` снимается в
+  `dispose`; нет маршрута или он открыт — старт сразу; на первом кадре push маршрут `offstage`
+  и его анимация врёт `completed` — ждём настоящего; Ронин-1/09 T2), без «Назад» (слева пустое место 34), «Продолжить сборку»
   (`ship_continue_button`) → `onContinue`. Прогресс не читает и не пишет.
 - `ShipScreen.finale({art, animateLast = true})` — финал «Ронина-1»: собрано N (15 / 15),
   последняя деталь въезжает при `animateLast`; ни «Назад», ни кнопок; на месте кнопки
