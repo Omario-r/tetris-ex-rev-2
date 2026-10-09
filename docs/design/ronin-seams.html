@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Швы по деталям</title>
+<style>
+  :root { --boardBg: hsl(219 13% 10%); --gunmetal: hsl(220 10% 22%); --hazard: hsl(23 62% 46%); }
+  body { margin:0; background:#0f1216; color:#cfd4da; font:13px/1.55 system-ui,sans-serif; padding:22px; }
+  h1 { font-size:18px; margin:0 0 6px; color:#e6eaee; }
+  .lead { color:#8b949e; max-width:900px; margin:0 0 6px; }
+  .sect { margin:26px 0 10px; font-size:12px; letter-spacing:.12em; color:#7c848d; text-transform:uppercase; }
+  .row { display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start; }
+  .card { background:#161b22; border:1px solid #262d36; border-radius:14px; padding:14px; }
+  .card h2 { font-size:13px; margin:0 0 8px; color:var(--hazard); letter-spacing:.04em; }
+  .card .an { color:#8b949e; font-size:12px; max-width:360px; margin:8px 0 0; }
+  .board { background:var(--boardBg); border:1px solid var(--gunmetal); border-radius:10px; padding:7px; display:inline-block; }
+  .pair { display:flex; gap:12px; align-items:flex-end; }
+  .pair .lbl { font-size:11px; color:#8b949e; text-align:center; margin-top:4px; }
+  canvas { display:block; }
+  ol { color:#8b949e; margin:4px 0 0 18px; padding:0; columns:2; max-width:760px; font-size:12px; }
+  ol b { color:#cfd4da; font-weight:600; }
+  @media (max-width:640px){ body{padding:16px} ol{columns:1} }
+</style>
+</head>
+<body>
+
+<h1>Швы корабля по деталям, предметы отдельно</h1>
+<p class="lead">Ответ на замечания PO на КТ-2 (2026-10-09). Плиты корпуса нарезаны ровно по
+логическим деталям, поэтому внутри детали нет чужих швов. Всё, что стоит на корпусе как
+отдельная вещь (визор, торпедные люки, датчик, RCS-квады), — свои детали. Покраска (шеврон,
+«VV-77», «77») остаётся на плитах. Во время сборки клетки однородные: край детали, щели-огни
+и контур предмета появляются, когда деталь собрана. Рельеф клеток — вариант Б.</p>
+<p class="lead">Мокап, не канон: канон рисунка `ship-render.js` не тронут.</p>
+
+<div class="sect">Экран корабля: было и стало</div>
+<div class="row" id="ships"></div>
+
+<div class="sect">Поле: во время сборки и деталь собрана</div>
+<div class="row" id="fields"></div>
+
+<div class="sect">Порядок «Ронина-1» с новыми предметами — 19 деталей</div>
+<ol id="order"></ol>
+
+<script>window.__SHIP_RES = 4;</script>
+<script src="ship-render.js?seams"></script>
+<script src="ronin-parts.js?v=2"></script>
+<script src="ronin-objects.js?v=2"></script>
+<script src="ronin-draw.js?v=2"></script>
+<script>
+"use strict";
+const SHIP = window.__SHIP, P = window.RONIN_PARTS, O = window.RONIN_OBJECTS, D = window.RONIN_DRAW;
+const { C, px, py, cx, M, hsl, W, H } = SHIP, RES = 4, CELL = 34;
+
+/* ---------- геометрия деталей ---------- */
+const secOf = p => P.sections.find(s => s.id === p.section);
+function frame(p){
+  if (p.layer === 1) return { s:p.s, x0:p.origin[0], y0:p.origin[1] };
+  const s = secOf(p);
+  return { s:s.s, x0:s.origin[0] + p.origin[0]/s.s, y0:s.origin[1] + p.origin[1]/s.s };
+}
+function cellRect(p, c, r){ const f = frame(p), cs = C/f.s; return [px(f.x0)+c*cs, py(f.y0)+r*cs, cs]; }
+const on = (p, c, r) => r >= 0 && r < p.mask.length && c >= 0 && c < p.mask[r].length && p.mask[r][c] === '#';
+function eachCell(p, cb){ p.mask.forEach((l, r) => { for (let c = 0; c < l.length; c++) if (l[c] === '#') cb(c, r); }); }
+
+const plates = P.parts.filter(p => p.layer === 0);
+const MAT = { prow:M.DARK, bridge:M.GRAF2, fwd:M.GRAF };
+const JL = [-2, 1.5, -1, 2.5, 0, -2.5, 1, -1.5, 3, -3, 2, -0.5];
+plates.forEach((p, i) => { p.m = MAT[p.section]; p.jl = JL[i % JL.length]; });
+
+/* ---------- графика предметов (как в ship-render.js) ---------- */
+function rr(g,x,y,w,h,r){g.beginPath();g.moveTo(x+r,y);g.arcTo(x+w,y,x+w,y+h,r);g.arcTo(x+w,y+h,x,y+h,r);g.arcTo(x,y+h,x,y,r);g.arcTo(x,y,x+w,y,r);g.closePath();}
+function rrPath(x,y,w,h,r){const p=new Path2D();p.moveTo(x+r,y);p.arcTo(x+w,y,x+w,y+h,r);p.arcTo(x+w,y+h,x,y+h,r);p.arcTo(x,y+h,x,y,r);p.arcTo(x,y,x+w,y,r);p.closePath();return p;}
+function glowDot(g,x,y,r,col){const gr=g.createRadialGradient(x,y,0,x,y,r*4);gr.addColorStop(0,col);gr.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=gr;g.beginPath();g.arc(x,y,r*4,0,7);g.fill();g.fillStyle=col;g.beginPath();g.arc(x,y,r,0,7);g.fill();}
+const BL = RES/2;  /* shadowBlur не масштабируется — как у канона в 2x */
+
+function drawSensor(g){
+  g.fillStyle=hsl(M.DARK,-2); g.fillRect(cx-.5*C,py(-.55),1*C,.6*C);
+  g.fillStyle=hsl(M.GUN,6);   g.fillRect(cx-.26*C,py(-.95),.52*C,.42*C);
+  g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;
+  g.strokeRect(cx-.5*C,py(-.55),1*C,.6*C); g.strokeRect(cx-.26*C,py(-.95),.52*C,.42*C);
+  g.fillStyle='rgba(180,220,255,.9)'; g.fillRect(cx-.18*C,py(-.78),.36*C,2.2);
+  glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
+}
+function drawRcs(g,X,Y,flip){
+  g.fillStyle=hsl(M.GUN,10); rr(g,X-.3*C,Y-.3*C,.6*C,.6*C,3); g.fill();
+  g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;g.stroke();
+  for (const a of [0, flip*Math.PI/2, Math.PI]){
+    g.save(); g.translate(X,Y); g.rotate(a); g.fillStyle='#101215';
+    g.beginPath();g.moveTo(-3.4,-.3*C);g.lineTo(3.4,-.3*C);g.lineTo(5.2,-.56*C);g.lineTo(-5.2,-.56*C);g.closePath();g.fill();
+    g.strokeStyle='rgba(255,255,255,.18)';g.lineWidth=1;g.stroke(); g.restore();
+  }
+}
+const VIS = { x:px(4.65), y:py(2.62), w:5.7*C, h:.58*C };
+function drawVisor(g, half){
+  g.save();
+  if (half) { g.beginPath(); g.rect(half<0 ? VIS.x-4 : VIS.x+VIS.w/2, VIS.y-8, VIS.w/2+4, VIS.h+16); g.clip(); }
+  rr(g,VIS.x,VIS.y,VIS.w,VIS.h,4); g.fillStyle='#101318'; g.fill();
+  g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1.5; g.stroke();
+  g.save(); g.shadowColor='rgba(150,210,255,.9)'; g.shadowBlur=9*BL;
+  for (const [sx,sw] of [[5.0,1.0],[6.4,1.0],[7.8,1.0],[9.2,.85]]){
+    const gr=g.createLinearGradient(px(sx),0,px(sx+sw),0);
+    gr.addColorStop(0,'#8fc6ee');gr.addColorStop(.5,'#e8f6ff');gr.addColorStop(1,'#79b6e2');
+    g.fillStyle=gr; rr(g,px(sx),VIS.y+.16*C,sw*C,.26*C,2.5); g.fill();
+  }
+  g.restore(); g.restore();
+}
+const hatchXY = s => [cx+s*1.45*C-.42*C, py(5.95)];
+function drawHatch(g, s){
+  const [tx,ty] = hatchXY(s);
+  g.save(); g.shadowColor='rgba(0,0,0,.5)'; g.shadowBlur=5*BL;
+  g.fillStyle=hsl(M.DARK,-1); rr(g,tx,ty,.84*C,.66*C,3); g.fill(); g.restore();
+  g.strokeStyle='rgba(0,0,0,.65)';g.lineWidth=1.6; rr(g,tx,ty,.84*C,.66*C,3); g.stroke();
+  g.strokeStyle='rgba(255,255,255,.14)';g.lineWidth=1;
+  g.beginPath();g.moveTo(tx+.42*C,ty+3);g.lineTo(tx+.42*C,ty+.66*C-3);g.stroke();
+  g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2);
+}
+
+/* ---------- новые предметы: формы и маски (растеризация как в ronin-objects.js) ---------- */
+const OBJ = [
+  { id:'sensor',  title:'Датчик носа', draw:drawSensor, shape:() => O.shape({kind:'sensor'}), s:7 },
+  { id:'visor_l', title:'Визор, левая половина', draw:g => drawVisor(g,-1),
+    shape:() => [rrPath(VIS.x, VIS.y, VIS.w/2, VIS.h, 4)], s:3.5 },
+  { id:'visor_r', title:'Визор, правая половина', draw:g => drawVisor(g, 1),
+    shape:() => [rrPath(VIS.x+VIS.w/2, VIS.y, VIS.w/2, VIS.h, 4)], s:3.5 },
+  { id:'hatch_l', title:'Торпедный люк, левый', draw:g => drawHatch(g,-1),
+    shape:() => { const [x,y] = hatchXY(-1); return [rrPath(x, y-2.6, .84*C, .66*C+2.6, 3)]; }, s:8 },
+  { id:'hatch_r', title:'Торпедный люк, правый', draw:g => drawHatch(g, 1),
+    shape:() => { const [x,y] = hatchXY( 1); return [rrPath(x, y-2.6, .84*C, .66*C+2.6, 3)]; }, s:8 },
+  { id:'rcs_fr', title:'RCS-квад, нос справа', draw:g => drawRcs(g,px(12),py(4.5), 1),
+    shape:() => O.shape({kind:'rcs', at:[12,4.5], flip:1}), s:8 },
+  { id:'rcs_fl', title:'RCS-квад, нос слева', draw:g => drawRcs(g,px(3),py(4.5),-1),
+    shape:() => O.shape({kind:'rcs', at:[3,4.5], flip:-1}), s:8 },
+];
+for (const o of OBJ){
+  o.layer = 1; o.paths = o.shape();
+  const r = O.rasterize(o.paths, o.s); o.mask = r.mask; o.origin = r.origin;
+  o.cells = o.mask.join('').split('#').length - 1;
+}
+
+/* ---------- рисунок: корпус по деталям ---------- */
+function makeCv(){ const cv = document.createElement('canvas'); cv.width = W*RES; cv.height = H*RES;
+  const g = cv.getContext('2d'); g.setTransform(RES,0,0,RES,0,0); return [cv, g]; }
+function hullRegion(){ const p = new Path2D();
+  for (const pl of plates) eachCell(pl, (c, r) => { const [x,y,cs] = cellRect(pl,c,r); p.rect(x,y,cs,cs); }); return p; }
+const REGION = hullRegion();
+
+/* clean — во время сборки: без кромок деталей, без щелей-огней; full — как на корабле */
+function drawHull(g, full){
+  for (const pl of plates){                                   /* заливка плиты */
+    g.fillStyle = hsl(pl.m, pl.jl);
+    eachCell(pl, (c, r) => { const [x,y,cs] = cellRect(pl,c,r); g.fillRect(x-.3, y-.3, cs+.6, cs+.6); });
+  }
+  g.save(); g.clip(REGION);
+  g.strokeStyle='rgba(255,255,255,.045)'; g.lineWidth=1;     /* лёгкая воксельная сетка */
+  for (let x = 3; x <= 12; x++){ g.beginPath(); g.moveTo(px(x),py(0)); g.lineTo(px(x),py(8)); g.stroke(); }
+  for (let y = 0; y <= 8; y++){ g.beginPath(); g.moveTo(px(3),py(y)); g.lineTo(px(12),py(y)); g.stroke(); }
+  const sh = g.createLinearGradient(px(0),0,px(15),0);        /* крупная светотень */
+  sh.addColorStop(0,'rgba(255,255,255,.12)');sh.addColorStop(.4,'rgba(255,255,255,0)');
+  sh.addColorStop(.62,'rgba(0,0,0,0)');sh.addColorStop(1,'rgba(0,0,0,.20)');
+  g.fillStyle=sh; g.fillRect(px(-1),py(-1),17*C,11*C);
+  g.restore();
+  /* покраска — остаётся на плитах */
+  g.save(); g.beginPath(); g.rect(px(5),py(0),5*C,2*C); g.clip();
+  g.fillStyle=hsl(M.ORAN,0,.95); g.beginPath();
+  g.moveTo(cx,py(1.95));g.lineTo(cx-2.1*C,py(.9));g.lineTo(cx-2.1*C,py(.38));
+  g.lineTo(cx,py(1.38));g.lineTo(cx+2.1*C,py(.38));g.lineTo(cx+2.1*C,py(.9));g.closePath();g.fill();
+  g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;
+  g.beginPath();g.moveTo(cx-2.1*C,py(.24));g.lineTo(cx,py(1.22));g.lineTo(cx+2.1*C,py(.24));g.stroke();
+  g.restore();
+  g.textAlign='center'; g.textBaseline='middle';
+  g.font='bold 12px "Arial Narrow","DejaVu Sans",sans-serif'; g.fillStyle='rgba(223,230,236,.85)';
+  g.fillText('V V - 7 7', cx, py(4.62));
+  g.font='bold 26px "Arial Narrow","DejaVu Sans",sans-serif'; g.fillStyle='rgba(228,234,240,.78)';
+  g.fillText('7 7', px(4.85), py(7.28));
+  if (!full) return;
+  for (const pl of plates){                                   /* кромки по границе детали = швы корабля */
+    eachCell(pl, (c, r) => {
+      const [x,y,cs] = cellRect(pl,c,r), lt = hsl(pl.m, pl.jl+12, .8), dk = hsl(pl.m, pl.jl-12, .85);
+      const seg = (x1,y1,x2,y2,col,w) => { g.strokeStyle=col; g.lineWidth=w; g.beginPath(); g.moveTo(x1,y1); g.lineTo(x2,y2); g.stroke(); };
+      if (!on(pl,c,r-1)) { seg(x,y+1.2,x+cs,y+1.2,lt,2);       seg(x,y+.4,x+cs,y+.4,'rgba(0,0,0,.6)',1.6); }
+      if (!on(pl,c-1,r)) { seg(x+1.2,y,x+1.2,y+cs,lt,2);       seg(x+.4,y,x+.4,y+cs,'rgba(0,0,0,.6)',1.6); }
+      if (!on(pl,c,r+1)) { seg(x,y+cs-1.2,x+cs,y+cs-1.2,dk,2); seg(x,y+cs-.4,x+cs,y+cs-.4,'rgba(0,0,0,.6)',1.6); }
+      if (!on(pl,c+1,r)) { seg(x+cs-1.2,y,x+cs-1.2,y+cs,dk,2); seg(x+cs-.4,y,x+cs-.4,y+cs,'rgba(0,0,0,.6)',1.6); }
+    });
+  }
+  for (const [x,y] of [[4.0,5.45],[10.2,5.45]]){              /* щели-огни — только собранная деталь */
+    g.save(); g.shadowBlur=7*BL; g.shadowColor='rgba(160,215,255,.85)'; g.fillStyle='#cfeaff';
+    rr(g,px(x),py(y),.8*C,.16*C,2); g.fill(); g.restore();
+  }
+  const sp = SHIP.span, L = (x, y) => g.lineTo(px(x), py(y));           /* контур корпуса, строки 0..7 */
+  g.beginPath(); g.moveTo(px(sp[0][0]), py(0));
+  for (let y = 0; y < 8; y++){ L(sp[y][0], y); L(sp[y][0], y+1); }
+  for (let y = 7; y >= 0; y--){ L(sp[y][1]+1, y+1); L(sp[y][1]+1, y); }
+  g.closePath(); g.strokeStyle='#07090c'; g.lineWidth=2.4; g.stroke();
+}
+const [HULL_CLEAN, gc] = makeCv(); drawHull(gc, false);
+const [HULL_FULL,  gf] = makeCv(); drawHull(gf, true);
+const OBJ_CV = {};
+for (const o of OBJ){ const [cv, g] = makeCv(); o.draw(g); OBJ_CV[o.id] = cv; }
+
+/* ---------- клетка поля ---------- */
+const probe = document.createElement('canvas').getContext('2d');
+function coverage(o, x, y, cs){
+  let hit = 0; const N = 6;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++)
+    if (o.paths.some(p => probe.isPointInPath(p, x+(i+.5)/N*cs, y+(j+.5)/N*cs))) hit++;
+  return hit/(N*N);
+}
+function avgColor(cv, x, y, cs){
+  const d = cv.getContext('2d').getImageData(Math.round(x*RES), Math.round(y*RES), Math.max(1,Math.round(cs*RES)), Math.max(1,Math.round(cs*RES))).data;
+  let R=0,G=0,B=0,n=0;
+  for (let i = 0; i < d.length; i += 4) if (d[i+3] > 128){ R+=d[i]; G+=d[i+1]; B+=d[i+2]; n++; }
+  return n ? `rgb(${R/n|0},${G/n|0},${B/n|0})` : 'hsl(219,13%,10%)';
+}
+function bands(g, x, y, w, h, s, k){
+  const b = 3*s;
+  g.fillStyle=`rgba(255,255,255,${.09*k})`; g.fillRect(x, y, w, b);
+  g.fillStyle=`rgba(0,0,0,${.35*k})`;       g.fillRect(x, y+h-b, w, b);
+  g.fillStyle=`rgba(255,255,255,${.04*k})`; g.fillRect(x, y, b, h);
+  g.fillStyle=`rgba(0,0,0,${.18*k})`;       g.fillRect(x+w-b, y, b, h);
+}
+function rivets(g, x, y, w, h, s){
+  g.fillStyle='rgba(0,0,0,.45)';
+  for (const [a,b] of [[x+4*s,y+4*s],[x+w-4*s,y+4*s],[x+4*s,y+h-4*s],[x+w-4*s,y+h-4*s]]){ g.beginPath(); g.arc(a,b,1.5*s,0,7); g.fill(); }
+}
+/* build — во время сборки (рельеф Б, однородные края); done — собрана: настоящий рисунок, без сетки */
+function drawCell(g, part, c, r, X, Y, u, phase){
+  const [x,y,cs] = cellRect(part, c, r);
+  const src = part.layer === 1 ? OBJ_CV[part.id] : (phase === 'done' ? HULL_FULL : HULL_CLEAN);
+  const paint = () => {
+    if (part.layer === 1 && phase === 'build' && coverage(part, x, y, cs) < .97){
+      g.fillStyle = avgColor(src, x, y, cs); g.fillRect(X, Y, u, u);
+    } else g.drawImage(src, x*RES, y*RES, cs*RES, cs*RES, X, Y, u, u);
+  };
+  if (phase === 'done') { paint(); return; }
+  const s = u/34, i = s, path = new Path2D(); path.addPath(rrPath(X+i, Y+i, u-2*i, u-2*i, 3*s));
+  g.save(); g.clip(path); paint(); bands(g, X+i, Y+i, u-2*i, u-2*i, s, 1.4); g.restore();
+  rivets(g, X+i, Y+i, u-2*i, u-2*i, s);
+}
+
+/* ---------- нарезка (упрощённый генератор мокапа) ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function slice(cells, seed){
+  const rnd = mulberry32(seed), rest = new Set(cells), out = [];
+  const nb = k => { const [c,r] = k.split(',').map(Number); return [(c+1)+','+r,(c-1)+','+r,c+','+(r+1),c+','+(r-1)]; };
+  function grow(a, size){ const res = [], seen = new Set();
+    (function g(cur, fr){ if (cur.length === size){ const k=[...cur].sort().join('|'); if(!seen.has(k)){seen.add(k);res.push([...cur]);} return; }
+      for (const f of fr){ if (cur.includes(f)) continue; g([...cur,f],[...fr,...nb(f).filter(n=>rest.has(n))]); } })([a], nb(a).filter(n=>rest.has(n)));
+    return res; }
+  let guard = 30000;
+  (function solve(){ if (!rest.size) return true; if (--guard < 0) return false;
+    const a = [...rest].sort((x,y)=>{const[xc,xr]=x.split(',').map(Number),[yc,yr]=y.split(',').map(Number);return xr-yr||xc-yc;})[0];
+    for (const size of [6,5,7,4,3]){ const cs = grow(a, size);
+      for (let i=cs.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[cs[i],cs[j]]=[cs[j],cs[i]];}
+      for (const c of cs.slice(0, 40)){ c.forEach(k=>rest.delete(k)); out.push(c); if (solve()) return true; out.pop(); c.forEach(k=>rest.add(k)); } }
+    return false; })();
+  if (!rest.size) return out;
+  /* запас: генератор мокапа не уложился — режем по строкам на куски по 7 клеток */
+  const rows = [...cells].sort((x,y)=>{const[xc,xr]=x.split(',').map(Number),[yc,yr]=y.split(',').map(Number);return xr-yr||xc-yc;});
+  const chunks = []; for (let i = 0; i < rows.length; i += 7) chunks.push(rows.slice(i, i+7));
+  return chunks;
+}
+
+/* ---------- поле ---------- */
+function field(cv, part, phase){
+  const w = Math.max(...part.mask.map(l => l.length)), h = part.mask.length, u = CELL;
+  const cells = []; eachCell(part, (c, r) => cells.push(c+','+r));
+  const pieces = slice(cells, part.seed ?? 3);
+  const placed = new Set(phase === 'done' ? cells : pieces.slice(0, Math.ceil(pieces.length/2)).flat());
+  const g = D.dpr(cv, (w+2)*u, (h+2)*u);
+  g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, (w+2)*u, (h+2)*u);
+  for (const k of cells){
+    const [c, r] = k.split(',').map(Number), X = (c+1)*u, Y = (r+1)*u;
+    if (placed.has(k)) drawCell(g, part, c, r, X, Y, u, phase);
+    else { g.setLineDash([4,3]); g.lineWidth=1.5; g.strokeStyle='hsla(23,62%,55%,.55)'; g.fillStyle='hsla(23,62%,46%,.05)';
+      g.fillRect(X+3, Y+3, u-6, u-6); g.strokeRect(X+3.5, Y+3.5, u-7, u-7); g.setLineDash([]); }
+  }
+}
+
+/* ---------- экран корабля ---------- */
+function ship(cv, mode){
+  const x0 = px(1.6), y0 = py(-1.4), w = px(13.4)-x0, h = py(8.4)-y0, k = 1.35;
+  const g = D.dpr(cv, w*k, h*k);
+  g.fillStyle = '#0f1114'; g.fillRect(0, 0, w*k, h*k);
+  if (mode === 'canon'){ g.drawImage(SHIP.off, x0*SHIP.RES, y0*SHIP.RES, w*SHIP.RES, h*SHIP.RES, 0, 0, w*k, h*k); return; }
+  g.drawImage(HULL_FULL, x0*RES, y0*RES, w*RES, h*RES, 0, 0, w*k, h*k);
+  for (const o of OBJ) g.drawImage(OBJ_CV[o.id], x0*RES, y0*RES, w*RES, h*RES, 0, 0, w*k, h*k);
+}
+
+/* ---------- вывод ---------- */
+const card = (title, an) => { const d = document.createElement('div'); d.className = 'card';
+  d.innerHTML = `<h2>${title}</h2>` + (an ? `<p class="an">${an}</p>` : ''); return d; };
+{
+  const wrap = document.getElementById('ships');
+  for (const [mode, t, an] of [
+    ['canon', 'Было: канон ship-render.js', 'Плиты рисунка нарезаны генератором по поясам и не совпадают с деталями: шов чужой плиты проходит посреди клетки детали. Визор и люки нарисованы на плитах.'],
+    ['seams', 'Стало: швы по деталям, предметы отдельно', 'Каждая плита — ровно одна деталь (12 плит). Визор, люки, датчик и RCS лежат поверх как свои детали. Покраска и щели-огни — на плитах.'],
+  ]){
+    const c = card(t, an), cv = document.createElement('canvas');
+    c.insertBefore(cv, c.querySelector('.an')); wrap.appendChild(c); ship(cv, mode);
+  }
+}
+{
+  const wrap = document.getElementById('fields');
+  const show = [
+    [P.parts.find(p => p.id === 'bridge_c'), 'Плита: мостик, центр (бывший «визор»)', 'Визор снят на свою деталь — плита однородная. Во время сборки край детали не виден, кромка и контур корпуса появляются после сборки.'],
+    [P.parts.find(p => p.id === 'fwd1_cl'),  'Плита: носовой пояс, левее киля', 'Покраска «VV-77» остаётся (надпись делят две детали). Щель-огонь и люк во время сборки не видны: люк — своя деталь, огонь проявится, когда деталь собрана.'],
+    [P.parts.find(p => p.id === 'prow'),     'Плита: нос', 'Шеврон — покраска, читается с первых кусков.'],
+    [OBJ.find(o => o.id === 'visor_l'),      'Предмет: визор, левая половина', 'Визор длинный и тонкий: целиком в поле 10×14 он даст полосу 10×1. Половинами — по 20 клеток, лёгкий уровень. Краевые клетки однотонные (преобладающий цвет), контур — после сборки.'],
+    [OBJ.find(o => o.id === 'hatch_l'),      'Предмет: торпедный люк', 'Люк в масштабе 8. Во время сборки края однотонные, включая оранжевую полоску сверху; внутри — тёмная крышка люка.'],
+    [OBJ.find(o => o.id === 'sensor'),       'Предмет: датчик носа', 'Тот же датчик: краевые клетки однотонные, строб и контур — после сборки.'],
+  ];
+  for (const [part, t, an] of show){
+    const c = card(`${t} · ${part.cells} кл.`, an), pair = document.createElement('div'); pair.className = 'pair';
+    for (const [phase, lbl] of [['build','во время сборки'],['done','собрана']]){
+      const box = document.createElement('div'), b = document.createElement('div'), cv = document.createElement('canvas');
+      b.className = 'board'; b.appendChild(cv); box.appendChild(b);
+      box.insertAdjacentHTML('beforeend', `<div class="lbl">${lbl}</div>`); pair.appendChild(box);
+      field(cv, part, phase);
+    }
+    c.insertBefore(pair, c.querySelector('.an')); wrap.appendChild(c);
+  }
+}
+{
+  const byId = id => P.parts.find(p => p.id === id) || OBJ.find(o => o.id === id);
+  const order = ['prow','sensor','bridge_c','bridge_l','bridge_r','visor_l','visor_r','fwd1_cl','hatch_l','fwd1_cr','hatch_r',
+                 'fwd1_r','rcs_fr','fwd2_r','fwd1_l','rcs_fl','fwd2_l','fwd2_cl','fwd2_cr'];
+  document.getElementById('order').innerHTML = order.map(id => { const p = byId(id);
+    const t = id === 'bridge_c' ? 'Мостик, центр' : p.title, obj = p.layer === 1;
+    return `<li>${obj ? '<b>' : ''}${t}${obj ? '</b>' : ''} — ${p.cells} кл.</li>`; }).join('');
+}
+</script>
+</body>
+</html>
