@@ -46,9 +46,10 @@
 <p class="lead">Эксперимент к обсуждению (PO, 2026-10-10), не канон. Износ — краска стёрта до
 металла. По референсам: сколы по внешним кромкам силуэта (больше всего — передняя кромка носа и
 уступы), по краям плит на швах (на крупных плитах — чаще), короткие потёртости на плоскости
-крупных плит, по краям крышек люков и по краю краски. Металл — светлый холодный серый; на графите
+крупных плит (редкие пятна металла), по краям крышек люков и по краю краски. Металл — светлый холодный серый; на графите
 приглушённый. Обводки у износа фоновой краски нет; у краски поверх корпуса (шеврон, номера) часть
-сколов с бурым ободком грунта с одной стороны. Свет не трогается. Во время сборки клетка однотонная
+сколов стёрта до металла (иногда с бурым ободком грунта с одной стороны), часть — только до нижней
+краски, сквозь скол видна плита. Свет не трогается. Во время сборки клетка однотонная
 (D-017), поэтому износ там виден только сколами краски.</p>
 <p class="lead">Износ: <label><input type="radio" name="wear" value="1" checked> лёгкий</label>
   <label><input type="radio" name="wear" value="2"> заметный</label></p>
@@ -266,7 +267,7 @@ function edgeWear(g, R, ax, ay, bx, by, nx, ny, dens, depth, metal){
       pts.forEach(([s], i) => g[i ? 'lineTo' : 'moveTo'](ax + ux*s - nx*.3, ay + uy*s - ny*.3));
       for (let i = pts.length-1; i >= 0; i--){ const [s, d] = pts[i]; g.lineTo(ax + ux*s + nx*d, ay + uy*s + ny*d); }
       g.closePath(); g.fill();
-      if (run > 3) for (let i = 0, n = 2 + (R()*4|0); i < n; i++){     // мелкие точки со стороны плиты
+      if (run > 4.5) for (let i = 0, n = 1 + (R()*3|0); i < n; i++){   // мелкие точки со стороны плиты
         const s = t0 + R()*(t1-t0), d = depth*(1.3 + R()*2);
         g.beginPath(); g.arc(ax + ux*s + nx*d, ay + uy*s + ny*d, .22 + R()*.3, 0, 7); g.fill(); }
     }
@@ -294,29 +295,26 @@ function hullEdges(){
   });
   return E;
 }
-const EDGE_K = { lead:[.6, 1.9], step:[.45, 1.5], side:[.32, 1.4], seam:[.08, .8], seamBig:[.22, 1.1] };
+const EDGE_K = { lead:[.6, 1.9], step:[.45, 1.5], side:[.32, 1.4], seam:[.06, .8], seamBig:[.12, 1.0] };
 
-/* потёртости на плоскости крупной плиты: пучок коротких параллельных штрихов металла и точки;
-   мимо краски — номера должны читаться */
+/* потёртости на плоскости крупной плиты: редкие рваные пятна металла с мелкими точками рядом
+   (как сколы по краю краски); мимо краски — номера должны читаться */
 function scuffs(g, R, p, k){
   const cells = []; D.eachCell(p, (c, r) => cells.push([c, r]));
   const pim = W.paint.getContext('2d').getImageData(0, 0, W.paint.width, W.paint.height);
   const painted = (x, y) => pim.data[(Math.round(y*R4)*pim.width + Math.round(x*R4))*4 + 3] > 40;
-  for (let i = 0, n = Math.round(p.cells/22*k); i < n; i++){
+  for (let i = 0, n = Math.round(p.cells/70*k); i < n; i++){
     const [c, r] = cells[R()*cells.length|0], [x0, y0, cs] = D.cellRect(p, c, r);
     const x = x0 + R()*cs, y = y0 + R()*cs; if (painted(x, y)) continue;
-    const metal = hullLumAt(x, y) < 0.15 ? METAL_DARK : METAL_LIGHT, a = (R()-.5)*.8 + (R() < .3 ? Math.PI/2 : 0);
-    const ux = Math.cos(a), uy = Math.sin(a);
-    g.strokeStyle = metal; g.fillStyle = metal; g.lineCap = 'round';
-    for (let j = 0, m = 2 + (R()*3|0); j < m; j++){
-      const off = (j - m/2)*1.1 + (R()-.5)*.4, len = 2 + R()*4.5, sh = (R()-.5)*2;
-      const sx = x - uy*off + ux*sh, sy = y + ux*off + uy*sh;
-      if (painted(sx, sy) || painted(sx + ux*len, sy + uy*len)) continue;
-      g.lineWidth = .45 + R()*.4; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + ux*len, sy + uy*len); g.stroke();
-    }
-    for (let j = 0, m = 1 + (R()*3|0); j < m; j++){
-      const dx = x + (R()-.5)*7, dy = y + (R()-.5)*7; if (painted(dx, dy)) continue;
-      g.beginPath(); g.arc(dx, dy, .2 + R()*.3, 0, 7); g.fill(); }
+    g.fillStyle = hullLumAt(x, y) < 0.15 ? METAL_DARK : METAL_LIGHT;
+    const rad = .5 + R()*(.6 + .3*k), m = 6 + (R()*3|0), el = 1 + R()*.8, a0 = R()*Math.PI;
+    g.beginPath();
+    for (let j = 0; j < m; j++){ const a = j/m*Math.PI*2, rr = rad*(.5 + R()*.6), ex = Math.cos(a)*rr*el, ey = Math.sin(a)*rr;
+      g[j ? 'lineTo' : 'moveTo'](x + ex*Math.cos(a0) - ey*Math.sin(a0), y + ex*Math.sin(a0) + ey*Math.cos(a0)); }
+    g.closePath(); g.fill();
+    for (let j = 0, d = 1 + (R()*3|0); j < d; j++){
+      const dx = x + (R()-.5)*5*rad, dy = y + (R()-.5)*5*rad; if (painted(dx, dy)) continue;
+      g.beginPath(); g.arc(dx, dy, .2 + R()*.25, 0, 7); g.fill(); }
   }
 }
 function wearHull(g, k){
@@ -356,7 +354,8 @@ function chipList(k){
     const text = y > py(2), rad = (text ? .45 : .6) + R()*(text ? .45 : .7 + .35*k), m = 6 + (R()*3|0);
     const shape = []; for (let i = 0; i < m; i++) shape.push([i/m*Math.PI*2, .55 + R()*.6]);
     const dots = []; for (let i = 0, n = text ? 0 : 1 + (R()*3|0); i < n; i++) dots.push([x + (R()-.5)*5*rad, y + (R()-.5)*5*rad, .2 + R()*.25]);
-    out.push({ x, y, rad, shape, dots, rim: R() < .6 });
+    const metal = R() < .45;                                  // до металла или только до нижней краски
+    out.push({ x, y, rad, shape, dots: metal ? dots : [], metal, rim: metal && R() < .6 });
   }
   return out;
 }
@@ -366,7 +365,11 @@ function applyChips(src, chips){
   const res = src.width / SHIP.W; g.setTransform(res, 0, 0, res, 0, 0); g.globalCompositeOperation = 'source-atop';
   const poly = (c, k, dx = 0, dy = 0) => { g.beginPath(); c.shape.forEach(([a, r], i) => g[i ? 'lineTo' : 'moveTo'](c.x + dx + Math.cos(a)*r*c.rad*k*1.3, c.y + dy + Math.sin(a)*r*c.rad*k)); g.closePath(); g.fill(); };
   for (const c of chips){
-    /* ободок грунта — только у краски поверх корпуса, у части сколов и с одной стороны (серп снизу-справа) */
+    if (!c.metal){                                            // стёрто до нижней краски: сквозь скол видна плита
+      g.globalCompositeOperation = 'destination-out'; g.fillStyle = '#000'; poly(c, 1);
+      g.globalCompositeOperation = 'source-atop'; continue;
+    }
+    /* до металла; ободок грунта — у части сколов и с одной стороны (серп снизу-справа) */
     if (c.rim){ g.fillStyle = PRIMER; poly(c, 1.15, .35*c.rad, .35*c.rad); }
     g.fillStyle = METAL_LIGHT; poly(c, 1);
     for (const [x, y, r] of c.dots){ g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
