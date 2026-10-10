@@ -516,26 +516,32 @@ class _GameScreenState extends State<GameScreen>
 
     var trayChanged = false;
     setState(() {
-      final anchor = _anchorAt(pointer);
-      if (anchor != null) {
+      // Палец над лотком важнее якоря на поле: кусок встаёт в лоток на место
+      // у пальца (с поля — `remove(at:)`, из лотка — перестановка), даже если
+      // угол поднятого куска ещё над полем.
+      final overTray = pointer != null && _isOverTray(pointer);
+      final anchor = overTray ? null : _anchorAt(pointer);
+      if (overTray) {
+        final index = _trayIndexAt(pointer, pieceId, clampToView: false);
+        if (fromTray) {
+          _controller.moveInTray(pieceId, index);
+        } else {
+          _controller.remove(pieceId, at: index);
+        }
+        trayChanged = true;
+      } else if (anchor != null) {
         if (fromTray) {
           _controller.place(pieceId, anchor.x, anchor.y);
         } else {
           _controller.move(pieceId, anchor.x, anchor.y);
         }
       } else if (pointer != null) {
-        // Якоря на поле нет: кусок встаёт в лоток на ближайшее место. Над
-        // лотком — к точке отпускания (перестановка для куска из лотка);
-        // иначе с поля — к пальцу по горизонтали в видимой части ряда, из
-        // лотка — без изменений.
-        final overTray = _isOverTray(pointer);
-        if (overTray || !fromTray) {
-          final index = _trayIndexAt(pointer, pieceId, clampToView: !overTray);
-          if (fromTray) {
-            _controller.moveInTray(pieceId, index);
-          } else {
-            _controller.remove(pieceId, at: index);
-          }
+        // Ни над лотком, ни над полем: с поля — в лоток к пальцу по
+        // горизонтали (x зажата в видимую часть ряда), из лотка — без
+        // изменений.
+        if (!fromTray) {
+          final index = _trayIndexAt(pointer, pieceId, clampToView: true);
+          _controller.remove(pieceId, at: index);
           trayChanged = true;
         }
       } else if (!fromTray) {
@@ -663,9 +669,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Живое снап-превью: клетки поля под текущим якорем + валидность
-  /// (`el-drop-ok` / `el-drop-bad`). `null` — драга нет или курсор вне поля.
+  /// (`el-drop-ok` / `el-drop-bad`). `null` — драга нет, курсор вне поля или
+  /// палец над лотком (отпускание уйдёт в лоток).
   PackDragPreview? _computePreview(PackState state) {
     if (_dragPieceId == null || _dragGlobalPos == null) return null;
+    // Палец над лотком — отпускание уйдёт в лоток, а не на поле: превью нет.
+    if (_isOverTray(_dragGlobalPos!)) return null;
     final anchor = _anchorAt(_dragGlobalPos);
     if (anchor == null) return null;
     final piece = _pieceById(_dragPieceId!);

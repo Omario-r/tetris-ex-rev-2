@@ -919,6 +919,87 @@ void main() {
       expect(trayOrder(tester), [order[1], order[0], ...order.sublist(2)]);
     });
 
+    /// Якорь поля, который дал бы кусок [id] при пальце в [finger] (формула
+    /// `_anchorAt`: левый верхний угол поднятого куска, округление).
+    ({int x, int y}) fieldAnchorFor(
+      WidgetTester tester,
+      PreparedLevel level,
+      int id,
+      Offset finger,
+    ) {
+      final piece = level.slice.pieces.firstWhere((p) => p.id == id);
+      var w = 0;
+      var h = 0;
+      for (final c in piece.cells) {
+        if (c.x + 1 > w) w = c.x + 1;
+        if (c.y + 1 > h) h = c.y + 1;
+      }
+      final origin = tester.getTopLeft(
+        find.byWidgetPredicate(
+          (x) => x is CustomPaint && x.painter is PackingPainter,
+        ),
+      );
+      final cell = packingPainter(tester).cellSize;
+      return (
+        x: ((finger.dx - w * cell / 2 - origin.dx) / cell).round(),
+        y: ((finger.dy - liftGap - h * cell - origin.dy) / cell).round(),
+      );
+    }
+
+    bool onField(({int x, int y}) a) =>
+        a.x >= 0 && a.x < 10 && a.y >= 0 && a.y < 14;
+
+    testWidgets('палец у верхней кромки лотка важнее якоря на поле: кусок с '
+        'поля уходит в лоток к пальцу', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = await layFirstPiece(tester, level);
+      final finger = Offset(180, trayRect(tester).top + 4);
+      expect(onField(fieldAnchorFor(tester, level, id, finger)), isTrue,
+          reason: 'условие теста: угол куска ещё над полем');
+      final expected = piecesLeftOf(tester, finger.dx);
+      final before = trayOrder(tester);
+
+      final gesture = await grabFromField(tester, level, id);
+      await gesture.moveTo(finger);
+      await tester.pump();
+      expect(packingPainter(tester).dragPreview, isNull,
+          reason: 'над лотком превью укладки нет');
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(packingPainter(tester).state.placements, isEmpty);
+      expect(trayOrder(tester),
+          [...before.take(expected), id, ...before.skip(expected)]);
+    });
+
+    testWidgets('палец у верхней кромки лотка: кусок лотка переставляется, а '
+        'не укладывается на поле', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final order = level.trayOrder;
+      final id = order[1];
+      final finger = Offset(180, trayRect(tester).top + 4);
+      expect(onField(fieldAnchorFor(tester, level, id, finger)), isTrue,
+          reason: 'условие теста: угол куска ещё над полем');
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_$id'))),
+      );
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      final rest = [...order]..remove(id);
+      final expected = piecesLeftOf(tester, finger.dx);
+      await gesture.moveTo(finger);
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(packingPainter(tester).state.placements, isEmpty);
+      expect(trayOrder(tester),
+          [...rest.take(expected), id, ...rest.skip(expected)]);
+    });
+
     testWidgets('кусок лотка, отпущенный вне поля и лотка, остаётся на своём '
         'месте', (tester) async {
       await pumpNarrow(tester);
