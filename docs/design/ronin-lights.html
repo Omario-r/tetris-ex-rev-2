@@ -45,9 +45,10 @@
 <h1 style="margin-top:40px">Вариант: корабль потёртый</h1>
 <p class="lead">Эксперимент к обсуждению (PO, 2026-10-10), не канон. Износ — краска стёрта до
 металла. По референсам: сколы по внешним кромкам силуэта (больше всего — передняя кромка носа и
-уступы), реже по краям плит на швах, по краям крышек люков и по краю краски; середины плит не
-трогаются. Металл — светлый холодный серый; на графите приглушённый и без ободка, на оранжевой
-краске — тёмная полоса грунта, затем металл. Свет не трогается. Во время сборки клетка однотонная
+уступы), по краям плит на швах (на крупных плитах — чаще), короткие потёртости на плоскости
+крупных плит, по краям крышек люков и по краю краски. Металл — светлый холодный серый; на графите
+приглушённый. Обводки у износа фоновой краски нет; у краски поверх корпуса (шеврон, номера) часть
+сколов с бурым ободком грунта с одной стороны. Свет не трогается. Во время сборки клетка однотонная
 (D-017), поэтому износ там виден только сколами краски.</p>
 <p class="lead">Износ: <label><input type="radio" name="wear" value="1" checked> лёгкий</label>
   <label><input type="radio" name="wear" value="2"> заметный</label></p>
@@ -287,13 +288,37 @@ function hullEdges(){
   }
   for (const p of plates) D.eachCell(p, (c, r) => {                                    // кромки плит на швах: верх и лево
     const [x, y, cs] = D.cellRect(p, c, r);
-    if (!on(p, c, r-1) && probe.isPointInPath(HULLREG, x + cs/2, y - .8)) E.push([x, y, x+cs, y, 0, 1, 'seam']);
-    if (!on(p, c-1, r) && probe.isPointInPath(HULLREG, x - .8, y + cs/2)) E.push([x, y, x, y+cs, 1, 0, 'seam']);
+    const kind = p.cells >= 60 ? 'seamBig' : 'seam';
+    if (!on(p, c, r-1) && probe.isPointInPath(HULLREG, x + cs/2, y - .8)) E.push([x, y, x+cs, y, 0, 1, kind]);
+    if (!on(p, c-1, r) && probe.isPointInPath(HULLREG, x - .8, y + cs/2)) E.push([x, y, x, y+cs, 1, 0, kind]);
   });
   return E;
 }
-const EDGE_K = { lead:[.6, 1.9], step:[.45, 1.5], side:[.32, 1.4], seam:[.08, .8] };
+const EDGE_K = { lead:[.6, 1.9], step:[.45, 1.5], side:[.32, 1.4], seam:[.08, .8], seamBig:[.22, 1.1] };
 
+/* потёртости на плоскости крупной плиты: пучок коротких параллельных штрихов металла и точки;
+   мимо краски — номера должны читаться */
+function scuffs(g, R, p, k){
+  const cells = []; D.eachCell(p, (c, r) => cells.push([c, r]));
+  const pim = W.paint.getContext('2d').getImageData(0, 0, W.paint.width, W.paint.height);
+  const painted = (x, y) => pim.data[(Math.round(y*R4)*pim.width + Math.round(x*R4))*4 + 3] > 40;
+  for (let i = 0, n = Math.round(p.cells/22*k); i < n; i++){
+    const [c, r] = cells[R()*cells.length|0], [x0, y0, cs] = D.cellRect(p, c, r);
+    const x = x0 + R()*cs, y = y0 + R()*cs; if (painted(x, y)) continue;
+    const metal = hullLumAt(x, y) < 0.15 ? METAL_DARK : METAL_LIGHT, a = (R()-.5)*.8 + (R() < .3 ? Math.PI/2 : 0);
+    const ux = Math.cos(a), uy = Math.sin(a);
+    g.strokeStyle = metal; g.fillStyle = metal; g.lineCap = 'round';
+    for (let j = 0, m = 2 + (R()*3|0); j < m; j++){
+      const off = (j - m/2)*1.1 + (R()-.5)*.4, len = 2 + R()*4.5, sh = (R()-.5)*2;
+      const sx = x - uy*off + ux*sh, sy = y + ux*off + uy*sh;
+      if (painted(sx, sy) || painted(sx + ux*len, sy + uy*len)) continue;
+      g.lineWidth = .45 + R()*.4; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx + ux*len, sy + uy*len); g.stroke();
+    }
+    for (let j = 0, m = 1 + (R()*3|0); j < m; j++){
+      const dx = x + (R()-.5)*7, dy = y + (R()-.5)*7; if (painted(dx, dy)) continue;
+      g.beginPath(); g.arc(dx, dy, .2 + R()*.3, 0, 7); g.fill(); }
+  }
+}
 function wearHull(g, k){
   const R = mulberry32(1977);
   g.save(); g.clip(HULLREG);
@@ -301,6 +326,7 @@ function wearHull(g, k){
     const [dens, depth] = EDGE_K[kind];
     edgeWear(g, R, ax, ay, bx, by, nx, ny, Math.min(.9, dens*k), depth*(.8 + .25*k));
   }
+  for (const p of plates) if (p.cells >= 60) scuffs(g, R, p, k);
   g.restore();
 }
 /* люки: края крышки */
@@ -330,7 +356,7 @@ function chipList(k){
     const text = y > py(2), rad = (text ? .45 : .6) + R()*(text ? .45 : .7 + .35*k), m = 6 + (R()*3|0);
     const shape = []; for (let i = 0; i < m; i++) shape.push([i/m*Math.PI*2, .55 + R()*.6]);
     const dots = []; for (let i = 0, n = text ? 0 : 1 + (R()*3|0); i < n; i++) dots.push([x + (R()-.5)*5*rad, y + (R()-.5)*5*rad, .2 + R()*.25]);
-    out.push({ x, y, rad, shape, dots });
+    out.push({ x, y, rad, shape, dots, rim: R() < .6 });
   }
   return out;
 }
@@ -338,10 +364,11 @@ function applyChips(src, chips){
   const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
   const g = cv.getContext('2d'); g.drawImage(src, 0, 0);
   const res = src.width / SHIP.W; g.setTransform(res, 0, 0, res, 0, 0); g.globalCompositeOperation = 'source-atop';
-  const poly = (c, k) => { g.beginPath(); c.shape.forEach(([a, r], i) => g[i ? 'lineTo' : 'moveTo'](c.x + Math.cos(a)*r*c.rad*k*1.3, c.y + Math.sin(a)*r*c.rad*k)); g.closePath(); g.fill(); };
+  const poly = (c, k, dx = 0, dy = 0) => { g.beginPath(); c.shape.forEach(([a, r], i) => g[i ? 'lineTo' : 'moveTo'](c.x + dx + Math.cos(a)*r*c.rad*k*1.3, c.y + dy + Math.sin(a)*r*c.rad*k)); g.closePath(); g.fill(); };
   for (const c of chips){
-    g.fillStyle = PRIMER; poly(c, 1.25);
-    g.fillStyle = METAL_LIGHT; poly(c, .8);
+    /* ободок грунта — только у краски поверх корпуса, у части сколов и с одной стороны (серп снизу-справа) */
+    if (c.rim){ g.fillStyle = PRIMER; poly(c, 1.15, .35*c.rad, .35*c.rad); }
+    g.fillStyle = METAL_LIGHT; poly(c, 1);
     for (const [x, y, r] of c.dots){ g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
   }
   return cv;
