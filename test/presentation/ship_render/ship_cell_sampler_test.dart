@@ -2,6 +2,7 @@ import 'dart:ui' as ui;
 
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/presentation/ship_render/ronin_art.dart';
+import 'package:explosive_tetris/presentation/ship_render/ship_art.dart';
 import 'package:explosive_tetris/presentation/ship_render/ship_cell_sampler.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -236,25 +237,23 @@ void main() {
     });
   });
 
-  group('partCellColors — преобладающий цвет клетки (D-016)', () {
-    testWidgets('плита prow: шеврон оранжевый, клетка без шеврона — цвет '
-        'плиты и тёмная; кеш — тот же объект', (tester) async {
+  group('partCellColors — вид и цвет клетки (D-017)', () {
+    testWidgets('плита prow: основа без краски — шеврон (7, 2) того же цвета '
+        'плиты, что (0, 3), обе тёмные; кеш — тот же объект', (tester) async {
       final prow = RoninParts.byId('prow');
       await tester.runAsync(() async {
         final colors = await partCellColors(art, prow);
         expect(colors.width, prow.mask.width);
         expect(colors.height, prow.mask.height);
 
-        final chevron = colors.colorAt(7, 2);
-        expect(
-          chevron.r * 255,
-          greaterThan(chevron.g * 255 + 40),
-          reason: 'клетка (7, 2) — шеврон: $chevron',
-        );
-
-        // (0, 3) — левый-нижний угол носа, шеврона нет.
+        // (0, 3) — левый-нижний угол носа, краски нет.
         final plain = colors.colorAt(0, 3);
-        final ref = await _fieldRef(art, prow, art.fieldBuildPicture, 8);
+        final ref = await _fieldRef(
+          art,
+          prow,
+          art.fieldLayer(ShipFieldLayer.hullBase),
+          8,
+        );
         final p = await _rgba(ref, 4, 3 * 8 + 4);
         ref.dispose();
         for (final (got, want) in [
@@ -264,10 +263,103 @@ void main() {
         ]) {
           expect((got * 255 - want).abs(), lessThanOrEqualTo(4));
         }
+        // (7, 2) — шеврон: краска рисуется поверх, в основе её нет.
+        final chevron = colors.colorAt(7, 2);
+        expect(colors.kindAt(7, 2), PartCellKind.base);
+        expect((_lum(chevron) - _lum(plain)).abs(), lessThan(.03));
         expect(colors.isDark(0, 3), isTrue, reason: 'нос — DARK: $plain');
-        expect(colors.isDark(7, 2), isFalse);
+        expect(colors.isDark(7, 2), isTrue, reason: '$chevron');
 
         expect(identical(await partCellColors(art, prow), colors), isTrue);
+      });
+    });
+
+    /// Клетки детали [id] вида [kind] — множество `(c, r)`.
+    Future<Set<(int, int)>> cellsOf(String id, PartCellKind kind) async {
+      final part = RoninParts.byId(id);
+      final colors = await partCellColors(art, part);
+      return {
+        for (final f in part.mask.cells)
+          if (colors.kindAt(f.x, f.y) == kind) (f.x, f.y),
+      };
+    }
+
+    testWidgets('световые клетки — ровно как в критерии; цвет светлый, у щелей '
+        'голубой', (tester) async {
+      await tester.runAsync(() async {
+        const want = {
+          'fwd1_l': {(4, 6), (5, 6), (6, 6)},
+          'fwd1_r': {(2, 6), (3, 6), (4, 6)},
+          'sensor': {(3, 0), (3, 1), (2, 3), (3, 3), (4, 3)},
+          'visor_l': {
+            (1, 1), (2, 1), (3, 1), (4, 1), //
+            (6, 1), (7, 1), (8, 1), (9, 1),
+          },
+          'visor_r': {
+            (1, 1), (2, 1), (3, 1), (4, 1), //
+            (6, 1), (7, 1), (8, 1),
+          },
+        };
+        for (final part in RoninParts.parts) {
+          final got = await cellsOf(part.id, PartCellKind.light);
+          expect(got, want[part.id] ?? const <(int, int)>{}, reason: part.id);
+          final colors = await partCellColors(art, part);
+          for (final (c, r) in got) {
+            final k = colors.colorAt(c, r);
+            expect(_lum(k), greaterThan(.6), reason: '${part.id} ($c, $r) $k');
+            if (part.id.startsWith('fwd1_')) {
+              expect(k.b, greaterThan(k.r), reason: 'щель ${part.id} ($c, $r)');
+            }
+          }
+        }
+      });
+    });
+
+    testWidgets('цветные клетки: hatch_l, hatch_r — ряд 0 целиком, оранжевые; '
+        'у остальных деталей нет', (tester) async {
+      await tester.runAsync(() async {
+        final row0 = {for (var c = 0; c < 7; c++) (c, 0)};
+        for (final part in RoninParts.parts) {
+          final got = await cellsOf(part.id, PartCellKind.accent);
+          final hatch = part.id == 'hatch_l' || part.id == 'hatch_r';
+          expect(got, hatch ? row0 : const <(int, int)>{}, reason: part.id);
+          final colors = await partCellColors(art, part);
+          for (final (c, r) in got) {
+            final k = colors.colorAt(c, r);
+            expect(k.r > k.g && k.g > k.b, isTrue, reason: '${part.id} $k');
+          }
+        }
+      });
+    });
+
+    testWidgets('prow, bridge_c, fwd1_cl, fwd2_l — только основа', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        for (final id in const ['prow', 'bridge_c', 'fwd1_cl', 'fwd2_l']) {
+          final part = RoninParts.byId(id);
+          expect(await cellsOf(id, PartCellKind.base), {
+            for (final f in part.mask.cells) (f.x, f.y),
+          }, reason: id);
+        }
+      });
+    });
+
+    testWidgets('основа sensor (1, 4), (5, 4) и hatch_l (6, 1), (6, 5) — не '
+        'почти чёрная (яркость > 0,05; обводка и тень не берутся)', (
+      tester,
+    ) async {
+      await tester.runAsync(() async {
+        for (final (id, c, r) in const [
+          ('sensor', 1, 4),
+          ('sensor', 5, 4),
+          ('hatch_l', 6, 1),
+          ('hatch_l', 6, 5),
+        ]) {
+          final colors = await partCellColors(art, RoninParts.byId(id));
+          final k = colors.colorAt(c, r);
+          expect(_lum(k), greaterThan(.05), reason: '$id ($c, $r) $k');
+        }
       });
     });
 
@@ -279,6 +371,97 @@ void main() {
         final colors = await partCellColors(art, visor);
         expect(_lum(colors.colorAt(2, 1)), greaterThan(.5));
         expect(colors.isDark(2, 0), isTrue, reason: '${colors.colorAt(2, 0)}');
+      });
+    });
+  });
+
+  group('paintPartCells — клетка по D-017 (с colors)', () {
+    const u = 34.0;
+
+    testWidgets('краска поверх основы: prow (3, 2) — центр оранжевый, '
+        'colorAt — тёмная основа носа', (tester) async {
+      final prow = RoninParts.byId('prow');
+      await tester.runAsync(() async {
+        final colors = await partCellColors(art, prow);
+        final img = await _raster(
+          (prow.mask.width * u).ceil(),
+          (prow.mask.height * u).ceil(),
+          (g) => paintPartCells(
+            g,
+            art,
+            prow,
+            prow.mask.cells,
+            origin: Offset.zero,
+            cellSize: u,
+            colors: colors,
+          ),
+        );
+        final center = await _rgba(img, (3.5 * u).floor(), (2.5 * u).floor());
+        img.dispose();
+        expect(center[0], greaterThan(center[1] + 40), reason: '$center');
+        expect(center[1], greaterThan(center[2]), reason: '$center');
+        expect(colors.kindAt(3, 2), PartCellKind.base);
+        expect(colors.isDark(3, 2), isTrue, reason: '${colors.colorAt(3, 2)}');
+      });
+    });
+
+    testWidgets('ореол: низ соседа (4, 5) световой клетки fwd1_l (4, 6) '
+        'светлее, чем без световых клеток', (tester) async {
+      final part = RoninParts.byId('fwd1_l');
+      await tester.runAsync(() async {
+        final colors = await partCellColors(art, part);
+        final w = (part.mask.width * u).ceil();
+        final h = (part.mask.height * u).ceil();
+        Future<ui.Image> field(Iterable<({int x, int y})> cells) => _raster(
+          w,
+          h,
+          (g) => paintPartCells(
+            g,
+            art,
+            part,
+            cells,
+            origin: Offset.zero,
+            cellSize: u,
+            colors: colors,
+          ),
+        );
+        final all = await field(part.mask.cells);
+        final dark = await field([
+          for (final f in part.mask.cells)
+            if (colors.kindAt(f.x, f.y) != PartCellKind.light) f,
+        ]);
+        final x = (4.5 * u).floor(), y = (6 * u).floor() - 3;
+        final lit = await _rgba(all, x, y), plain = await _rgba(dark, x, y);
+        all.dispose();
+        dark.dispose();
+        expect(_sum(lit), greaterThan(_sum(plain) + 30), reason: '$lit $plain');
+      });
+    });
+
+    testWidgets('paintPartCell световой клетки — ореол до неё, за пределами '
+        'клетки', (tester) async {
+      final part = RoninParts.byId('fwd1_l');
+      await tester.runAsync(() async {
+        final colors = await partCellColors(art, part);
+        final img = await _raster(
+          (part.mask.width * u).ceil(),
+          (part.mask.height * u).ceil(),
+          (g) => paintPartCell(
+            g,
+            art,
+            part,
+            4,
+            6,
+            const Rect.fromLTWH(4 * u, 6 * u, u, u),
+            colors: colors,
+          ),
+        );
+        final above = await _rgba(img, (4.5 * u).floor(), (6 * u).floor() - 3);
+        final center = await _rgba(img, (4.5 * u).floor(), (6.5 * u).floor());
+        img.dispose();
+        expect(above[3], greaterThan(0), reason: 'ореол над клеткой: $above');
+        expect(_lum(colors.colorAt(4, 6)), greaterThan(.6));
+        expect(center[2], greaterThan(center[0]), reason: 'щель: $center');
       });
     });
   });
