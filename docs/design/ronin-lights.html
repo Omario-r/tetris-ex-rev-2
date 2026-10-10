@@ -180,7 +180,7 @@ function field(cv, part, mode, lights, accents, paintCv){
   const g = D.dpr(cv, (w+2)*u, (h+2)*u);
   g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, (w+2)*u, (h+2)*u);
   if (mode === 'done'){ D.drawField(g, part, u, 1, 1, 'done'); return; }
-  if (mode === 'now'){ D.eachCell(part, (c, r) => D.drawCell(g, part, c, r, (c+1)*u, (r+1)*u, u, 'build')); return; }
+  if (mode === 'canon'){ D.drawField(g, part, u, 1, 1, 'build'); return; }   /* канон ronin-draw.js */
   const lit = [];
   D.eachCell(part, (c, r) => {
     const X = (c+1)*u, Y = (r+1)*u, k = c+','+r, col = lights.get(k);
@@ -209,7 +209,7 @@ for (const [id, t, an] of SHOW){
   const part = P.parts.find(p => p.id === id), lights = elemCells(part, 'light'), accents = elemCells(part, 'accent');
   root.insertAdjacentHTML('beforeend', `<div class="sect">${part.order}. ${t} · ${part.cells} кл., цветных — ${accents.size}, световых — ${lights.size}</div>`);
   const row = document.createElement('div'); row.className = 'row'; root.appendChild(row);
-  for (const [mode, title] of [['now', 'Сейчас'], ['new', 'Новая клетка'], ['done', 'Собрана']]){
+  for (const [mode, title] of [['canon', 'Во время сборки (D-017)'], ['done', 'Собрана']]){
     const card = document.createElement('div'), b = document.createElement('div'), cv = document.createElement('canvas');
     card.className = 'card'; b.className = 'board'; b.appendChild(cv);
     card.innerHTML = `<h2>${title}</h2>`; card.appendChild(b); row.appendChild(card);

@@ -19,7 +19,9 @@
   render(opt) — рисует сцену в новую offscreen-канву и возвращает её:
     res    — разрешение (по умолчанию 2);
     layer  — 'all' (с фоном) | 'hull' (обшивка и покраска, без фона и предметов)
-             | 'objects' (только предметы слоя 1, прозрачный фон);
+             | 'objects' (только предметы слоя 1, прозрачный фон)
+             | 'paint' (только краска корпуса, прозрачный фон — поверх однотонной
+               основы клетки поля, D-017);
     edges  — false: без кромок деталей и контура корпуса (поле укладки);
     lights — false: без света — щели-огни, огни гондол, строб и огонёк датчика,
              стекло визора (поле укладки во время сборки);
@@ -145,7 +147,7 @@ const RONIN1_ROWS=8;   /* строки рисунка, которые разме
 function render(opt){
 opt=opt||{};
 const RES=opt.res||2, LAYER=opt.layer||'all';
-const BG=LAYER==='all', HULL=LAYER!=='objects', OBJ=LAYER!=='hull';
+const BG=LAYER==='all', HULL=LAYER==='all'||LAYER==='hull', OBJ=LAYER==='all'||LAYER==='objects';
 const EDGES=opt.edges!==false, LIGHTS=opt.lights!==false, PAINT=opt.paint!==false, ACCENTS=opt.accents!==false;
 const off=document.createElement('canvas'); off.width=W*RES; off.height=H*RES;
 const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
@@ -190,6 +192,43 @@ const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
   halo.addColorStop(0,'rgba(140,215,255,.34)');halo.addColorStop(.5,'rgba(120,200,255,.13)');halo.addColorStop(1,'rgba(120,200,255,0)');
   g.fillStyle=halo;g.beginPath();g.arc(cx,gy,6.4*C,0,7);g.fill();
 })();
+
+/* краска корпуса (D-017): шеврон, «VV-77», «77», «РОНИН» — поверх основы, отдельным слоем */
+function drawPaint(){
+/* шеврон на носу */
+g.save(); g.beginPath();
+g.rect(px(span[0][0]),py(0),(span[0][1]-span[0][0]+1)*C,2*C); g.clip();
+g.fillStyle=hsl(M.ORAN,0,.95);
+g.beginPath();
+g.moveTo(cx,py(1.95));g.lineTo(cx-2.1*C,py(.9));g.lineTo(cx-2.1*C,py(.38));
+g.lineTo(cx,py(1.38));g.lineTo(cx+2.1*C,py(.38));g.lineTo(cx+2.1*C,py(.9));g.closePath();g.fill();
+g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;
+g.beginPath();g.moveTo(cx-2.1*C,py(.24));g.lineTo(cx,py(1.22));g.lineTo(cx+2.1*C,py(.24));g.stroke();
+g.restore();
+
+/* номер борта */
+g.font='bold 12px "Arial Narrow","DejaVu Sans",sans-serif';
+g.textAlign='center'; g.textBaseline='middle';
+g.fillStyle='rgba(223,230,236,.85)';
+g.fillText('V V - 7 7', cx, py(4.62));
+
+/* трафарет «77» на носовой секции (как бортовые надписи референса) */
+g.save();
+g.font='bold 26px "Arial Narrow","DejaVu Sans",sans-serif';
+g.fillStyle='rgba(228,234,240,.78)';
+g.fillText('7 7', px(4.85), py(7.28));
+g.restore();
+
+/* --- маркировка «РОНИН» --- */
+(function(){
+  const word='РОНИН';
+  g.font='bold 21px "Arial Narrow","DejaVu Sans",sans-serif';
+  g.fillStyle='rgba(30,18,8,.92)';
+  for(let i=0;i<5;i++) g.fillText(word[i], px(4.5), py(8.55+i));
+  g.strokeStyle='rgba(30,18,8,.5)'; g.lineWidth=2;
+  g.beginPath();g.moveTo(px(3.4),py(8.25));g.lineTo(px(3.4),py(12.75));g.stroke();
+})();
+}
 
 /* ================================================================
    КОРПУС
@@ -266,42 +305,8 @@ g.restore();
    ДЕТАЛИ ПО СЕКЦИЯМ
 ================================================================ */
 
-/* --- нос: шеврон + датчик-блок + строб --- */
-if(PAINT){
-g.save(); g.beginPath();
-g.rect(px(span[0][0]),py(0),(span[0][1]-span[0][0]+1)*C,2*C); g.clip();
-g.fillStyle=hsl(M.ORAN,0,.95);
-g.beginPath();
-g.moveTo(cx,py(1.95));g.lineTo(cx-2.1*C,py(.9));g.lineTo(cx-2.1*C,py(.38));
-g.lineTo(cx,py(1.38));g.lineTo(cx+2.1*C,py(.38));g.lineTo(cx+2.1*C,py(.9));g.closePath();g.fill();
-g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2;
-g.beginPath();g.moveTo(cx-2.1*C,py(.24));g.lineTo(cx,py(1.22));g.lineTo(cx+2.1*C,py(.24));g.stroke();
-g.restore();
-
-/* номер борта */
-g.font='bold 12px "Arial Narrow","DejaVu Sans",sans-serif';
-g.textAlign='center'; g.textBaseline='middle';
-g.fillStyle='rgba(223,230,236,.85)';
-g.fillText('V V - 7 7', cx, py(4.62));
-
-/* трафарет «77» на носовой секции (как бортовые надписи референса) */
-g.save();
-g.font='bold 26px "Arial Narrow","DejaVu Sans",sans-serif';
-g.fillStyle='rgba(228,234,240,.78)';
-g.fillText('7 7', px(4.85), py(7.28));
-g.restore();
-}   /* /PAINT */
-
-/* --- маркировка «РОНИН» --- */
-(function(){
-  if(!PAINT) return;
-  const word='РОНИН';
-  g.font='bold 21px "Arial Narrow","DejaVu Sans",sans-serif';
-  g.fillStyle='rgba(30,18,8,.92)';
-  for(let i=0;i<5;i++) g.fillText(word[i], px(4.5), py(8.55+i));
-  g.strokeStyle='rgba(30,18,8,.5)'; g.lineWidth=2;
-  g.beginPath();g.moveTo(px(3.4),py(8.25));g.lineTo(px(3.4),py(12.75));g.stroke();
-})();
+/* --- краска корпуса --- */
+if(PAINT) drawPaint();
 
 /* --- стыковочный люк-октагон --- */
 (function(){
@@ -668,6 +673,7 @@ rcs(px(3),py(4.5),-1); rcs(px(12),py(4.5),1);
 rcs(px(3),py(20.5),-1); rcs(px(12),py(20.5),1);
 }
 }
+if(LAYER==='paint') drawPaint();
 return off;
 }   /* /render */
 

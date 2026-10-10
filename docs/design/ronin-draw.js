@@ -13,10 +13,15 @@
     <script src="ronin-draw.js"></script>
   Нужные варианты рисунка ronin-draw заказывает сам через __SHIP.render (лениво).
 
-  Клетка поля (D-016):
-    'build' — во время сборки: плитка с рельефом куска (вариант Б). Плита — рисунок
-              без кромок деталей и щелей-огней; предмет — преобладающий цвет клетки.
-              Заклёпки чёрные 45 %, на тёмной клетке (яркость < 0,2) — 85 %.
+  Клетка поля (D-016, D-017):
+    'build' — во время сборки: плитка с рельефом куска (вариант Б). Вид клетки (cellInfo):
+              основа — однотонная (преобладающий цвет рисунка без краски, цветных
+              элементов и света; почти чёрное не берётся, если его < 70 %), поверх —
+              краска корпуса (слой 'paint', может занимать часть клетки); цветной
+              элемент — клетка целиком его цвета; свет — то же с ореолом на соседей,
+              краски поверх нет. Элемент берёт клетку, если занимает ≥ 40 % её, или
+              ≥ 15 % и ≥ 70 % от соседа поперёк элемента. Заклёпки чёрные 45 %, на
+              тёмной клетке (яркость < 0,2) — 85 %.
     'done'  — деталь собрана: настоящий рисунок без рельефа и сетки; кромку детали
               рисует crispEdge в пикселях поля.
 */
@@ -27,11 +32,19 @@ const C = SHIP.C, RES = SHIP.RES || 2;
 const secOf = (part) => P.sections.find(s => s.id === part.section);
 
 /* ---------- варианты рисунка (лениво) ---------- */
+const OFF = { lights:false, paint:false, accents:false };
 const PICS = {}, PIC_OPT = {
   hull:  { res:RES, layer:'hull' },                               // корабль: обшивка
   obj:   { res:RES, layer:'objects' },                            // корабль и поле: предметы
-  build: { res:2,   layer:'hull', edges:false, lights:false },    // поле, сборка
   done:  { res:RES, layer:'hull', edges:false },                  // поле, собрана
+  /* поле, сборка (D-017): основа, + цветные элементы, + свет; краска корпуса отдельно */
+  hullBase:  Object.assign({ res:2, layer:'hull', edges:false }, OFF),
+  hullAcc:   Object.assign({ res:2, layer:'hull', edges:false }, OFF, { accents:true }),
+  hullLight: Object.assign({ res:2, layer:'hull', edges:false }, OFF, { lights:true }),
+  objBase:   Object.assign({ res:2, layer:'objects' }, OFF),
+  objAcc:    Object.assign({ res:2, layer:'objects' }, OFF, { accents:true }),
+  objLight:  Object.assign({ res:2, layer:'objects' }, OFF, { lights:true }),
+  paint:     { res:2, layer:'paint' },
 };
 function pic(k){ if (!PICS[k]) PICS[k] = { cv: SHIP.render(PIC_OPT[k]), res: PIC_OPT[k].res }; return PICS[k]; }
 
@@ -60,18 +73,70 @@ function dpr(cv, w, h){
   return g;
 }
 
-/* преобладающий цвет участка рисунка: самая частая корзина квантованного цвета */
-function domColor(p, x, y, cs){
-  const k = p.res, d = p.cv.getContext('2d', { willReadFrequently:true })
-    .getImageData(Math.round(x*k), Math.round(y*k), Math.max(1, Math.round(cs*k)), Math.max(1, Math.round(cs*k))).data;
-  const bins = new Map();
-  for (let i = 0; i < d.length; i += 4){ if (d[i+3] < 128) continue;
-    const key = (d[i]>>4)<<8 | (d[i+1]>>4)<<4 | (d[i+2]>>4), b = bins.get(key) || [0,0,0,0];
-    b[0]+=d[i]; b[1]+=d[i+1]; b[2]+=d[i+2]; b[3]++; bins.set(key, b); }
-  let best = null; for (const b of bins.values()) if (!best || b[3] > best[3]) best = b;
+/* пиксели рисунка (лениво, один раз) */
+function pixels(p){ if (!p.img) p.img = p.cv.getContext('2d', { willReadFrequently:true }).getImageData(0, 0, p.cv.width, p.cv.height); return p.img; }
+const lumAt = (d, i) => (0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]) / 255;
+const lum = ([r, g, b]) => (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+const rgb = (a, al) => al == null ? `rgb(${a.map(v => v|0).join(',')})` : `rgba(${a.map(v => v|0).join(',')},${al})`;
+/* квадрат клетки в пикселях рисунка p */
+function box(p, x, y, cs){ const k = p.res; return [Math.round(x*k), Math.round(y*k), Math.max(1, Math.round(cs*k))]; }
+
+/* преобладающий цвет участка рисунка: самая частая корзина квантованного цвета;
+   skipDark — почти чёрное (обводка, тень) не берётся, если его меньше 70 % участка */
+function domColor(p, x, y, cs, skipDark){
+  const im = pixels(p), d = im.data, W = im.width, [x0, y0, n] = box(p, x, y, cs);
+  const bins = new Map(); let dark = 0, tot = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    const q = ((y0+j)*W + x0+i)*4; if (d[q+3] < 128) continue; tot++;
+    const isDark = !!skipDark && lumAt(d, q) < 0.03; if (isDark) dark++;
+    const key = (isDark ? 1<<12 : 0) | (d[q]>>4)<<8 | (d[q+1]>>4)<<4 | (d[q+2]>>4), b = bins.get(key) || [0,0,0,0,isDark];
+    b[0]+=d[q]; b[1]+=d[q+1]; b[2]+=d[q+2]; b[3]++; bins.set(key, b);
+  }
+  const skip = tot && dark/tot < 0.7;
+  let best = null; for (const b of bins.values()) if (!(skip && b[4]) && (!best || b[3] > best[3])) best = b;
   return best ? [best[0]/best[3], best[1]/best[3], best[2]/best[3]] : [23, 26, 30];
 }
-const lum = ([r, g, b]) => (0.2126*r + 0.7152*g + 0.0722*b) / 255;
+
+/* доля пикселей элемента в клетке и их средний цвет; kind 'light' — ярче основы на 0,25,
+   'accent' — отличается от основы (сумма |ΔRGB| > 40) */
+function elemShare(part, c, r, kind){
+  const [x, y, cs] = cellRect(part, c, r), obj = part.layer === 1;
+  const src = pic((obj ? 'obj' : 'hull') + (kind === 'light' ? 'Light' : 'Acc')), base = pic(obj ? 'objBase' : 'hullBase');
+  const im = pixels(src), d = im.data, b = pixels(base).data, W = im.width, [x0, y0, n] = box(src, x, y, cs);
+  let hit = 0, tot = 0; const sum = [0, 0, 0];
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    const q = ((y0+j)*W + x0+i)*4; if (d[q+3] < 128) continue; tot++;
+    const on = kind === 'light' ? lumAt(d, q) - lumAt(b, q) > 0.25
+      : Math.abs(d[q]-b[q]) + Math.abs(d[q+1]-b[q+1]) + Math.abs(d[q+2]-b[q+2]) > 40;
+    if (on){ hit++; sum[0] += d[q]; sum[1] += d[q+1]; sum[2] += d[q+2]; }
+  }
+  return { f: tot ? hit/tot : 0, col: hit ? sum.map(v => v/hit) : null };
+}
+/* клетки элемента: ≥ 40 % клетки, или ≥ 15 % и ≥ 70 % от соседа поперёк элемента
+   (элемент шире, чем выше, — соседи сверху и снизу, иначе — слева и справа) */
+function elemCells(part, kind){
+  const F = new Map(); eachCell(part, (c, r) => F.set(c+','+r, elemShare(part, c, r, kind)));
+  const hot = [...F].filter(([, v]) => v.f >= 0.15).map(([k]) => k.split(',').map(Number));
+  const out = new Map(); if (!hot.length) return out;
+  const span = i => Math.max(...hot.map(h => h[i])) - Math.min(...hot.map(h => h[i]));
+  const across = span(0) >= span(1) ? [[0,1],[0,-1]] : [[1,0],[-1,0]];
+  for (const [c, r] of hot){
+    const v = F.get(c+','+r), nb = Math.max(0, ...across.map(([a, b]) => (F.get((c+a)+','+(r+b)) || {f:0}).f));
+    if (v.f >= 0.4 || v.f >= 0.7*nb) out.set(c+','+r, v.col);
+  }
+  return out;
+}
+/* вид и цвет каждой клетки детали (D-017), кеш по id: 'c,r' → { kind, col } */
+const INFO = {};
+function cellInfo(part){
+  if (INFO[part.id]) return INFO[part.id];
+  const light = elemCells(part, 'light'), acc = elemCells(part, 'accent'), out = new Map();
+  eachCell(part, (c, r) => { const k = c+','+r, [x, y, cs] = cellRect(part, c, r);
+    out.set(k, light.has(k) ? { kind:'light', col:light.get(k) }
+      : acc.has(k) ? { kind:'accent', col:acc.get(k) }
+      : { kind:'base', col:domColor(pic(part.layer === 1 ? 'objBase' : 'hullBase'), x, y, cs, true) }); });
+  return INFO[part.id] = out;
+}
 
 function rrPath(x, y, w, h, r){ const p = new Path2D(); p.moveTo(x+r,y); p.arcTo(x+w,y,x+w,y+h,r);
   p.arcTo(x+w,y+h,x,y+h,r); p.arcTo(x,y+h,x,y,r); p.arcTo(x,y,x+w,y,r); p.closePath(); return p; }
@@ -89,27 +154,45 @@ function rivets(g, x, y, w, h, s, dark){
   for (const [a, b] of [[x+4*s,y+4*s],[x+w-4*s,y+4*s],[x+4*s,y+h-4*s],[x+w-4*s,y+h-4*s]]){
     g.beginPath(); g.arc(a, b, 1.5*s, 0, 7); g.fill(); }
 }
+/* ореол световой клетки — на соседей (рисуется до самой клетки) */
+function halo(g, col, dx, dy, u){
+  g.save(); g.shadowColor = rgb(col, .9); g.shadowBlur = .7*u;
+  g.fillStyle = rgb(col); g.fill(rrPath(dx+2, dy+2, u-4, u-4, 3)); g.restore();
+}
+/* плитка клетки во время сборки, без ореола */
+function buildTile(g, part, c, r, dx, dy, u){
+  const [x, y, cs] = cellRect(part, c, r), info = cellInfo(part).get(c+','+r);
+  const s = u/34, i = s, w = u - 2*i;
+  g.save(); g.clip(rrPath(dx+i, dy+i, w, w, 3*s));
+  g.fillStyle = rgb(info.col); g.fillRect(dx, dy, u, u);
+  if (info.kind === 'base' && part.layer === 0){ const p = pic('paint');
+    g.drawImage(p.cv, x*p.res, y*p.res, cs*p.res, cs*p.res, dx, dy, u, u); }
+  tileRelief(g, dx+i, dy+i, w, w, s, 1.4);
+  g.restore();
+  rivets(g, dx+i, dy+i, w, w, s, lum(info.col) < 0.2);
+}
 
 /* одна клетка детали в (dx,dy) размером u; phase — 'build' | 'done' (по умолчанию) */
 function drawCell(g, part, c, r, dx, dy, u, phase){
-  const [x, y, cs] = cellRect(part, c, r), obj = part.layer === 1;
   if (phase !== 'build'){
-    const p = pic(obj ? 'obj' : 'done');
+    const [x, y, cs] = cellRect(part, c, r), p = pic(part.layer === 1 ? 'obj' : 'done');
     g.drawImage(p.cv, x*p.res, y*p.res, cs*p.res, cs*p.res, dx, dy, u, u);
     return;
   }
-  const p = pic(obj ? 'obj' : 'build'), dom = domColor(p, x, y, cs);
-  const s = u/34, i = s, w = u - 2*i;
-  g.save(); g.clip(rrPath(dx+i, dy+i, w, w, 3*s));
-  if (obj){ g.fillStyle = `rgb(${dom.map(v => v|0).join(',')})`; g.fillRect(dx, dy, u, u); }
-  else g.drawImage(p.cv, x*p.res, y*p.res, cs*p.res, cs*p.res, dx, dy, u, u);
-  tileRelief(g, dx+i, dy+i, w, w, s, 1.4);
-  g.restore();
-  rivets(g, dx+i, dy+i, w, w, s, lum(dom) < 0.2);
+  const info = cellInfo(part).get(c+','+r);
+  if (info.kind === 'light') halo(g, info.col, dx, dy, u);
+  buildTile(g, part, c, r, dx, dy, u);
 }
 
 /* деталь на поле укладки: маска со сдвигом (oc,or) в клетках поля */
 function drawField(g, part, u, oc, or, phase){
+  if (phase === 'build'){                       /* световые клетки последними — ореол ложится на соседей */
+    const info = cellInfo(part), lit = [];
+    eachCell(part, (c, r) => info.get(c+','+r).kind === 'light' ? lit.push([c, r]) : buildTile(g, part, c, r, (oc+c)*u, (or+r)*u, u));
+    for (const [c, r] of lit) halo(g, info.get(c+','+r).col, (oc+c)*u, (or+r)*u, u);
+    for (const [c, r] of lit) buildTile(g, part, c, r, (oc+c)*u, (or+r)*u, u);
+    return;
+  }
   eachCell(part, (c, r) => drawCell(g, part, c, r, (oc+c)*u, (or+r)*u, u, phase));
   if (phase !== 'build' && part.layer === 0) crispEdge(g, part, u, oc, or);
 }
@@ -201,6 +284,6 @@ function shipOutlinePath(g, T){
   }
 }
 
-return { RES, pic, frame, cellRect, eachCell, dpr, domColor, drawCell, drawField, crispEdge, drawSeams,
+return { RES, pic, frame, cellRect, eachCell, dpr, domColor, cellInfo, drawCell, drawField, crispEdge, drawSeams,
          strokeOutline, shipRegion, drawOnShip, strokeOnShip, centerOnShip, shipOutlinePath };
 })();
