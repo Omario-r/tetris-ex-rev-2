@@ -51,7 +51,11 @@
 сколов стёрта до металла (иногда с бурым ободком грунта с одной стороны), часть — только до нижней
 краски, сквозь скол видна плита. Свет не трогается. Во время сборки клетка однотонная
 (D-017), поэтому износ там виден только сколами краски.</p>
-<p class="lead">Износ: <label><input type="radio" name="wear" value="1" checked> лёгкий</label>
+<p class="lead">Решение PO (2026-10-10): износ прорабатывать отдельно; пока — минимум: металл только по
+внешним кромкам силуэта (нос, уступы, борта) и редкие сколы краски поверх корпуса. Швы, плоскость
+плит и люки не трогаются. Прежние уровни оставлены для сравнения.</p>
+<p class="lead">Износ: <label><input type="radio" name="wear" value="0.6" checked> минимум</label>
+  <label><input type="radio" name="wear" value="1"> лёгкий</label>
   <label><input type="radio" name="wear" value="2"> заметный</label></p>
 <div class="sect">Экран корабля: новый и потёртый</div>
 <div class="row" id="wearShips"></div>
@@ -322,13 +326,15 @@ function wearHull(g, k){
   g.save(); g.clip(HULLREG);
   for (const [ax, ay, bx, by, nx, ny, kind] of hullEdges()){
     const [dens, depth] = EDGE_K[kind];
+    if (k < 1 && kind.startsWith('seam')) continue;            // минимум: швы не трогаем
     edgeWear(g, R, ax, ay, bx, by, nx, ny, Math.min(.9, dens*k), depth*(.8 + .25*k));
   }
-  for (const p of plates) if (p.cells >= 60) scuffs(g, R, p, k);
+  if (k >= 1) for (const p of plates) if (p.cells >= 60) scuffs(g, R, p, k);
   g.restore();
 }
 /* люки: края крышки */
 function wearObj(g, k){
+  if (k < 1) return;                                           // минимум: люки не трогаем
   const R = mulberry32(4242), w = .84*C, h = .66*C;
   g.save(); g.clip(OBJREG);
   for (const s of [-1, 1]){
@@ -411,7 +417,7 @@ const WEAR_SHOW = [['prow', 'Нос'], ['fwd1_cl', 'Носовой пояс, л�
 function renderWear(k){
   const w = worn(k), ships = document.getElementById('wearShips'), parts = document.getElementById('wearParts');
   ships.innerHTML = ''; parts.innerHTML = '';
-  for (const [title, ww] of [['Новый', null], [k === 1 ? 'Потёртый, лёгкий' : 'Потёртый, заметный', w]]){
+  for (const [title, ww] of [['Новый', null], [k < 1 ? 'Потёртый, минимум' : k === 1 ? 'Потёртый, лёгкий' : 'Потёртый, заметный', w]]){
     const card = document.createElement('div'), cv = document.createElement('canvas');
     card.className = 'card'; card.innerHTML = `<h2>${title}</h2>`; card.appendChild(cv); ships.appendChild(card); shipView(cv, ww);
   }
@@ -430,7 +436,7 @@ function renderWear(k){
   }
 }
 document.querySelectorAll('input[name=wear]').forEach(el => el.addEventListener('change', () => renderWear(+el.value)));
-renderWear(1);
+renderWear(0.6);
 </script>
 </body>
 </html>
