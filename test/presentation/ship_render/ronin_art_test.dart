@@ -80,7 +80,10 @@ Future<ui.Image> _rasterize(ui.Picture picture, Size scene, double k) {
   Canvas(rec)
     ..scale(k)
     ..drawPicture(picture);
-  return rec.endRecording().toImage((scene.width * k).ceil(), (scene.height * k).ceil());
+  return rec.endRecording().toImage(
+    (scene.width * k).ceil(),
+    (scene.height * k).ceil(),
+  );
 }
 
 /// Пиксель сцены [picture] в точке [at] (px рисунка) в масштабе 1:1 —
@@ -98,10 +101,13 @@ Future<(int, int, int, int)> _pixel(ui.Picture picture, Offset at) async {
 
 /// Каналы RGB [a] и [b] различаются не больше чем на [tol].
 bool _near((int, int, int, int) a, (int, int, int, int) b, int tol) =>
-    (a.$1 - b.$1).abs() <= tol && (a.$2 - b.$2).abs() <= tol && (a.$3 - b.$3).abs() <= tol;
+    (a.$1 - b.$1).abs() <= tol &&
+    (a.$2 - b.$2).abs() <= tol &&
+    (a.$3 - b.$3).abs() <= tol;
 
 /// Яркость пикселя 0..1 (относительная, как `Color.computeLuminance`).
-double _lum((int, int, int, int) p) => Color.fromARGB(255, p.$1, p.$2, p.$3).computeLuminance();
+double _lum((int, int, int, int) p) =>
+    Color.fromARGB(255, p.$1, p.$2, p.$3).computeLuminance();
 
 /// Сумма каналов RGB — грубая светлота для сравнения «темнее».
 int _sum((int, int, int, int) p) => p.$1 + p.$2 + p.$3;
@@ -130,7 +136,11 @@ void main() {
       for (var k = 0; k < _refPlates.length; k++) {
         final p = plates[k];
         final (x, y, w, h, kind, _, _, _) = _refPlates[k];
-        expect((p.x, p.y, p.w, p.h, p.kind), (x, y, w, h, kind), reason: 'плита #$k');
+        expect(
+          (p.x, p.y, p.w, p.h, p.kind),
+          (x, y, w, h, kind),
+          reason: 'плита #$k',
+        );
       }
     });
 
@@ -160,24 +170,27 @@ void main() {
       ]);
     });
 
-    test('плиты тилят корпус: каждая клетка силуэта покрыта ровно одной плитой', () {
-      final cover = <(int, int), int>{};
-      for (final p in plates) {
-        for (var y = p.y; y < p.y + p.h; y++) {
-          for (var x = p.x; x < p.x + p.w; x++) {
-            cover[(x, y)] = (cover[(x, y)] ?? 0) + 1;
+    test(
+      'плиты тилят корпус: каждая клетка силуэта покрыта ровно одной плитой',
+      () {
+        final cover = <(int, int), int>{};
+        for (final p in plates) {
+          for (var y = p.y; y < p.y + p.h; y++) {
+            for (var x = p.x; x < p.x + p.w; x++) {
+              cover[(x, y)] = (cover[(x, y)] ?? 0) + 1;
+            }
           }
         }
-      }
-      var cells = 0;
-      for (var y = 0; y < RoninArt.rows; y++) {
-        for (var x = RoninArt.span[y][0]; x <= RoninArt.span[y][1]; x++) {
-          expect(cover[(x, y)], 1, reason: 'клетка ($x, $y)');
-          cells++;
+        var cells = 0;
+        for (var y = 0; y < RoninArt.rows; y++) {
+          for (var x = RoninArt.span[y][0]; x <= RoninArt.span[y][1]; x++) {
+            expect(cover[(x, y)], 1, reason: 'клетка ($x, $y)');
+            cells++;
+          }
         }
-      }
-      expect(cover.length, cells);
-    });
+        expect(cover.length, cells);
+      },
+    );
   });
 
   group('RoninArt', () {
@@ -190,29 +203,35 @@ void main() {
       expect(art.toScene(7.5, 2), Offset(4 * c + 7.5 * c, 1.9 * c + 2 * c));
     });
 
-    test('слои записываются и растеризуются без исключений, картинка кешируется', () async {
-      expect(identical(art.hullPicture, art.hullPicture), isTrue);
-      expect(identical(art.objectsPicture, art.objectsPicture), isTrue);
-      final hull = await _rasterize(art.hullPicture, art.sceneSize, .1);
-      final objects = await _rasterize(art.objectsPicture, art.sceneSize, .1);
-      expect(hull.width, greaterThan(0));
-      expect(objects.height, greaterThan(0));
+    test(
+      'слои записываются и растеризуются без исключений, картинка кешируется',
+      () async {
+        expect(identical(art.hullPicture, art.hullPicture), isTrue);
+        expect(identical(art.objectsPicture, art.objectsPicture), isTrue);
+        final hull = await _rasterize(art.hullPicture, art.sceneSize, .1);
+        final objects = await _rasterize(art.objectsPicture, art.sceneSize, .1);
+        expect(hull.width, greaterThan(0));
+        expect(objects.height, greaterThan(0));
 
-      // альфа пикселя сцены (x, y в px рисунка) на растре масштаба .1
-      Future<int> alpha(ui.Image img, Offset at) async {
-        final data = (await img.toByteData(format: ui.ImageByteFormat.rawRgba))!;
-        final i = ((at.dy * .1).floor() * img.width + (at.dx * .1).floor()) * 4;
-        return data.getUint8(i + 3);
-      }
+        // альфа пикселя сцены (x, y в px рисунка) на растре масштаба .1
+        Future<int> alpha(ui.Image img, Offset at) async {
+          final data = (await img.toByteData(
+            format: ui.ImageByteFormat.rawRgba,
+          ))!;
+          final i =
+              ((at.dy * .1).floor() * img.width + (at.dx * .1).floor()) * 4;
+          return data.getUint8(i + 3);
+        }
 
-      // корпус непрозрачен внутри силуэта и пуст вне его; предметы — только предметы
-      expect(await alpha(hull, art.toScene(7.5, 12)), 255);
-      expect(await alpha(hull, const Offset(5, 5)), 0);
-      expect(await alpha(objects, art.toScene(7.5, -.25)), greaterThan(0));
-      expect(await alpha(objects, art.toScene(7.5, 12)), 0);
-      hull.dispose();
-      objects.dispose();
-    });
+        // корпус непрозрачен внутри силуэта и пуст вне его; предметы — только предметы
+        expect(await alpha(hull, art.toScene(7.5, 12)), 255);
+        expect(await alpha(hull, const Offset(5, 5)), 0);
+        expect(await alpha(objects, art.toScene(7.5, -.25)), greaterThan(0));
+        expect(await alpha(objects, art.toScene(7.5, 12)), 0);
+        hull.dispose();
+        objects.dispose();
+      },
+    );
 
     test('outline — корпус px(3)..px(12) с гондолами по бортам', () {
       final b = art.outline.getBounds();
@@ -223,22 +242,40 @@ void main() {
       expect(b.bottom, closeTo(RoninArt.py(27), 1e-3));
       // корпус внутри, гондола снаружи корпуса — тоже внутри контура
       expect(art.outline.contains(art.toScene(7.5, 13)), isTrue);
-      expect(art.outline.contains(Offset(RoninArt.px(3) - bw / 2, RoninArt.py(15))), isTrue);
+      expect(
+        art.outline.contains(Offset(RoninArt.px(3) - bw / 2, RoninArt.py(15))),
+        isTrue,
+      );
     });
 
-    test('objectShape: RCS вокруг своей точки, датчик над носом, чужой id — ArgumentError', () {
-      expect(art.objectShape('rcs_fl').contains(art.toScene(3, 4.5)), isTrue);
-      expect(art.objectShape('rcs_fr').contains(art.toScene(12, 4.5)), isTrue);
-      expect(art.objectShape('rcs_fl').contains(art.toScene(12, 4.5)), isFalse);
-      // боковое сопло наружу: rcs_fl — влево, rcs_fr — вправо
-      expect(art.objectShape('rcs_fl').contains(art.toScene(2.55, 4.5)), isTrue);
-      expect(art.objectShape('rcs_fr').contains(art.toScene(12.45, 4.5)), isTrue);
-      final sensor = art.objectShape('sensor');
-      expect(sensor.contains(art.toScene(7.5, -.25)), isTrue);
-      expect(sensor.contains(art.toScene(7.5, -1.06)), isTrue);
-      expect(sensor.contains(art.toScene(7.5, .5)), isFalse);
-      expect(() => art.objectShape('nope'), throwsArgumentError);
-    });
+    test(
+      'objectShape: RCS вокруг своей точки, датчик над носом, чужой id — ArgumentError',
+      () {
+        expect(art.objectShape('rcs_fl').contains(art.toScene(3, 4.5)), isTrue);
+        expect(
+          art.objectShape('rcs_fr').contains(art.toScene(12, 4.5)),
+          isTrue,
+        );
+        expect(
+          art.objectShape('rcs_fl').contains(art.toScene(12, 4.5)),
+          isFalse,
+        );
+        // боковое сопло наружу: rcs_fl — влево, rcs_fr — вправо
+        expect(
+          art.objectShape('rcs_fl').contains(art.toScene(2.55, 4.5)),
+          isTrue,
+        );
+        expect(
+          art.objectShape('rcs_fr').contains(art.toScene(12.45, 4.5)),
+          isTrue,
+        );
+        final sensor = art.objectShape('sensor');
+        expect(sensor.contains(art.toScene(7.5, -.25)), isTrue);
+        expect(sensor.contains(art.toScene(7.5, -1.06)), isTrue);
+        expect(sensor.contains(art.toScene(7.5, .5)), isFalse);
+        expect(() => art.objectShape('nope'), throwsArgumentError);
+      },
+    );
 
     test('objectShape v3: визор половинами и торпедные люки', () {
       final vl = art.objectShape('visor_l'), vr = art.objectShape('visor_r');
@@ -253,11 +290,14 @@ void main() {
       expect(hl.contains(art.toScene(8.9, 6.2)), isFalse);
     });
 
-    test('поле: fieldBuildPicture и fieldDonePicture записываются и кешируются', () {
-      expect(identical(art.fieldBuildPicture, art.fieldBuildPicture), isTrue);
-      expect(identical(art.fieldDonePicture, art.fieldDonePicture), isTrue);
-      expect(identical(art.fieldBuildPicture, art.hullPicture), isFalse);
-    });
+    test(
+      'поле: fieldBuildPicture и fieldDonePicture записываются и кешируются',
+      () {
+        expect(identical(art.fieldBuildPicture, art.fieldBuildPicture), isTrue);
+        expect(identical(art.fieldDonePicture, art.fieldDonePicture), isTrue);
+        expect(identical(art.fieldBuildPicture, art.hullPicture), isFalse);
+      },
+    );
 
     test('roninObjects — семь предметов «Ронина-1» v3', () {
       expect(roninObjects.keys.toSet(), {
@@ -280,62 +320,238 @@ void main() {
       return art.toScene(cell.x + cell.size / 2, cell.y + cell.size / 2);
     }
 
-    test('плита по детали: клетки (3, 3) и (4, 3) fwd1_cl одного цвета — нет чужого шва', () async {
-      final a = await _pixel(art.hullPicture, cellCenter('fwd1_cl', 3, 3));
-      final b = await _pixel(art.hullPicture, cellCenter('fwd1_cl', 4, 3));
-      expect(_near(a, b, 3), isTrue, reason: '$a vs $b');
-    });
+    test(
+      'плита по детали: клетки (3, 3) и (4, 3) fwd1_cl одного цвета — нет чужого шва',
+      () async {
+        final a = await _pixel(art.hullPicture, cellCenter('fwd1_cl', 3, 3));
+        final b = await _pixel(art.hullPicture, cellCenter('fwd1_cl', 4, 3));
+        expect(_near(a, b, 3), isTrue, reason: '$a vs $b');
+      },
+    );
 
-    test('визор — предмет: в корпусе под ним плита мостика, в слое 1 — непрозрачен', () async {
-      final at = art.toScene(5.2, 2.9);
-      // та же колонка той же плиты bridge_l выше визора v2 — эталон цвета плиты
-      final plate = await _pixel(art.hullPicture, art.toScene(5.2, 2.5));
-      final hull = await _pixel(art.hullPicture, at);
-      expect(_near(hull, plate, 3), isTrue, reason: '$hull vs $plate');
-      expect((await _pixel(art.objectsPicture, at)).$4, 255);
-    });
+    test(
+      'визор — предмет: в корпусе под ним плита мостика, в слое 1 — непрозрачен',
+      () async {
+        final at = art.toScene(5.2, 2.9);
+        // та же колонка той же плиты bridge_l выше визора v2 — эталон цвета плиты
+        final plate = await _pixel(art.hullPicture, art.toScene(5.2, 2.5));
+        final hull = await _pixel(art.hullPicture, at);
+        expect(_near(hull, plate, 3), isTrue, reason: '$hull vs $plate');
+        expect((await _pixel(art.objectsPicture, at)).$4, 255);
+      },
+    );
 
-    test('торпедный люк — предмет: в корпусе под ним плита пояса, в слое 1 непрозрачен', () async {
-      final at = art.toScene(5.9, 6.25);
-      // та же колонка той же плиты fwd2_cl ниже люка
-      final plate = await _pixel(art.hullPicture, art.toScene(5.9, 6.75));
-      final hull = await _pixel(art.hullPicture, at);
-      expect(_near(hull, plate, 3), isTrue, reason: '$hull vs $plate');
-      expect((await _pixel(art.objectsPicture, at)).$4, 255);
-    });
+    test(
+      'торпедный люк — предмет: в корпусе под ним плита пояса, в слое 1 непрозрачен',
+      () async {
+        final at = art.toScene(5.9, 6.25);
+        // та же колонка той же плиты fwd2_cl ниже люка
+        final plate = await _pixel(art.hullPicture, art.toScene(5.9, 6.75));
+        final hull = await _pixel(art.hullPicture, at);
+        expect(_near(hull, plate, 3), isTrue, reason: '$hull vs $plate');
+        expect((await _pixel(art.objectsPicture, at)).$4, 255);
+      },
+    );
 
-    test('щель-огонь: в fieldDonePicture светлая, в fieldBuildPicture — цвет плиты', () async {
-      final at = art.toScene(4.4, 5.53);
-      expect(_lum(await _pixel(art.fieldDonePicture, at)), greaterThan(.6));
-      expect(_lum(await _pixel(art.hullPicture, at)), greaterThan(.6));
-      // та же колонка той же плиты fwd1_l выше щели
-      final plate = await _pixel(art.fieldBuildPicture, art.toScene(4.4, 5.2));
-      final build = await _pixel(art.fieldBuildPicture, at);
-      expect(_near(build, plate, 3), isTrue, reason: '$build vs $plate');
-    });
+    test(
+      'щель-огонь: в fieldDonePicture светлая, в fieldBuildPicture — цвет плиты',
+      () async {
+        final at = art.toScene(4.4, 5.53);
+        expect(_lum(await _pixel(art.fieldDonePicture, at)), greaterThan(.6));
+        expect(_lum(await _pixel(art.hullPicture, at)), greaterThan(.6));
+        // та же колонка той же плиты fwd1_l выше щели
+        final plate = await _pixel(
+          art.fieldBuildPicture,
+          art.toScene(4.4, 5.2),
+        );
+        final build = await _pixel(art.fieldBuildPicture, at);
+        expect(_near(build, plate, 3), isTrue, reason: '$build vs $plate');
+      },
+    );
 
-    test('кромка детали: граница fwd1_cl | fwd1_cr темнее центра клетки в hullPicture, '
-        'в поле — нет', () async {
-      // ряд 0 пояса: fwd1_cl до колонки секции 17, fwd1_cr с 18 (x = 7.5)
-      final center = cellCenter('fwd1_cl', 8, 0);
-      final edge = Offset(art.toScene(7.5, 0).dx - .5, center.dy);
-      for (final (name, pic, hasEdge) in [
-        ('hull', art.hullPicture, true),
-        ('fieldBuild', art.fieldBuildPicture, false),
-        ('fieldDone', art.fieldDonePicture, false),
-      ]) {
-        final e = await _pixel(pic, edge), m = await _pixel(pic, center);
-        if (hasEdge) {
-          expect(_sum(e), lessThan(_sum(m) - 24), reason: '$name: $e vs $m');
-        } else {
-          expect(_near(e, m, 4), isTrue, reason: '$name: $e vs $m');
+    test(
+      'кромка детали: граница fwd1_cl | fwd1_cr темнее центра клетки в hullPicture, '
+      'в поле — нет',
+      () async {
+        // ряд 0 пояса: fwd1_cl до колонки секции 17, fwd1_cr с 18 (x = 7.5)
+        final center = cellCenter('fwd1_cl', 8, 0);
+        final edge = Offset(art.toScene(7.5, 0).dx - .5, center.dy);
+        for (final (name, pic, hasEdge) in [
+          ('hull', art.hullPicture, true),
+          ('fieldBuild', art.fieldBuildPicture, false),
+          ('fieldDone', art.fieldDonePicture, false),
+        ]) {
+          final e = await _pixel(pic, edge), m = await _pixel(pic, center);
+          if (hasEdge) {
+            expect(_sum(e), lessThan(_sum(m) - 24), reason: '$name: $e vs $m');
+          } else {
+            expect(_near(e, m, 4), isTrue, reason: '$name: $e vs $m');
+          }
         }
+      },
+    );
+
+    test(
+      'слой 1 без повтора контура корпуса (предметы лежат поверх него)',
+      () async {
+        expect((await _pixel(art.objectsPicture, art.toScene(3, 12))).$4, 0);
+        expect((await _pixel(art.hullPicture, art.toScene(3, 12))).$4, 255);
+      },
+    );
+  });
+
+  group('слои рисунка поля (D-017)', () {
+    final ShipArt art = RoninArt();
+    const c = RoninArt.cellPx;
+
+    // оранжевый почти непрозрачный (краска и полоса — альфа .95 и .85):
+    // R заметно больше G, G больше B
+    bool orange((int, int, int, int) p) =>
+        p.$4 > 200 && p.$1 > 150 && p.$1 > p.$2 + 40 && p.$2 > p.$3;
+
+    test('fieldLayer кешируется по слою, слои различаются', () {
+      for (final l in ShipFieldLayer.values) {
+        expect(
+          identical(art.fieldLayer(l), art.fieldLayer(l)),
+          isTrue,
+          reason: '$l',
+        );
+      }
+      expect(
+        identical(
+          art.fieldLayer(ShipFieldLayer.hullBase),
+          art.fieldLayer(ShipFieldLayer.hullLights),
+        ),
+        isFalse,
+      );
+    });
+
+    test(
+      'щель-огонь: светлая только в hullLights, в hullBase и hullAccents — цвет плиты',
+      () async {
+        final at = art.toScene(4.4, 5.53);
+        final plate = await _pixel(
+          art.fieldLayer(ShipFieldLayer.hullBase),
+          art.toScene(4.4, 5.2),
+        );
+        expect(
+          _lum(await _pixel(art.fieldLayer(ShipFieldLayer.hullLights), at)),
+          greaterThan(.6),
+        );
+        for (final l in [ShipFieldLayer.hullBase, ShipFieldLayer.hullAccents]) {
+          final p = await _pixel(art.fieldLayer(l), at);
+          expect(_near(p, plate, 3), isTrue, reason: '$l: $p vs $plate');
+        }
+      },
+    );
+
+    test(
+      'шеврон: в paint оранжевый, в hullBase — плита носа; вне краски paint прозрачен',
+      () async {
+        final at = art.toScene(7.5, 1.5);
+        expect(
+          orange(await _pixel(art.fieldLayer(ShipFieldLayer.paint), at)),
+          isTrue,
+        );
+        final base = await _pixel(art.fieldLayer(ShipFieldLayer.hullBase), at);
+        final plate = await _pixel(
+          art.fieldLayer(ShipFieldLayer.hullBase),
+          art.toScene(7.5, 1.1),
+        );
+        expect(_near(base, plate, 3), isTrue, reason: '$base vs $plate');
+        expect(orange(base), isFalse);
+        expect(
+          (await _pixel(
+            art.fieldLayer(ShipFieldLayer.paint),
+            art.toScene(5.5, 3.5),
+          )).$4,
+          0,
+        );
+      },
+    );
+
+    test('полоса люка: оранжевая только в objectsAccents', () async {
+      final at = Offset(RoninArt.cx - 1.45 * c, RoninArt.py(5.95) - 1.6);
+      expect(
+        orange(await _pixel(art.fieldLayer(ShipFieldLayer.objectsAccents), at)),
+        isTrue,
+      );
+      for (final l in [
+        ShipFieldLayer.objectsBase,
+        ShipFieldLayer.objectsLights,
+      ]) {
+        final p = await _pixel(art.fieldLayer(l), at);
+        expect(orange(p), isFalse, reason: '$l: $p');
       }
     });
 
-    test('слой 1 без повтора контура корпуса (предметы лежат поверх него)', () async {
-      expect((await _pixel(art.objectsPicture, art.toScene(3, 12))).$4, 0);
-      expect((await _pixel(art.hullPicture, art.toScene(3, 12))).$4, 255);
-    });
+    test(
+      'стекло визора: светлое только в objectsLights, в objectsBase — тёмная рама',
+      () async {
+        final at = art.toScene(5.5, 2.9);
+        expect(
+          _lum(await _pixel(art.fieldLayer(ShipFieldLayer.objectsLights), at)),
+          greaterThan(.6),
+        );
+        final base = await _pixel(
+          art.fieldLayer(ShipFieldLayer.objectsBase),
+          at,
+        );
+        expect(base.$4, 255);
+        expect(_lum(base), lessThan(.1), reason: '$base');
+        final accents = await _pixel(
+          art.fieldLayer(ShipFieldLayer.objectsAccents),
+          at,
+        );
+        expect(_near(accents, base, 3), isTrue, reason: '$accents vs $base');
+      },
+    );
+
+    test(
+      'огонёк датчика: яркий в objectsLights, в objectsBase — нет',
+      () async {
+        final at = art.toScene(7.5, -1.06);
+        expect(
+          _lum(await _pixel(art.fieldLayer(ShipFieldLayer.objectsLights), at)),
+          greaterThan(.8),
+        );
+        final base = await _pixel(
+          art.fieldLayer(ShipFieldLayer.objectsBase),
+          at,
+        );
+        expect(_lum(base), lessThan(.5), reason: '$base');
+      },
+    );
+
+    test(
+      'hullPicture и objectsPicture — рисунок целиком (краска, цвет, свет на месте)',
+      () async {
+        expect(
+          orange(await _pixel(art.hullPicture, art.toScene(7.5, 1.5))),
+          isTrue,
+        );
+        expect(
+          _lum(await _pixel(art.hullPicture, art.toScene(4.4, 5.53))),
+          greaterThan(.6),
+        );
+        expect(
+          orange(
+            await _pixel(
+              art.objectsPicture,
+              Offset(RoninArt.cx - 1.45 * c, RoninArt.py(5.95) - 1.6),
+            ),
+          ),
+          isTrue,
+        );
+        expect(
+          _lum(await _pixel(art.objectsPicture, art.toScene(5.5, 2.9))),
+          greaterThan(.6),
+        );
+        expect(
+          _lum(await _pixel(art.objectsPicture, art.toScene(7.5, -1.06))),
+          greaterThan(.8),
+        );
+      },
+    );
   });
 }

@@ -60,7 +60,16 @@ class RoninPlate {
   final String kind;
   final int i;
   final double jl, rv;
-  const RoninPlate(this.x, this.y, this.w, this.h, this.kind, this.i, this.jl, this.rv);
+  const RoninPlate(
+    this.x,
+    this.y,
+    this.w,
+    this.h,
+    this.kind,
+    this.i,
+    this.jl,
+    this.rv,
+  );
 }
 
 class _Band {
@@ -98,8 +107,12 @@ const _gun = _Mat(220, 10, 22);
 const _blackm = _Mat(220, 12, 13);
 
 /// `hsl(m, dl, da)` эталона: светлота клампится в `[3, 92]`.
-Color _hsl(_Mat m, [double dl = 0, double da = 1]) =>
-    HSLColor.fromAHSL(da, m.h, m.s / 100, (m.l + dl).clamp(3, 92) / 100).toColor();
+Color _hsl(_Mat m, [double dl = 0, double da = 1]) => HSLColor.fromAHSL(
+  da,
+  m.h,
+  m.s / 100,
+  (m.l + dl).clamp(3, 92) / 100,
+).toColor();
 
 Color _rgba(int r, int g, int b, double a) => Color.fromRGBO(r, g, b, a);
 
@@ -178,7 +191,9 @@ class RoninArt implements ShipArt {
       var y = b.r0;
       while (y <= b.r1) {
         final canPair =
-            y + 1 <= b.r1 && span[y][0] == span[y + 1][0] && span[y][1] == span[y + 1][1];
+            y + 1 <= b.r1 &&
+            span[y][0] == span[y + 1][0] &&
+            span[y][1] == span[y + 1][1];
         final ph = (canPair && rnd() < .8) ? 2 : 1;
         final x0 = span[y][0], x1 = span[y][1];
         final wide = b.kind == 'bandA' || b.kind == 'bandB';
@@ -206,10 +221,25 @@ class RoninArt implements ShipArt {
   };
 
   /// Сдвиг светлоты плиты-детали по её индексу в списке плит (`PLATE_JL`).
-  static const List<double> _partPlateJl = [-2, 1.5, -1, 2.5, 0, -2.5, 1, -1.5, 3, -3, 2, -.5];
+  static const List<double> _partPlateJl = [
+    -2,
+    1.5,
+    -1,
+    2.5,
+    0,
+    -2.5,
+    1,
+    -1.5,
+    3,
+    -3,
+    2,
+    -.5,
+  ];
 
   /// Плиты-детали (layer 0) в порядке `RoninParts.parts` (`partPlates`).
-  static final List<_PartPlate> _partPlates = List.unmodifiable(_buildPartPlates());
+  static final List<_PartPlate> _partPlates = List.unmodifiable(
+    _buildPartPlates(),
+  );
 
   static List<_PartPlate> _buildPartPlates() {
     final out = <_PartPlate>[];
@@ -218,9 +248,16 @@ class RoninArt implements ShipArt {
       final cs = cellPx / p.scale;
       final x0 = px(p.shipX), y0 = py(p.shipY);
       out.add(
-        _PartPlate(_partPlateMat[p.sectionId]!, _partPlateJl[i % _partPlateJl.length], cs, p.mask, [
-          for (final q in p.mask.cells) (q.x, q.y, x0 + q.x * cs, y0 + q.y * cs),
-        ]),
+        _PartPlate(
+          _partPlateMat[p.sectionId]!,
+          _partPlateJl[i % _partPlateJl.length],
+          cs,
+          p.mask,
+          [
+            for (final q in p.mask.cells)
+              (q.x, q.y, x0 + q.x * cs, y0 + q.y * cs),
+          ],
+        ),
       );
     }
     return out;
@@ -237,9 +274,13 @@ class RoninArt implements ShipArt {
       case 'fwd':
         return p.rv < .15 ? _dark : _graf;
       case 'bandA':
-        return inInset ? _dark : (inName ? _oran : (p.rv < .16 ? _rust : _oran));
+        return inInset
+            ? _dark
+            : (inName ? _oran : (p.rv < .16 ? _rust : _oran));
       case 'mid':
-        return p.rv < .06 ? _dark : (p.rv > .94 ? _oran : (p.rv < .72 ? _graf : _graf2));
+        return p.rv < .06
+            ? _dark
+            : (p.rv > .94 ? _oran : (p.rv < .72 ? _graf : _graf2));
       case 'bandB':
         return p.rv < .46 ? _oran : (p.rv < .56 ? _dark : _graf2);
       case 'eng':
@@ -287,10 +328,57 @@ class RoninArt implements ShipArt {
   );
 
   @override
-  late final ui.Picture fieldDonePicture = _record((g) => _drawHull(g, edges: false));
+  late final ui.Picture fieldDonePicture = _record(
+    (g) => _drawHull(g, edges: false),
+  );
 
   @override
   late final ui.Picture objectsPicture = _record(_drawObjects);
+
+  final Map<ShipFieldLayer, ui.Picture> _fieldLayers = {};
+
+  @override
+  ui.Picture fieldLayer(ShipFieldLayer layer) => _fieldLayers.putIfAbsent(
+    layer,
+    () => _record(switch (layer) {
+      ShipFieldLayer.hullBase => (g) => _drawHull(
+        g,
+        edges: false,
+        lights: false,
+        paint: false,
+        accents: false,
+      ),
+      ShipFieldLayer.hullAccents => (g) => _drawHull(
+        g,
+        edges: false,
+        lights: false,
+        paint: false,
+      ),
+      ShipFieldLayer.hullLights => (g) => _drawHull(
+        g,
+        edges: false,
+        paint: false,
+        accents: false,
+      ),
+      ShipFieldLayer.objectsBase => (g) => _drawObjects(
+        g,
+        lights: false,
+        paint: false,
+        accents: false,
+      ),
+      ShipFieldLayer.objectsAccents => (g) => _drawObjects(
+        g,
+        lights: false,
+        paint: false,
+      ),
+      ShipFieldLayer.objectsLights => (g) => _drawObjects(
+        g,
+        paint: false,
+        accents: false,
+      ),
+      ShipFieldLayer.paint => _drawPaint,
+    }),
+  );
 
   @override
   late final Path outline = _buildOutline();
@@ -306,7 +394,11 @@ class RoninArt implements ShipArt {
       'rcs' => _rcsShape(px(o.x), py(o.y), o.flip),
       'visor' => _visorShape(o.flip),
       'hatch' => _hatchShape(o.flip),
-      _ => throw ArgumentError.value(o.kind, 'kind', 'неизвестный вид предмета'),
+      _ => throw ArgumentError.value(
+        o.kind,
+        'kind',
+        'неизвестный вид предмета',
+      ),
     };
     return parts.reduce((a, b) => Path.combine(PathOperation.union, a, b));
   }
@@ -331,9 +423,14 @@ class RoninArt implements ShipArt {
   // ---------- формы предметов (ronin-objects.js) ----------
 
   static List<Path> _sensorShape() => [
-    Path()..addRect(Rect.fromLTWH(cx - .5 * cellPx, py(-.55), 1 * cellPx, .6 * cellPx)),
-    Path()..addRect(Rect.fromLTWH(cx - .26 * cellPx, py(-.95), .52 * cellPx, .42 * cellPx)),
-    Path()..addOval(Rect.fromCircle(center: Offset(cx, py(-1.06)), radius: 2.2)),
+    Path()..addRect(
+      Rect.fromLTWH(cx - .5 * cellPx, py(-.55), 1 * cellPx, .6 * cellPx),
+    ),
+    Path()..addRect(
+      Rect.fromLTWH(cx - .26 * cellPx, py(-.95), .52 * cellPx, .42 * cellPx),
+    ),
+    Path()
+      ..addOval(Rect.fromCircle(center: Offset(cx, py(-1.06)), radius: 2.2)),
   ];
 
   static List<Path> _rcsShape(double x, double y, int flip) {
@@ -346,13 +443,16 @@ class RoninArt implements ShipArt {
     Path rot(double a) {
       final ca = math.cos(a), sa = math.sin(a);
       final pts = [
-        for (final q in up) Offset(x + q[0] * ca - q[1] * sa, y + q[0] * sa + q[1] * ca),
+        for (final q in up)
+          Offset(x + q[0] * ca - q[1] * sa, y + q[0] * sa + q[1] * ca),
       ];
       return Path()..addPolygon(pts, true);
     }
 
     return [
-      Path()..addRRect(_rr(x - .3 * cellPx, y - .3 * cellPx, .6 * cellPx, .6 * cellPx, 3)),
+      Path()..addRRect(
+        _rr(x - .3 * cellPx, y - .3 * cellPx, .6 * cellPx, .6 * cellPx, 3),
+      ),
       rot(0),
       rot(flip * math.pi / 2),
       rot(math.pi),
@@ -394,7 +494,13 @@ class RoninArt implements ShipArt {
   static Path _line(List<Offset> pts) => Path()..addPolygon(pts, false);
 
   /// Заливка с canvas-тенью (offset 0): размытая копия формы цветом тени под ней.
-  static void _shadowed(Canvas g, Path path, Paint fill, Color shadow, double blur) {
+  static void _shadowed(
+    Canvas g,
+    Path path,
+    Paint fill,
+    Color shadow,
+    double blur,
+  ) {
     g.drawPath(
       path,
       Paint()
@@ -409,7 +515,8 @@ class RoninArt implements ShipArt {
     g.drawCircle(
       c,
       r * 4,
-      Paint()..shader = ui.Gradient.radial(c, r * 4, [col, const Color(0x00000000)]),
+      Paint()
+        ..shader = ui.Gradient.radial(c, r * 4, [col, const Color(0x00000000)]),
     );
     g.drawCircle(c, r, _fill(col));
   }
@@ -429,11 +536,17 @@ class RoninArt implements ShipArt {
     final tp = TextPainter(
       text: TextSpan(
         text: s,
-        style: TextStyle(fontSize: fontSize, fontWeight: FontWeight.bold, color: color),
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.bold,
+          color: color,
+        ),
       ),
       textDirection: TextDirection.ltr,
     )..layout();
-    final baseline = tp.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+    final baseline = tp.computeDistanceToActualBaseline(
+      TextBaseline.alphabetic,
+    );
     final sx = tp.width > 0 ? targetWidth / tp.width : 1.0;
     g
       ..save()
@@ -447,8 +560,16 @@ class RoninArt implements ShipArt {
   // ---------- слой 0: корпус ----------
 
   /// Корпус (блок `if(HULL)` эталона). [edges] — кромки плит-деталей и контур
-  /// корпуса, [lights] — щели-огни (`render({edges, lights})`).
-  static void _drawHull(Canvas g, {bool edges = true, bool lights = true}) {
+  /// корпуса, [lights] — щели-огни, [paint] — краска корпуса (`_drawPaint`),
+  /// [accents] — цветные элементы (на корпусе сейчас нет, пробрасывается на
+  /// будущее) (`render({edges, lights, paint, accents})`, D-017).
+  static void _drawHull(
+    Canvas g, {
+    bool edges = true,
+    bool lights = true,
+    bool paint = true,
+    bool accents = true,
+  }) {
     const c = cellPx;
     final hull = _hullPath();
 
@@ -495,7 +616,10 @@ class RoninArt implements ShipArt {
     for (final p in plates) {
       if (p.y < ronin1Rows) continue;
       final m = _plateMat(p);
-      final x = px(p.x.toDouble()), y = py(p.y.toDouble()), wd = p.w * c, hd = p.h * c;
+      final x = px(p.x.toDouble()),
+          y = py(p.y.toDouble()),
+          wd = p.w * c,
+          hd = p.h * c;
       g.drawRect(Rect.fromLTWH(x, y, wd, hd), _fill(_hsl(m, p.jl)));
       g.drawPath(
         _line([
@@ -546,7 +670,11 @@ class RoninArt implements ShipArt {
       final s0 = math.max(span[yb][0], span[yb - 1][0]).toDouble();
       final s1 = math.min(span[yb][1], span[yb - 1][1]).toDouble();
       final y = py(yb.toDouble());
-      g.drawLine(Offset(px(s0), y), Offset(px(s1 + 1), y), _stroke(_rgba(0, 0, 0, .6), 2.5));
+      g.drawLine(
+        Offset(px(s0), y),
+        Offset(px(s1 + 1), y),
+        _stroke(_rgba(0, 0, 0, .6), 2.5),
+      );
       g.drawLine(
         Offset(px(s0), y - 2),
         Offset(px(s1 + 1), y - 2),
@@ -592,7 +720,9 @@ class RoninArt implements ShipArt {
     // потёки — только строки 8+, ГСЧ расходуется как раньше
     final wr = mulberry32(9);
     for (var i = 0; i < 9; i++) {
-      final wx = px(3 + wr() * 9), wy = py(4 + wr() * 20), wl = (.5 + wr() * 1.4) * c;
+      final wx = px(3 + wr() * 9),
+          wy = py(4 + wr() * 20),
+          wl = (.5 + wr() * 1.4) * c;
       final a = .05 + wr() * .04;
       if (wy < py(ronin1Rows.toDouble())) continue;
       g.drawRect(Rect.fromLTWH(wx, wy, 2, wl), _fill(_rgba(0, 0, 0, a)));
@@ -600,15 +730,38 @@ class RoninArt implements ShipArt {
     for (var i = 0; i < 5; i++) {
       final wx = px(3 + wr() * 9), wy = py(4 + wr() * 20);
       if (wy < py(ronin1Rows.toDouble())) continue;
-      g.drawRect(Rect.fromLTWH(wx, wy, 3.5, .35 * c), _fill(_rgba(255, 255, 255, .04)));
+      g.drawRect(
+        Rect.fromLTWH(wx, wy, 3.5, .35 * c),
+        _fill(_rgba(255, 255, 255, .04)),
+      );
     }
     g.restore();
+
+    // краска корпуса: шеврон, номер борта, трафарет
+    if (paint) _drawPaint(g);
+
+    // бортовые огни-иллюминаторы (щели)
+    if (lights) _lights(g);
+
+    // контур корпуса
+    if (edges) g.drawPath(hull, _stroke(const Color(0xFF07090C), 2.4));
+  }
+
+  /// Краска корпуса (`drawPaint` эталона, D-017): шеврон носа (клип по носу),
+  /// «V V - 7 7», «7 7». «РОНИН» (строки 8+) не портирован — Ронин-2.
+  static void _drawPaint(Canvas g) {
+    const c = cellPx;
 
     // нос: шеврон
     g
       ..save()
       ..clipRect(
-        Rect.fromLTWH(px(span[0][0].toDouble()), py(0), (span[0][1] - span[0][0] + 1) * c, 2 * c),
+        Rect.fromLTWH(
+          px(span[0][0].toDouble()),
+          py(0),
+          (span[0][1] - span[0][0] + 1) * c,
+          2 * c,
+        ),
       );
     g.drawPath(
       Path()..addPolygon([
@@ -622,7 +775,11 @@ class RoninArt implements ShipArt {
       _fill(_hsl(_oran, 0, .95)),
     );
     g.drawPath(
-      _line([Offset(cx - 2.1 * c, py(.24)), Offset(cx, py(1.22)), Offset(cx + 2.1 * c, py(.24))]),
+      _line([
+        Offset(cx - 2.1 * c, py(.24)),
+        Offset(cx, py(1.22)),
+        Offset(cx + 2.1 * c, py(.24)),
+      ]),
       _stroke(_rgba(255, 255, 255, .5), 2),
     );
     g.restore();
@@ -632,12 +789,6 @@ class RoninArt implements ShipArt {
 
     // трафарет «7 7»
     _text(g, '7 7', 26, 29.644, _rgba(228, 234, 240, .78), px(4.85), py(7.28));
-
-    // бортовые огни-иллюминаторы (щели)
-    if (lights) _lights(g);
-
-    // контур корпуса
-    if (edges) g.drawPath(hull, _stroke(const Color(0xFF07090C), 2.4));
   }
 
   /// Бортовые огни-иллюминаторы — щели с подсветкой (только при `lights`).
@@ -665,7 +816,16 @@ class RoninArt implements ShipArt {
 
   // ---------- слой 1: предметы ----------
 
-  static void _drawObjects(Canvas g) {
+  /// Предметы слоя 1. [lights] — строб и огонёк датчика, стёкла визора;
+  /// [accents] — оранжевая полоса люков; [paint] — краски на предметах нет
+  /// (параметр симметричен корпусу, `render({lights, paint, accents})`, D-017).
+  /// Рама визора, корпус датчика, крышки люков и RCS — всегда.
+  static void _drawObjects(
+    Canvas g, {
+    bool lights = true,
+    bool paint = true,
+    bool accents = true,
+  }) {
     const c = cellPx;
 
     // датчик-блок на носу + строб
@@ -676,51 +836,66 @@ class RoninArt implements ShipArt {
     final edge = _stroke(_rgba(0, 0, 0, .6), 1.5);
     g.drawRect(body, edge);
     g.drawRect(head, edge);
-    g.drawRect(
-      Rect.fromLTWH(cx - .18 * c, py(-.78), .36 * c, 2.2),
-      _fill(_rgba(180, 220, 255, .9)),
-    );
-    _glowDot(g, cx, py(-1.06), 2.2, _rgba(255, 255, 255, .95));
+    if (lights) {
+      g.drawRect(
+        Rect.fromLTWH(cx - .18 * c, py(-.78), .36 * c, 2.2),
+        _fill(_rgba(180, 220, 255, .9)),
+      );
+      _glowDot(g, cx, py(-1.06), 2.2, _rgba(255, 255, 255, .95));
+    }
 
     // мостик: визор со щелями (v3: выше v2 — три ряда клеток, средний стекло)
     final vx = px(4.65), vy = py(2.48), vw = 5.7 * c, vh = .86 * c;
     final visor = _rr(vx, vy, vw, vh, 4);
     g.drawRRect(visor, _fill(const Color(0xFF101318)));
     g.drawRRect(visor, _stroke(_rgba(255, 255, 255, .18), 1.5));
-    for (final sl in const [
-      [5.0, 1.0],
-      [6.4, 1.0],
-      [7.8, 1.0],
-      [9.2, .85],
-    ]) {
-      final sx = sl[0], sw = sl[1];
-      _shadowed(
-        g,
-        Path()..addRRect(_rr(px(sx), vy + .28 * c, sw * c, .30 * c, 2.5)),
-        Paint()
-          ..shader = ui.Gradient.linear(
-            Offset(px(sx), 0),
-            Offset(px(sx + sw), 0),
-            const [Color(0xFF8FC6EE), Color(0xFFE8F6FF), Color(0xFF79B6E2)],
-            const [0, .5, 1],
-          ),
-        _rgba(150, 210, 255, .9),
-        9,
-      );
+    if (lights) {
+      for (final sl in const [
+        [5.0, 1.0],
+        [6.4, 1.0],
+        [7.8, 1.0],
+        [9.2, .85],
+      ]) {
+        final sx = sl[0], sw = sl[1];
+        _shadowed(
+          g,
+          Path()..addRRect(_rr(px(sx), vy + .28 * c, sw * c, .30 * c, 2.5)),
+          Paint()
+            ..shader = ui.Gradient.linear(
+              Offset(px(sx), 0),
+              Offset(px(sx + sw), 0),
+              const [Color(0xFF8FC6EE), Color(0xFFE8F6FF), Color(0xFF79B6E2)],
+              const [0, .5, 1],
+            ),
+          _rgba(150, 210, 255, .9),
+          9,
+        );
+      }
     }
 
     // торпедные люки на носовой секции
     for (final s in const [-1, 1]) {
       final tx = cx + s * 1.45 * c - .42 * c, ty = py(5.95);
       final hatch = _rr(tx, ty, .84 * c, .66 * c, 3);
-      _shadowed(g, Path()..addRRect(hatch), _fill(_hsl(_dark, -1)), _rgba(0, 0, 0, .5), 5);
+      _shadowed(
+        g,
+        Path()..addRRect(hatch),
+        _fill(_hsl(_dark, -1)),
+        _rgba(0, 0, 0, .5),
+        5,
+      );
       g.drawRRect(hatch, _stroke(_rgba(0, 0, 0, .65), 1.6));
       g.drawLine(
         Offset(tx + .42 * c, ty + 3),
         Offset(tx + .42 * c, ty + .66 * c - 3),
         _stroke(_rgba(255, 255, 255, .14), 1),
       );
-      g.drawRect(Rect.fromLTWH(tx + 2, ty - 2.6, .84 * c - 4, 2), _fill(_rgba(224, 131, 55, .85)));
+      if (accents) {
+        g.drawRect(
+          Rect.fromLTWH(tx + 2, ty - 2.6, .84 * c - 4, 2),
+          _fill(_rgba(224, 131, 55, .85)),
+        );
+      }
     }
 
     // RCS-квады — все четыре
