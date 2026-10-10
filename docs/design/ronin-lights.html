@@ -42,11 +42,12 @@
 <div id="parts"></div>
 
 <h1 style="margin-top:40px">Вариант: корабль потёртый</h1>
-<p class="lead">Эксперимент к обсуждению (PO, 2026-10-10), не канон. Поверх рисунка — износ:
-грязь к низу плит, пятна копоти, затёртые кромки на швах, царапины, копоть вокруг RCS-квадов,
-потёки вниз от щелей и люков, сколы краски на шевроне и надписях. Свет не пачкается: стёкла и
-щели светятся чисто. Во время сборки клетка однотонная (D-017), поэтому износ там виден только
-сколами краски; целиком он проявляется, когда деталь собрана.</p>
+<p class="lead">Эксперимент к обсуждению (PO, 2026-10-10), не канон. Износ — краска стёрта до
+металла. По референсам: сколы по внешним кромкам силуэта (больше всего — передняя кромка носа и
+уступы), реже по краям плит на швах, по краям крышек люков и по краю краски; середины плит не
+трогаются. Металл — светлый холодный серый; на графите приглушённый и без ободка, на оранжевой
+краске — тёмная полоса грунта, затем металл. Свет не трогается. Во время сборки клетка однотонная
+(D-017), поэтому износ там виден только сколами краски.</p>
 <p class="lead">Износ: <label><input type="radio" name="wear" value="1" checked> лёгкий</label>
   <label><input type="radio" name="wear" value="2"> заметный</label></p>
 <div class="sect">Экран корабля: новый и потёртый</div>
@@ -234,78 +235,113 @@ const OBJREG = new Path2D(); objs.filter(p => !p.id.startsWith('visor')).forEach
 const BB = plates.map(bbox).reduce((a, b) => ({ x0:Math.min(a.x0,b.x0), y0:Math.min(a.y0,b.y0), x1:Math.max(a.x1,b.x1), y1:Math.max(a.y1,b.y1) }));
 const on = (p, c, r) => r >= 0 && r < p.mask.length && c >= 0 && p.mask[r][c] === '#';
 
-function blot(g, x, y, r, a, col){ const gr = g.createRadialGradient(x, y, 0, x, y, r);
-  gr.addColorStop(0, `rgba(${col},${a})`); gr.addColorStop(1, `rgba(${col},0)`); g.fillStyle = gr; g.fillRect(x-r, y-r, 2*r, 2*r); }
-function scratch(g, R, x, y, k){
-  const len = 3 + R()*10, a = (R()-.5)*.9 + (R() < .25 ? Math.PI/2 : 0), dx = Math.cos(a)*len, dy = Math.sin(a)*len;
-  g.lineCap = 'round';
-  g.strokeStyle = `rgba(0,0,0,${.16*Math.min(k,1.5)})`; g.lineWidth = .7;
-  g.beginPath(); g.moveTo(x+.5, y+.6); g.lineTo(x+dx+.5, y+dy+.6); g.stroke();
-  g.strokeStyle = `rgba(214,222,230,${.20*Math.min(k,1.5)})`; g.lineWidth = .55;
-  g.beginPath(); g.moveTo(x, y); g.quadraticCurveTo(x+dx/2+(R()-.5)*2, y+dy/2+(R()-.5)*2, x+dx, y+dy); g.stroke();
-}
-function drip(g, x, y, len, w, a){ const gr = g.createLinearGradient(0, y, 0, y+len);
-  gr.addColorStop(0, `rgba(10,8,6,${a})`); gr.addColorStop(1, 'rgba(10,8,6,0)');
-  g.fillStyle = gr; g.beginPath(); g.moveTo(x-w/2, y); g.lineTo(x+w/2, y); g.lineTo(x+w*.25, y+len); g.lineTo(x-w*.25, y+len); g.closePath(); g.fill(); }
+/* износ — краска стёрта до металла (референсы: сколы по кромкам, углам, краям люков и знаков;
+   середины плит, впадины и стыки швов не трогаются; на графите металл приглушённый и без
+   ободка, на оранжевой краске — тёмная полоса грунта, затем металл) */
+const METAL_DARK = '#727C86', METAL_LIGHT = '#B8C2CC', PRIMER = '#3A2618';   /* на графите металл приглушён, иначе белая сыпь */
+const probe = document.createElement('canvas').getContext('2d');
+function noise1(R, step){ const v = []; return t => { const i = Math.floor(t/step), f = t/step - i;
+  while (v.length <= i+1) v.push(R()); const s = f*f*(3-2*f); return v[i]*(1-s) + v[i+1]*s; }; }
+function hullLumAt(x, y){ const im = img(W.hullN), q = (Math.round(y*R4)*im.width + Math.round(x*R4))*4; return lum(im.data, q); }
 
-/* износ обшивки — в координатах рисунка; k — сила (1 лёгкий, 2 заметный) */
+/* стёртая кромка: отрезок a→b, (nx,ny) — внутрь детали; dens — доля кромки с износом,
+   depth — наибольшая глубина, px рисунка; metal — цвет (по умолчанию по яркости плиты) */
+function edgeWear(g, R, ax, ay, bx, by, nx, ny, dens, depth, metal){
+  const len = Math.hypot(bx-ax, by-ay); if (len < 1) return;
+  const ux = (bx-ax)/len, uy = (by-ay)/len, N = noise1(R, 1.6 + R()*1.6);
+  let t = R()*3;
+  while (t < len){
+    const run = 1.5 + R()*6;
+    if (R() < dens){
+      const t0 = t, t1 = Math.min(len, t + run), pts = [];
+      for (let s = t0; s <= t1 + 1e-6; s += .5){
+        const taper = Math.min(1, (s-t0)/1, (t1-s)/1);
+        pts.push([s, Math.max(.2, depth * (.25 + .75*N(s)) * taper)]);
+      }
+      const mid = (t0+t1)/2;
+      g.fillStyle = metal || (hullLumAt(ax + ux*mid + nx*2, ay + uy*mid + ny*2) < 0.15 ? METAL_DARK : METAL_LIGHT);
+      g.beginPath();
+      pts.forEach(([s], i) => g[i ? 'lineTo' : 'moveTo'](ax + ux*s - nx*.3, ay + uy*s - ny*.3));
+      for (let i = pts.length-1; i >= 0; i--){ const [s, d] = pts[i]; g.lineTo(ax + ux*s + nx*d, ay + uy*s + ny*d); }
+      g.closePath(); g.fill();
+      if (run > 3) for (let i = 0, n = 2 + (R()*4|0); i < n; i++){     // мелкие точки со стороны плиты
+        const s = t0 + R()*(t1-t0), d = depth*(1.3 + R()*2);
+        g.beginPath(); g.arc(ax + ux*s + nx*d, ay + uy*s + ny*d, .22 + R()*.3, 0, 7); g.fill(); }
+    }
+    t += run + 1 + R()*5;
+  }
+}
+
+/* кромки корпуса строк 0–7: [ax, ay, bx, by, nx, ny, вид] */
+function hullEdges(){
+  const sp = SHIP.span, E = [];
+  E.push([px(sp[0][0]), py(0), px(sp[0][1]+1), py(0), 0, 1, 'lead']);                 // передняя кромка носа
+  for (let y = 0; y < 8; y++){
+    E.push([px(sp[y][0]), py(y), px(sp[y][0]), py(y+1), 1, 0, 'side']);
+    E.push([px(sp[y][1]+1), py(y), px(sp[y][1]+1), py(y+1), -1, 0, 'side']);
+    if (y > 0 && sp[y][0] < sp[y-1][0]){                                               // уступ силуэта
+      E.push([px(sp[y][0]), py(y), px(sp[y-1][0]), py(y), 0, 1, 'step']);
+      E.push([px(sp[y-1][1]+1), py(y), px(sp[y][1]+1), py(y), 0, 1, 'step']);
+    }
+  }
+  for (const p of plates) D.eachCell(p, (c, r) => {                                    // кромки плит на швах: верх и лево
+    const [x, y, cs] = D.cellRect(p, c, r);
+    if (!on(p, c, r-1) && probe.isPointInPath(HULLREG, x + cs/2, y - .8)) E.push([x, y, x+cs, y, 0, 1, 'seam']);
+    if (!on(p, c-1, r) && probe.isPointInPath(HULLREG, x - .8, y + cs/2)) E.push([x, y, x, y+cs, 1, 0, 'seam']);
+  });
+  return E;
+}
+const EDGE_K = { lead:[.6, 1.9], step:[.45, 1.5], side:[.32, 1.4], seam:[.08, .8] };
+
 function wearHull(g, k){
   const R = mulberry32(1977);
   g.save(); g.clip(HULLREG);
-  for (const p of plates){                                   // грязь к низу плиты
-    const b = bbox(p), gr = g.createLinearGradient(0, b.y0, 0, b.y1);
-    gr.addColorStop(0, 'rgba(14,10,6,0)'); gr.addColorStop(.55, 'rgba(14,10,6,0)'); gr.addColorStop(1, `rgba(14,10,6,${.13*k})`);
-    g.save(); g.clip(D.shipRegion(p)); g.fillStyle = gr; g.fillRect(b.x0, b.y0, b.x1-b.x0, b.y1-b.y0); g.restore();
+  for (const [ax, ay, bx, by, nx, ny, kind] of hullEdges()){
+    const [dens, depth] = EDGE_K[kind];
+    edgeWear(g, R, ax, ay, bx, by, nx, ny, Math.min(.9, dens*k), depth*(.8 + .25*k));
   }
-  for (let i = 0; i < 26*k; i++)                             // пятна копоти и грязи
-    blot(g, BB.x0 + R()*(BB.x1-BB.x0), BB.y0 + R()*(BB.y1-BB.y0), 4 + R()*12, (.07 + R()*.09)*Math.min(k, 1.6), '14,10,6');
-  for (let i = 0; i < 8*k; i++)                              // светлые затёртости
-    blot(g, BB.x0 + R()*(BB.x1-BB.x0), BB.y0 + R()*(BB.y1-BB.y0), 3 + R()*7, .05*Math.min(k, 1.6), '200,210,220');
-  for (const p of plates) D.eachCell(p, (c, r) => {           // затёртые кромки на швах
-    const [x, y, cs] = D.cellRect(p, c, r), e = [];
-    if (!on(p, c, r-1)) e.push([x, y+1.2, x+cs, y+1.2]);
-    if (!on(p, c-1, r)) e.push([x+1.2, y, x+1.2, y+cs]);
-    if (!on(p, c, r+1)) e.push([x, y+cs-1.2, x+cs, y+cs-1.2]);
-    if (!on(p, c+1, r)) e.push([x+cs-1.2, y, x+cs-1.2, y+cs]);
-    for (const [ax, ay, bx, by] of e){ if (R() > .22*k) continue;
-      const t0 = R()*.5, t1 = t0 + .3 + R()*.5;
-      g.strokeStyle = `rgba(206,214,224,${.16 + R()*.14})`; g.lineWidth = .8;
-      g.beginPath(); g.moveTo(ax+(bx-ax)*t0, ay+(by-ay)*t0); g.lineTo(ax+(bx-ax)*Math.min(1,t1), ay+(by-ay)*Math.min(1,t1)); g.stroke(); }
-  });
-  for (let i = 0; i < 34*k; i++) scratch(g, R, BB.x0 + R()*(BB.x1-BB.x0), BB.y0 + R()*(BB.y1-BB.y0), k);
-  for (const [ax, ay] of [[3, 4.5], [12, 4.5]]){              // копоть вокруг RCS
-    blot(g, px(ax), py(ay), .95*C, .30*Math.min(k, 1.5), '8,6,4');
-    for (let i = 0; i < 2+k; i++) drip(g, px(ax) + (R()-.5)*.6*C, py(ay) + .25*C, (.5 + R()*.6)*C*k, 2 + R()*2, .22);
-  }
-  for (const [ax, ay] of [[4.4, 5.62], [10.6, 5.62]])          // потёки от щелей
-    for (let i = 0; i < 1+k; i++) drip(g, px(ax) + (R()-.5)*.6*C, py(ay), (.35 + R()*.5)*C*k, 1.5 + R()*1.5, .2);
-  for (const s of [-1, 1]){ const tx = SHIP.cx + s*1.45*C;    // потёки от люков
-    for (let i = 0; i < 1+k; i++) drip(g, tx + (R()-.5)*.6*C, py(6.62), (.35 + R()*.5)*C*k, 2 + R()*1.5, .2); }
   g.restore();
 }
-/* износ предметов (кроме визора): немного грязи и царапин */
+/* люки: края крышки */
 function wearObj(g, k){
-  const R = mulberry32(4242);
+  const R = mulberry32(4242), w = .84*C, h = .66*C;
   g.save(); g.clip(OBJREG);
-  for (const p of objs.filter(p => !p.id.startsWith('visor'))){ const b = bbox(p);
-    for (let i = 0; i < 2*k; i++) blot(g, b.x0 + R()*(b.x1-b.x0), b.y0 + R()*(b.y1-b.y0), 3 + R()*5, .12*Math.min(k,1.5), '14,10,6');
-    for (let i = 0; i < 3*k; i++) scratch(g, R, b.x0 + R()*(b.x1-b.x0), b.y0 + R()*(b.y1-b.y0), k); }
+  for (const s of [-1, 1]){
+    const tx = SHIP.cx + s*1.45*C - .42*C, ty = py(5.95);
+    edgeWear(g, R, tx, ty+3, tx, ty+h-3, 1, 0, .35*k, 1, METAL_DARK);
+    edgeWear(g, R, tx+w, ty+3, tx+w, ty+h-3, -1, 0, .35*k, 1, METAL_DARK);
+    edgeWear(g, R, tx+3, ty+h, tx+w-3, ty+h, 0, -1, .4*k, 1.1, METAL_DARK);
+  }
   g.restore();
 }
-/* сколы краски: вырезаем из канвы краски неровные пятна там, где краска есть */
-function chipPaint(src, k){
+
+/* сколы краски по её краю: тёмная полоса грунта, внутри металл; режут только краску.
+   Список считается один раз в координатах рисунка и кладётся на канвы любого разрешения. */
+function chipList(k){
+  const src = W.paint, im = src.getContext('2d').getImageData(0, 0, src.width, src.height), d = im.data, res = src.width / SHIP.W;
+  const A = (x, y) => d[(Math.round(y*res)*im.width + Math.round(x*res))*4 + 3];
+  const R = mulberry32(31337), out = [];
+  let guard = 0;
+  while (out.length < 16*k && guard++ < 80000){
+    const x = BB.x0 + R()*(BB.x1-BB.x0), y = BB.y0 + R()*(BB.y1-BB.y0);
+    if (A(x, y) < 128) continue;
+    if (![[1.2,0],[-1.2,0],[0,1.2],[0,-1.2]].some(([a, b]) => A(x+a, y+b) < 128)) continue;  // только край краски
+    const text = y > py(2), rad = (text ? .45 : .6) + R()*(text ? .45 : .7 + .35*k), m = 6 + (R()*3|0);
+    const shape = []; for (let i = 0; i < m; i++) shape.push([i/m*Math.PI*2, .55 + R()*.6]);
+    const dots = []; for (let i = 0, n = text ? 0 : 1 + (R()*3|0); i < n; i++) dots.push([x + (R()-.5)*5*rad, y + (R()-.5)*5*rad, .2 + R()*.25]);
+    out.push({ x, y, rad, shape, dots });
+  }
+  return out;
+}
+function applyChips(src, chips){
   const cv = document.createElement('canvas'); cv.width = src.width; cv.height = src.height;
   const g = cv.getContext('2d'); g.drawImage(src, 0, 0);
-  const res = src.width / SHIP.W, d = src.getContext('2d').getImageData(0, 0, src.width, src.height).data;
-  const R = mulberry32(31337); g.setTransform(res, 0, 0, res, 0, 0); g.globalCompositeOperation = 'destination-out';
-  let n = 0, guard = 0;
-  while (n < 30*k && guard++ < 40000){
-    const x = BB.x0 + R()*(BB.x1-BB.x0), y = BB.y0 + R()*(BB.y1-BB.y0);
-    if (d[(Math.round(y*res)*src.width + Math.round(x*res))*4 + 3] < 128) continue;
-    const rad = .5 + R()*(.7 + .4*k), m = 5 + (R()*3|0);
-    g.fillStyle = `rgba(0,0,0,${.75 + R()*.25})`; g.beginPath();
-    for (let i = 0; i < m; i++){ const a = i/m*Math.PI*2, rr = rad*(.5 + R()*.7); g[i ? 'lineTo' : 'moveTo'](x + Math.cos(a)*rr*1.4, y + Math.sin(a)*rr); }
-    g.closePath(); g.fill(); n++;
+  const res = src.width / SHIP.W; g.setTransform(res, 0, 0, res, 0, 0); g.globalCompositeOperation = 'source-atop';
+  const poly = (c, k) => { g.beginPath(); c.shape.forEach(([a, r], i) => g[i ? 'lineTo' : 'moveTo'](c.x + Math.cos(a)*r*c.rad*k*1.3, c.y + Math.sin(a)*r*c.rad*k)); g.closePath(); g.fill(); };
+  for (const c of chips){
+    g.fillStyle = PRIMER; poly(c, 1.25);
+    g.fillStyle = METAL_LIGHT; poly(c, .8);
+    for (const [x, y, r] of c.dots){ g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); }
   }
   return cv;
 }
@@ -315,7 +351,7 @@ function worn(k){
   if (WORN[k]) return WORN[k];
   const mk = () => { const cv = document.createElement('canvas'); cv.width = SHIP.W*R4; cv.height = SHIP.H*R4;
     const g = cv.getContext('2d'); g.setTransform(R4, 0, 0, R4, 0, 0); return [cv, g]; };
-  const paint4 = chipPaint(W.paint, k), paint2 = chipPaint(L.hull.paintOnly, k);
+  const chips = chipList(k), paint4 = applyChips(W.paint, chips), paint2 = applyChips(L.hull.paintOnly, chips);
   const compose = (hull) => { const [cv, g] = mk(); g.drawImage(hull.cv, 0, 0, SHIP.W, SHIP.H);
     g.drawImage(paint4, 0, 0, SHIP.W, SHIP.H); wearHull(g, k); return cv; };
   const hullE = compose(W.hullE), hullN = compose(W.hullN);
