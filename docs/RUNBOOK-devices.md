@@ -21,7 +21,16 @@ flutter devices
 ```
 
 iPhone PO — id `00008101-000538EA0C84001E`; он подставлен в iOS-команды ниже.
-Другое устройство — свой id из `flutter devices`.
+iPhone сына (плейтест) — id `00008140-001248C022D8401C`:
+
+```
+flutter run --release -d 00008140-001248C022D8401C --dart-define=BUILD_COMMIT=$(git rev-parse --short HEAD) --dart-define="BUILD_TIME=$(date '+%d.%m %H:%M')"
+```
+
+Другое устройство — свой id из `flutter devices`. Новый iPhone (iOS 16+) — сначала
+«Режим разработчика»: пункт появляется в **Настройки → Конфиденциальность и
+безопасность** (внизу) только после того, как телефон увидел Xcode (**Window →
+Devices and Simulators**) или после первой попытки `flutter run`.
 
 ---
 
