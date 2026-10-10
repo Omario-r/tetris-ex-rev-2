@@ -23,10 +23,12 @@
     edges  — false: без кромок деталей и контура корпуса (поле укладки);
     lights — false: без света — щели-огни, огни гондол, строб и огонёк датчика,
              стекло визора (поле укладки во время сборки);
-    paint  — false: без покраски — шеврон, «VV-77», «77», «РОНИН», полосы люков.
-  Клетка поля во время сборки — три вида (решение PO 2026-10-10): основа
-  (однотонная, из рисунка без краски и света), краска поверх основы (может
-  занимать часть клетки), свет (однотонный, светится, краски поверх нет).
+    paint  — false: без краски корпуса — шеврон, «VV-77», «77», «РОНИН»;
+    accents — false: без цветных элементов деталей — полосы торпедных люков.
+  Клетка поля во время сборки (решение PO 2026-10-10): основа — однотонная, из
+  рисунка без краски, цветных элементов и света; краска корпуса — поверх основы,
+  может занимать часть клетки; цветной элемент — клетка целиком его цвета; свет —
+  цветной элемент, который светится (ореол), краски поверх нет.
   window.__SHIP.off — рисунок по window.__SHIP_RES / window.__SHIP_NO_OBJECTS
   (совместимость со страницами v2).
 */
@@ -144,7 +146,7 @@ function render(opt){
 opt=opt||{};
 const RES=opt.res||2, LAYER=opt.layer||'all';
 const BG=LAYER==='all', HULL=LAYER!=='objects', OBJ=LAYER!=='hull';
-const EDGES=opt.edges!==false, LIGHTS=opt.lights!==false, PAINT=opt.paint!==false;
+const EDGES=opt.edges!==false, LIGHTS=opt.lights!==false, PAINT=opt.paint!==false, ACCENTS=opt.accents!==false;
 const off=document.createElement('canvas'); off.width=W*RES; off.height=H*RES;
 const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 
@@ -644,7 +646,7 @@ for(const s of [-1,1]){
   g.strokeStyle='rgba(0,0,0,.65)';g.lineWidth=1.6; rr(g,tx,ty,.84*C,.66*C,3); g.stroke();
   g.strokeStyle='rgba(255,255,255,.14)';g.lineWidth=1;
   g.beginPath();g.moveTo(tx+.42*C,ty+3);g.lineTo(tx+.42*C,ty+.66*C-3);g.stroke();
-  if(PAINT){ g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2); }
+  if(ACCENTS){ g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2); }
 }
 
 /* --- RCS-квады --- */

@@ -23,19 +23,19 @@
 </head>
 <body>
 
-<h1>Клетка поля: основа, краска, свет</h1>
-<p class="lead">Доработка к КТ-2 (PO, 2026-10-10). Во время сборки клетка — один из трёх видов:</p>
+<h1>Клетка поля: основа, краска, цветной элемент, свет</h1>
+<p class="lead">Доработка к КТ-2 (PO, 2026-10-10). Во время сборки клетка — один из видов:</p>
 <ul class="vars">
-  <li><b>Основа</b> — часть детали, всегда однотонная: преобладающий цвет рисунка без краски и света.
-    Поверх может лежать краска.</li>
-  <li><b>Краска</b> — шеврон, «VV-77», «77», полоса люка. Ложится поверх основы и может занимать
+  <li><b>Основа</b> — часть детали, всегда однотонная: преобладающий цвет рисунка без краски,
+    цветных элементов и света. Поверх может лежать краска корпуса.</li>
+  <li><b>Краска корпуса</b> — шеврон, «VV-77», «77». Ложится поверх основы и может занимать
     часть клетки.</li>
-  <li><b>Свет</b> — щели-огни, строб и огонёк датчика, стёкла визора. Однотонная и светится
-    (ореол на соседей); краски поверх нет.</li>
+  <li><b>Цветной элемент</b> — окрашенная часть детали (полоса люка). Клетка целиком его цвета.</li>
+  <li><b>Свет</b> — цветной элемент, который светится: щели-огни, строб и огонёк датчика, стёкла
+    визора. Клетка целиком его цвета и с ореолом на соседей; краски поверх нет.</li>
 </ul>
-<p class="lead">Клетка световая, если свет занимает ≥ 40 % клетки, или ≥ 15 % и не меньше 70 % от
-соседа сверху/снизу/слева/справа — тонкая щель ложится в один ряд. Цвет света — среднее его
-пикселей. Цвет основы — преобладающий; почти чёрная обводка и тень предмета не берутся, если их
+<p class="lead">Клетка цветного элемента или света — если он занимает ≥ 40 % клетки, или ≥ 15 % и не меньше 70 % от
+соседа поперёк элемента — тонкая щель ложится в один ряд, а вдоль идёт до конца. Цвет — среднее его пикселей. Цвет основы — преобладающий; почти чёрная обводка и тень предмета не берутся, если их
 меньше 70 % клетки (иначе у люка и датчика по краям чёрные «дыры»).
 Все куски уложены, деталь ещё не собрана; справа — собранная деталь (рисунок целиком, как сейчас).</p>
 
@@ -55,11 +55,12 @@ const rnd = o => ({ cv: SHIP.render(Object.assign({ res:RES }, o)), res:RES });
 const HULL = { layer:'hull', edges:false }, OBJS = { layer:'objects' };
 const L = {};
 for (const [k, base] of [['hull', HULL], ['obj', OBJS]]){
-  L[k] = {
-    base:  rnd(Object.assign({}, base, { lights:false, paint:false })),   // основа
-    paint: rnd(Object.assign({}, base, { lights:false })),                // основа + краска
-    light: rnd(Object.assign({}, base, { paint:false })),                 // основа + свет
-  };
+  L[k] = {};
+  const off = { lights:false, paint:false, accents:false };
+  L[k].base   = rnd(Object.assign({}, base, off));                                  // основа
+  L[k].paint  = rnd(Object.assign({}, base, off, { paint:true }));                  // + краска корпуса
+  L[k].accent = rnd(Object.assign({}, base, off, { accents:true }));                // + цветные элементы
+  L[k].light  = rnd(Object.assign({}, base, off, { lights:true }));                 // + свет
 }
 const img = p => p.img || (p.img = p.cv.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, p.cv.width, p.cv.height));
 const lum = (d, i) => (0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]) / 255;
@@ -78,27 +79,34 @@ for (const k of ['hull', 'obj']){
   cv.getContext('2d').putImageData(out, 0, 0); L[k].paintOnly = cv;
 }
 
-/* доля пикселей света в клетке и их средний цвет */
-function cellLight(part, c, r){
+/* доля пикселей элемента (kind: 'light' | 'accent') в клетке и их средний цвет */
+function cellElem(part, c, r, kind){
   const [x, y, cs] = D.cellRect(part, c, r), S = L[part.layer === 1 ? 'obj' : 'hull'];
-  const lt = img(S.light), d = lt.data, b = img(S.base).data, W = lt.width;
+  const lt = img(S[kind]), d = lt.data, b = img(S.base).data, W = lt.width;
   const x0 = Math.round(x*RES), y0 = Math.round(y*RES), n = Math.max(1, Math.round(cs*RES));
   let hit = 0, tot = 0; const sum = [0, 0, 0];
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
     const q = ((y0+j)*W + x0+i) * 4; if (d[q+3] < 128) continue; tot++;
-    if (lum(d, q) - lum(b, q) > 0.25){ hit++; sum[0] += d[q]; sum[1] += d[q+1]; sum[2] += d[q+2]; }
+    const on = kind === 'light' ? lum(d, q) - lum(b, q) > 0.25
+      : Math.abs(d[q]-b[q]) + Math.abs(d[q+1]-b[q+1]) + Math.abs(d[q+2]-b[q+2]) > 40;
+    if (on){ hit++; sum[0] += d[q]; sum[1] += d[q+1]; sum[2] += d[q+2]; }
   }
   return { f: tot ? hit/tot : 0, col: hit ? sum.map(v => v/hit) : null };
 }
-/* световая клетка: свет ≥ 40 % клетки; или ≥ 15 % и не меньше 70 % от любого соседа */
-function lightCells(part){
-  const F = new Map(); D.eachCell(part, (c, r) => F.set(c+','+r, cellLight(part, c, r)));
+/* клетка элемента: элемент ≥ 40 % клетки; или ≥ 15 % и не меньше 70 % от соседа ПОПЕРЁК
+   элемента (элемент шире, чем выше, — соседи сверху и снизу; иначе — слева и справа).
+   Тонкая щель ложится в один ряд, а вдоль идёт до конца. */
+function elemCells(part, kind){
+  const F = new Map(); D.eachCell(part, (c, r) => F.set(c+','+r, cellElem(part, c, r, kind)));
+  const hot = [...F].filter(([, v]) => v.f >= 0.15).map(([k]) => k.split(',').map(Number));
+  if (!hot.length) return new Map();
+  const span = i => Math.max(...hot.map(h => h[i])) - Math.min(...hot.map(h => h[i]));
+  const across = span(0) >= span(1) ? [[0,1],[0,-1]] : [[1,0],[-1,0]];
   const out = new Map();
-  for (const [k, v] of F){
-    if (v.f < 0.15) continue;
-    const [c, r] = k.split(',').map(Number);
-    const nb = Math.max(0, ...[[1,0],[-1,0],[0,1],[0,-1]].map(([a, b]) => (F.get((c+a)+','+(r+b)) || {f:0}).f));
-    if (v.f >= 0.4 || v.f >= 0.7*nb) out.set(k, v.col);
+  for (const [c, r] of hot){
+    const v = F.get(c+','+r);
+    const nb = Math.max(0, ...across.map(([a, b]) => (F.get((c+a)+','+(r+b)) || {f:0}).f));
+    if (v.f >= 0.4 || v.f >= 0.7*nb) out.set(c+','+r, v.col);
   }
   return out;
 }
@@ -146,7 +154,7 @@ function cell(g, part, c, r, X, Y, u, light){
   rivets(g, X+i, Y+i, w, w, s, lumRgb(col) < 0.2);
 }
 
-function field(cv, part, mode, lights){
+function field(cv, part, mode, lights, accents){
   const u = U, w = Math.max(...part.mask.map(l => l.length)), h = part.mask.length;
   const g = D.dpr(cv, (w+2)*u, (h+2)*u);
   g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, (w+2)*u, (h+2)*u);
@@ -154,8 +162,8 @@ function field(cv, part, mode, lights){
   if (mode === 'now'){ D.eachCell(part, (c, r) => D.drawCell(g, part, c, r, (c+1)*u, (r+1)*u, u, 'build')); return; }
   const lit = [];
   D.eachCell(part, (c, r) => {
-    const X = (c+1)*u, Y = (r+1)*u, col = lights.get(c+','+r);
-    if (col) lit.push([c, r, X, Y, col]); else cell(g, part, c, r, X, Y, u, null);
+    const X = (c+1)*u, Y = (r+1)*u, k = c+','+r, col = lights.get(k);
+    if (col) lit.push([c, r, X, Y, col]); else cell(g, part, c, r, X, Y, u, accents.get(k) || null);
   });
   for (const [, , X, Y, col] of lit){                       /* ореол света — на соседей */
     g.save(); g.shadowColor = rgb(col, .9); g.shadowBlur = .7*u;
@@ -172,19 +180,19 @@ const SHOW = [
   ['fwd1_r',   'Плита: носовой пояс, правая скула', 'Свет: вторая щель.'],
   ['fwd2_l',   'Плита: носовой пояс, низ слева', 'Краска: «77».'],
   ['sensor',   'Предмет: датчик носа', 'Свет: строб и белый огонёк на кончике.'],
-  ['hatch_l',  'Предмет: торпедный люк', 'Краска: оранжевая полоса сверху — поверх тёмной основы, на часть клетки.'],
+  ['hatch_l',  'Предмет: торпедный люк', 'Цветной элемент: оранжевая полоса — клетки целиком оранжевые, без свечения.'],
   ['visor_l',  'Предмет: визор, левая половина', 'Свет: стёкла — средний ряд светится.'],
 ];
 const root = document.getElementById('parts');
 for (const [id, t, an] of SHOW){
-  const part = P.parts.find(p => p.id === id), lights = lightCells(part);
-  root.insertAdjacentHTML('beforeend', `<div class="sect">${part.order}. ${t} · ${part.cells} кл., световых — ${lights.size}</div>`);
+  const part = P.parts.find(p => p.id === id), lights = elemCells(part, 'light'), accents = elemCells(part, 'accent');
+  root.insertAdjacentHTML('beforeend', `<div class="sect">${part.order}. ${t} · ${part.cells} кл., цветных — ${accents.size}, световых — ${lights.size}</div>`);
   const row = document.createElement('div'); row.className = 'row'; root.appendChild(row);
-  for (const [mode, title] of [['now', 'Сейчас'], ['new', 'Основа, краска, свет'], ['done', 'Собрана']]){
+  for (const [mode, title] of [['now', 'Сейчас'], ['new', 'Новая клетка'], ['done', 'Собрана']]){
     const card = document.createElement('div'), b = document.createElement('div'), cv = document.createElement('canvas');
     card.className = 'card'; b.className = 'board'; b.appendChild(cv);
     card.innerHTML = `<h2>${title}</h2>`; card.appendChild(b); row.appendChild(card);
-    field(cv, part, mode, lights);
+    field(cv, part, mode, lights, accents);
   }
   root.insertAdjacentHTML('beforeend', `<p class="an">${an}</p>`);
 }
