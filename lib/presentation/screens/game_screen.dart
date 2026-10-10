@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/gestures.dart' show kTouchSlop;
 import 'package:flutter/material.dart';
 
+import '../../application/build_info.dart';
 import '../../application/progress_service.dart';
 import '../../game_engine/data/level_map.dart';
 import '../../game_engine/data/ronin_parts.dart';
@@ -110,9 +110,6 @@ class _GameScreenState extends State<GameScreen>
   /// высота куска уровня в клетках; считается один раз при (пере)сборке уровня.
   late double _trayCellSize;
 
-  /// Сдвиг seed от канонного `RoninPartDef.seed` детали (0 → канонная
-  /// нарезка); «Пересобрать нарезку» инкрементирует и режет заново.
-  int _seedOffset = 0;
   late PackController _controller;
 
   /// Эталонная раскладка последней нарезки — solve-хук (дев + тесты).
@@ -181,13 +178,10 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// Строит уровень через [prepareLevel]: силуэт в поле, масштаб клетки и
-  /// нарезка («Крупные куски») с seed детали плюс текущий `_seedOffset`.
+  /// нарезка («Крупные куски») с seed детали.
   void _rebuild() {
     final part = RoninParts.parts[_fragmentIndex];
-    final prepared = prepareLevel(
-      part.mask,
-      seed: part.seed + _seedOffset,
-    );
+    final prepared = prepareLevel(part.mask, seed: part.seed);
     _silhouette = prepared.silhouette;
     _targetX = prepared.targetX;
     _targetY = prepared.targetY;
@@ -208,8 +202,6 @@ class _GameScreenState extends State<GameScreen>
         trayOrder: prepared.trayOrder,
       ),
     );
-    // Пересборка уровня (дев-читы нарезки) снимает паузу: деталь снова не
-    // собрана; прогресс уже засчитан, повторное засчитывание идемпотентно.
     _done = false;
     if (_cellColors == null) _loadCellColors(part);
   }
@@ -284,75 +276,47 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  // --- Читы (только dev-сборка, вход под kDebugMode) ---
+  // --- Читы (дев-инструменты, вход под kDevTools, D-018) ---
 
   void _openCheatMenu() {
     showCheatMenu(
       context,
       onSelectLevel: _cheatSelectLevel,
-      onInstantWin: _cheatInstantWin,
-      onSetShipParts: _cheatSetShipParts,
-      onReshuffle: _cheatReshuffle,
-      onSolve: _cheatSolve,
+      onResetGame: _cheatResetGame,
+      onFinishLevel: _cheatFinishLevel,
     );
   }
 
-  void _cheatSelectLevel(int levelIndex) {
-    Navigator.of(context).pop();
-    Navigator.of(context).pushReplacement(
+  /// Чит «Уровень N»: открыть деталь `levelIndex`, корабль собран до неё
+  /// (детали 1…levelIndex).
+  Future<void> _cheatSelectLevel(int levelIndex) async {
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await ProgressService().setCollectedCount(levelIndex);
+    navigator.pushReplacement(
       MaterialPageRoute(builder: (_) => GameScreen(levelIndex: levelIndex)),
     );
   }
 
-  /// Чит «мгновенная победа»: та же пауза «деталь собрана», движок не трогаем.
-  void _cheatInstantWin() {
-    Navigator.of(context).pop();
-    _markDone();
-  }
-
-  /// Чит «Состояние корабля → n»: собрано n деталей (0..N; «15» — 15 / 15).
-  Future<void> _cheatSetShipParts(int parts) async {
-    Navigator.of(context).pop();
-    await ProgressService().setCollectedCount(parts);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Корабль: собрано $parts'),
-        duration: const Duration(seconds: 1),
-      ),
+  /// Чит «Сбросить на начало»: прогресс 0, деталь 1.
+  Future<void> _cheatResetGame() async {
+    final navigator = Navigator.of(context);
+    navigator.pop();
+    await ProgressService().reset();
+    navigator.pushReplacement(
+      MaterialPageRoute(builder: (_) => const GameScreen(levelIndex: 0)),
     );
   }
 
-  /// Дев-чит «Пересобрать нарезку»: новый сдвиг seed → новая нарезка той же детали.
-  void _cheatReshuffle() {
-    Navigator.of(context).pop();
-    _reshuffle();
-  }
-
-  /// Дев-чит «Решить»: solve-хук (см. [_solveAll]).
-  void _cheatSolve() {
+  /// Чит «Закончить уровень»: закрыть меню и уложить все куски (см. [_solveAll]),
+  /// дальше обычная пауза «деталь собрана».
+  void _cheatFinishLevel() {
     Navigator.of(context).pop();
     _solveAll();
   }
 
-  void _reshuffle() {
-    _seedOffset++;
-    _restartLevel();
-  }
-
-  /// Пересобирает текущий уровень с текущим `_seedOffset` и сбрасывает драг.
-  void _restartLevel() {
-    setState(() {
-      _dragPieceId = null;
-      _dragGlobalPos = null;
-      _dragFromTray = false;
-      _resetCandidate();
-      _rebuild();
-    });
-  }
-
   /// Solve-хук: раскладывает все кусочки по эталонному `PackSlice.solution` —
-  /// и дев-инструмент (`Key('cheat_solve')`), и programmatic-хук для тестов,
+  /// и чит «Закончить уровень» (`Key('cheat_finish_level')`), и хук для тестов,
   /// доводящий укладку до `isComplete` без симуляции drag-жестов.
   void _solveAll() {
     setState(() {
@@ -734,8 +698,8 @@ class _GameScreenState extends State<GameScreen>
               children: [
                 Column(
                   children: [
-                    _buildTopbar(context),
-                    _buildProgress(state),
+                    _fixedText(_buildTopbar(context)),
+                    _fixedText(_buildProgress(state)),
                     Expanded(
                       child: Center(
                         child: _buildBoard(
@@ -749,7 +713,7 @@ class _GameScreenState extends State<GameScreen>
                     ),
                     // Пауза «деталь собрана» — кнопки на месте лотка, та же
                     // высота зоны: поле не прыгает.
-                    _done ? _buildDoneButtons() : _buildTray(state),
+                    _done ? _fixedText(_buildDoneButtons()) : _buildTray(state),
                   ],
                 ),
                 if (_dragPieceId != null && _dragGlobalPos != null)
@@ -760,6 +724,13 @@ class _GameScreenState extends State<GameScreen>
         ),
       ),
     );
+  }
+
+  /// Зоны фиксированной высоты (топбар, прогресс, кнопки паузы) держат
+  /// системный шрифт не крупнее 1,0: иначе блок с текстом переполняет зону
+  /// (D-018, «bottom overflowed» на телефоне PO). Лоток и поле текста не имеют.
+  Widget _fixedText(Widget child) {
+    return MediaQuery.withClampedTextScaling(maxScaleFactor: 1.0, child: child);
   }
 
   Widget _buildTopbar(BuildContext context) {
@@ -777,7 +748,7 @@ class _GameScreenState extends State<GameScreen>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                if (kDebugMode)
+                if (kDevTools)
                   Padding(
                     padding: const EdgeInsets.only(right: 8.0),
                     child: _DevButton(

@@ -1,40 +1,34 @@
 import 'package:flutter/material.dart';
 
+import '../../application/build_info.dart';
 import '../../game_engine/data/ronin_parts.dart';
 
-/// Оверлей чит-меню для дев-сборки: минимальный список кнопок.
+/// Оверлей чит-меню (дев-инструменты, D-018): строка сборки, выбор уровня,
+/// «Сбросить на начало», «Закончить уровень».
 ///
 /// Показывается через [showCheatMenu] (bottom sheet). Вход на него — только под
-/// `kDebugMode` (см. `GameScreen`). Сама логика читов живёт в `GameScreen` и
+/// `kDevTools` (см. `GameScreen`). Сама логика читов живёт в `GameScreen` и
 /// передаётся колбэками; меню — только вид.
 class CheatMenu extends StatelessWidget {
-  /// Перезапустить игру на уровне с индексом `levelIndex` (0-based).
+  /// Открыть деталь `levelIndex` (0-based): корабль собран до неё.
   final void Function(int levelIndex) onSelectLevel;
 
-  /// Мгновенная победа: засчитать текущий уровень пройденным (мета-уровень).
-  final VoidCallback onInstantWin;
+  /// Сбросить прогресс и начать с детали 1.
+  final VoidCallback onResetGame;
 
-  /// Задать «собрано N деталей» (N = 0..`RoninParts.parts.length`).
-  final void Function(int parts) onSetShipParts;
+  /// Закончить текущий уровень: все куски укладываются, дальше обычная пауза.
+  final VoidCallback onFinishLevel;
 
-  /// Пересобрать нарезку текущего уровня (новый seed).
-  final VoidCallback onReshuffle;
-
-  /// Solve-хук: доложить деталь по эталонной раскладке (дев-инструмент).
-  final VoidCallback onSolve;
-
-  /// Сколько дев-уровней предлагать в «выборе уровня». `null` (по умолчанию) —
-  /// все детали корабля `RoninParts.parts.length` (не можем задать дефолтом: длина
-  /// списка не `const`). Единый источник истины «N уровней ↔ N деталей».
+  /// Сколько уровней предлагать в «Уровне». `null` (по умолчанию) — все детали
+  /// корабля `RoninParts.parts.length` (не можем задать дефолтом: длина списка
+  /// не `const`). Единый источник истины «N уровней ↔ N деталей».
   final int? levelCount;
 
   const CheatMenu({
     super.key,
     required this.onSelectLevel,
-    required this.onInstantWin,
-    required this.onSetShipParts,
-    required this.onReshuffle,
-    required this.onSolve,
+    required this.onResetGame,
+    required this.onFinishLevel,
     this.levelCount,
   });
 
@@ -48,12 +42,15 @@ class CheatMenu extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Text('Чит-меню', style: Theme.of(context).textTheme.titleLarge),
+              const SizedBox(height: 4),
               Text(
-                'Чит-меню (dev)',
-                style: Theme.of(context).textTheme.titleLarge,
+                'Сборка: ${buildLabel()}',
+                key: const Key('cheat_build'),
+                style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(height: 16),
-              _section(context, 'Выбор уровня', [
+              _section(context, 'Уровень', [
                 for (
                   int i = 0;
                   i < (levelCount ?? RoninParts.parts.length);
@@ -65,33 +62,22 @@ class CheatMenu extends StatelessWidget {
                     child: Text('${i + 1}'),
                   ),
               ]),
-              _section(context, 'Мгновенная победа', [
-                ElevatedButton(
-                  key: const Key('cheat_instant_win'),
-                  onPressed: onInstantWin,
-                  child: const Text('Победить'),
-                ),
-              ]),
-              _section(context, 'Состояние корабля', [
-                for (int n = 0; n <= RoninParts.parts.length; n++)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
                   ElevatedButton(
-                    key: Key('cheat_ship_parts_$n'),
-                    onPressed: () => onSetShipParts(n),
-                    child: Text('$n'),
+                    key: const Key('cheat_reset'),
+                    onPressed: onResetGame,
+                    child: const Text('Сбросить на начало'),
                   ),
-              ]),
-              _section(context, 'Нарезка (dev)', [
-                ElevatedButton(
-                  key: const Key('cheat_reshuffle'),
-                  onPressed: onReshuffle,
-                  child: const Text('Пересобрать нарезку'),
-                ),
-                ElevatedButton(
-                  key: const Key('cheat_solve'),
-                  onPressed: onSolve,
-                  child: const Text('Решить'),
-                ),
-              ]),
+                  ElevatedButton(
+                    key: const Key('cheat_finish_level'),
+                    onPressed: onFinishLevel,
+                    child: const Text('Закончить уровень'),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
@@ -118,20 +104,16 @@ class CheatMenu extends StatelessWidget {
 Future<void> showCheatMenu(
   BuildContext context, {
   required void Function(int levelIndex) onSelectLevel,
-  required VoidCallback onInstantWin,
-  required void Function(int parts) onSetShipParts,
-  required VoidCallback onReshuffle,
-  required VoidCallback onSolve,
+  required VoidCallback onResetGame,
+  required VoidCallback onFinishLevel,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     builder: (_) => CheatMenu(
       onSelectLevel: onSelectLevel,
-      onInstantWin: onInstantWin,
-      onSetShipParts: onSetShipParts,
-      onReshuffle: onReshuffle,
-      onSolve: onSolve,
+      onResetGame: onResetGame,
+      onFinishLevel: onFinishLevel,
     ),
   );
 }

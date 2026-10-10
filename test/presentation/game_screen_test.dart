@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:explosive_tetris/application/build_info.dart';
 import 'package:explosive_tetris/application/progress_service.dart';
 import 'package:explosive_tetris/game_engine/data/ronin_parts.dart';
 import 'package:explosive_tetris/game_engine/packing/slice_config.dart';
@@ -122,7 +123,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('cheat_button')));
       await _pumpFrames(tester);
-      await tester.tap(find.byKey(const Key('cheat_solve')));
+      await tester.tap(find.byKey(const Key('cheat_finish_level')));
       await _pumpFrames(tester);
 
       expect(find.byKey(const Key('packing_complete')), findsOneWidget);
@@ -157,10 +158,10 @@ void main() {
     });
 
     Future<void> solve(WidgetTester tester) async {
-      // Solve-хук из чит-меню раскладывает всю деталь без drag-жестов.
+      // Чит «Закончить уровень» раскладывает всю деталь без drag-жестов.
       await tester.tap(find.byKey(const Key('cheat_button')));
       await _pumpFrames(tester);
-      await tester.tap(find.byKey(const Key('cheat_solve')));
+      await tester.tap(find.byKey(const Key('cheat_finish_level')));
       await _pumpFrames(tester);
     }
 
@@ -496,7 +497,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('cheat_button')));
       await _pumpFrames(tester);
-      await tester.tap(find.byKey(const Key('cheat_solve')));
+      await tester.tap(find.byKey(const Key('cheat_finish_level')));
       await _pumpFrames(tester);
 
       expect(trayPieces(), findsNothing, reason: 'лоток должен опустеть');
@@ -1102,6 +1103,76 @@ void main() {
     });
   });
 
+  group('GameScreen — чит-меню (Ронин-1/13, D-018)', () {
+    Future<void> openMenu(WidgetTester tester) async {
+      await tester.tap(find.byKey(const Key('cheat_button')));
+      await _pumpFrames(tester);
+    }
+
+    testWidgets('кнопка чит-меню есть (kDevTools по умолчанию true)',
+        (tester) async {
+      expect(kDevTools, isTrue);
+      await pumpGame(tester);
+      expect(find.byKey(const Key('cheat_button')), findsOneWidget);
+    });
+
+    testWidgets('«Уровень N»: открыта деталь N, собрано N−1 деталей',
+        (tester) async {
+      for (final i in const [2, 7]) {
+        SharedPreferences.setMockInitialValues({});
+        await pumpGame(tester);
+        await openMenu(tester);
+        await tester.tap(find.byKey(Key('cheat_level_$i')));
+        await _pumpFrames(tester);
+
+        expect(tester.widget<GameScreen>(find.byType(GameScreen)).levelIndex, i);
+        expect(find.text('ДЕТАЛЬ ${i + 1} / ${RoninParts.parts.length}'),
+            findsOneWidget);
+        expect(await ProgressService().getCollectedCount(), i);
+      }
+    });
+
+    testWidgets('«Уровень» понижает прогресс: с детали 6 на деталь 2',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'current_level': 5});
+      await pumpGame(tester, level: 5);
+      await openMenu(tester);
+      await tester.tap(find.byKey(const Key('cheat_level_1')));
+      await _pumpFrames(tester);
+
+      expect(await ProgressService().getCollectedCount(), 1);
+      expect(find.text('ДЕТАЛЬ 2 / ${RoninParts.parts.length}'), findsOneWidget);
+    });
+
+    testWidgets('«Сбросить на начало»: прогресс 0, деталь 1', (tester) async {
+      SharedPreferences.setMockInitialValues({'current_level': 5});
+      await pumpGame(tester, level: 5);
+      await openMenu(tester);
+      await tester.tap(find.byKey(const Key('cheat_reset')));
+      await _pumpFrames(tester);
+
+      expect(tester.widget<GameScreen>(find.byType(GameScreen)).levelIndex, 0);
+      expect(find.text('ДЕТАЛЬ 1 / ${RoninParts.parts.length}'), findsOneWidget);
+      expect(await ProgressService().getCollectedCount(), 0);
+    });
+
+    testWidgets(
+        '«Закончить уровень»: пауза «деталь собрана», деталь засчитана',
+        (tester) async {
+      SharedPreferences.setMockInitialValues({'current_level': 3});
+      await pumpGame(tester, level: 3);
+      await openMenu(tester);
+      await tester.tap(find.byKey(const Key('cheat_finish_level')));
+      await _pumpFrames(tester);
+
+      expect(find.byType(GameScreen), findsOneWidget);
+      expect(find.byKey(const Key('packing_complete')), findsOneWidget);
+      expect(find.byKey(const Key('done_next_button')), findsOneWidget);
+      expect(find.byKey(const Key('done_to_ship_button')), findsOneWidget);
+      expect(await ProgressService().getCollectedCount(), 4);
+    });
+  });
+
   group('GameScreen — нарезка «Крупные куски» (Ронин-1/07)', () {
     testWidgets('поле 10×14, клетка 34, число кусков из prepareLevel', (
       tester,
@@ -1117,33 +1188,6 @@ void main() {
         seed: RoninParts.parts[0].seed,
       ).slice.pieces.length;
       expect(find.text('уложено 0 / $expected кусков'), findsOneWidget);
-    });
-
-    testWidgets('«Пересобрать» сдвигает seed и меняет нарезку', (
-      tester,
-    ) async {
-      await pumpGame(tester);
-      List<String> sig(int seed) => [
-        for (final p in prepareLevel(
-          RoninParts.parts[0].mask,
-          seed: seed,
-        ).slice.pieces)
-          p.cells.map((c) => '${c.x},${c.y}').join(';'),
-      ];
-      // Канонный seed детали и он же со сдвигом +1 (один «Пересобрать»).
-      final seed0 = sig(RoninParts.parts[0].seed);
-      final seed1 = sig(RoninParts.parts[0].seed + 1);
-      expect(seed1, isNot(seed0));
-
-      await tester.tap(find.byKey(const Key('cheat_button')));
-      await _pumpFrames(tester);
-      await tester.tap(find.byKey(const Key('cheat_reshuffle')));
-      await _pumpFrames(tester);
-      // сдвиг seed +1 (один reshuffle).
-      expect([
-        for (final p in packingPainter(tester).state.pieces)
-          p.cells.map((c) => '${c.x},${c.y}').join(';'),
-      ], seed1);
     });
 
     testWidgets(

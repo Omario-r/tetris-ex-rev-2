@@ -37,7 +37,7 @@ PO может **ставить игру с иконки (release) и при эт
 
 ### T1 — флаг дев-инструментов, строка сборки, новое чит-меню, без переполнения
 
-- **Статус:** готова к запуску
+- **Статус:** готова (не закоммичена — коммит делает Постановщик)
 - **Рекомендованный агент:** Исполнитель · Claude (`ispolnitel`)
 - **Модули (≤ 3):** `lib/application/` (новый `build_info.dart`, паспорт),
   `lib/presentation/screens/` (`game_screen.dart`, `cheat_menu.dart`,
@@ -93,4 +93,30 @@ PO может **ставить игру с иконки (release) и при эт
 - **Арх-дельта:** новый файл в модуле `application` (паспорт).
 - **Результат:** `flutter analyze` — 0; `flutter test` — зелёный.
 - **DoD:** паспорта `application`, `screens`; `system/AGENT.md` п. 5. Не коммитить.
-- **Заметки по выполнению:** —
+- **Заметки по выполнению:**
+  - Сделано: `lib/application/build_info.dart` (`kDevTools`, `kBuildCommit`, `kBuildTime`,
+    `buildLabel()` + `composeBuildLabel(commit, time)` для тестов). `kDebugMode` заменён на
+    `kDevTools` в `GameScreen` (кнопка читов) и `ShipScreen` («Сброс прогресса (dev)»).
+    `CheatMenu`/`showCheatMenu`: «Чит-меню», `cheat_build` «Сборка: …», «Уровень» 1…N
+    (`cheat_level_$i`), `cheat_reset`, `cheat_finish_level`; колбэки `onSelectLevel`,
+    `onResetGame`, `onFinishLevel`. `GameScreen`: `_cheatSelectLevel` (pop → `setCollectedCount(i)`
+    → `pushReplacement(GameScreen(i))`), `_cheatResetGame` (pop → `reset()` → `GameScreen(0)`),
+    `_cheatFinishLevel` (pop → `_solveAll()`). Сняты `_cheatInstantWin`, `_cheatSetShipParts`,
+    `_cheatReshuffle`, `_cheatSolve`, `_reshuffle`, `_restartLevel`, `_seedOffset`; `_markDone`
+    и `_solveAll` остались.
+  - Переполнение: `_fixedText` (`MediaQuery.withClampedTextScaling(maxScaleFactor: 1.0)`) на
+    топбаре, строке прогресса и кнопках паузы `GameScreen`. `ShipScreen` на ×1,5 переполнялся
+    (шапка `_Header` высотой 38, 9 px по низу) — решение внутри ТЗ п. 5 «поправить так же»:
+    шапка в таком же clamp.
+  - Тесты: новые `test/application/build_info_test.dart` и
+    `test/presentation/text_scale_overflow_test.dart` (3 размера × 3 шрифта; GameScreen — детали
+    1/13/17 + пауза через чит-меню, ShipScreen — три режима). `cheat_menu_test` переписан под
+    новый состав (строка сборки, N кнопок, две кнопки, старых ключей нет, нет overflow на
+    390×844). В `game_screen_test`: `cheat_solve` → `cheat_finish_level` (3 места), удалён тест
+    «Пересобрать» (чит снят), добавлена группа «чит-меню» (уровень i → собрано i и деталь i,
+    понижение прогресса, сброс, «Закончить уровень»). `win_flow_test`: `cheat_solve` →
+    `cheat_finish_level`. `ship_screen_test`: правка комментария.
+  - Паспорта `application` и `presentation/screens` обновлены. Ранбук и `STATUS.md` не трогал
+    (по указанию Постановщика).
+  - Итог: `flutter analyze` — No issues found; `flutter test` — 613 тестов, All tests passed.
+  - Развилок нет.

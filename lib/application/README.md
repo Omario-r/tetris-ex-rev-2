@@ -5,7 +5,8 @@
 
 ## Назначение
 
-Прикладной слой между ядром и UI. Сейчас — персист прогресса (`ProgressService`).
+Прикладной слой между ядром и UI. Сейчас — персист прогресса (`ProgressService`) и
+сведения о сборке / флаг дев-инструментов (`build_info.dart`, D-018).
 Слой тонкий: игрового цикла нет — в `presentation/screens/game_screen` есть только
 пульс-`AnimationController` (анимация `doneGlow`).
 
@@ -29,6 +30,13 @@
     hotfix 2026-07-11 — было захардкожено `15` из «Мета-каркаса», разошлось с `LevelMap`
     (7 уровней) и роняло приложение на холодном старте с устаревшим persist-значением).
 
+- `build_info.dart` (Ронин-1/13 T1, D-018): `kDevTools` (`--dart-define=DEV_TOOLS`, по
+  умолчанию `true` — чит-меню и дев-кнопки в любой сборке; до публикации выключить),
+  `kBuildCommit` / `kBuildTime` (`--dart-define=BUILD_COMMIT` / `BUILD_TIME`, по умолчанию
+  пусто), `buildLabel()` — «`<commit> · <time>`», пустые части опускаются, обе пустые —
+  «dev»; `composeBuildLabel(commit, time)` — та же сборка строки из параметров (для тестов).
+  Зависимостей нет.
+
 ## Зависит от
 
 - `game_engine/data` — `RoninParts.parts.length` (единый источник истины `_max`). Внешнее:
@@ -36,7 +44,8 @@
 
 ## От него зависят
 
-- `presentation` — `main.dart`, `game_screen`, `ship_screen` используют `ProgressService`.
+- `presentation` — `main.dart`, `game_screen`, `ship_screen` используют `ProgressService`;
+  `game_screen`, `cheat_menu`, `ship_screen` — `kDevTools`/`buildLabel()`.
 
 ## Инварианты
 
@@ -51,4 +60,4 @@
 
 ## Как проверить
 
-`flutter test test/application/progress_service_test.dart`.
+`flutter test test/application/progress_service_test.dart test/application/build_info_test.dart`.

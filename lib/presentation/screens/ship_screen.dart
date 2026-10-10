@@ -1,7 +1,7 @@
 import 'dart:math' as math;
-import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
+import '../../application/build_info.dart';
 import '../../application/progress_service.dart';
 import '../../game_engine/data/ronin_parts.dart';
 import '../ship_render/ronin_art.dart';
@@ -24,7 +24,7 @@ enum _ShipMode { manual, afterWin, finale }
 ///   нет, «Продолжить сборку» → [onContinue] (следующий уровень).
 /// - **финал** (`ShipScreen.finale(...)`) — собраны все детали «Ронина-1»:
 ///   надпись «ПРОДОЛЖЕНИЕ СЛЕДУЕТ», ни кнопок, ни «Назад»; прогресс не
-///   сбрасывается (решение PO 2026-07-29). В дев-сборке — «Сброс прогресса (dev)».
+///   сбрасывается (решение PO 2026-07-29). С `kDevTools` — «Сброс прогресса (dev)».
 ///
 /// Рисунок — через интерфейс [ShipArt] ([art]; по умолчанию — «Ронин»).
 class ShipScreen extends StatefulWidget {
@@ -235,7 +235,7 @@ class _ShipScreenState extends State<ShipScreen>
     );
   }
 
-  /// Финал: все детали, надпись «ПРОДОЛЖЕНИЕ СЛЕДУЕТ» на месте кнопки; в дев-сборке
+  /// Финал: все детали, надпись «ПРОДОЛЖЕНИЕ СЛЕДУЕТ» на месте кнопки; с `kDevTools`
   /// под ней — сброс прогресса.
   Widget _buildFinale(BuildContext context) {
     final collected = RoninParts.parts.length;
@@ -261,7 +261,7 @@ class _ShipScreenState extends State<ShipScreen>
               ),
             ),
           ),
-          if (kDebugMode)
+          if (kDevTools)
             TextButton(
               key: const Key('ship_dev_reset'),
               onPressed: () => _devReset(context),
@@ -313,7 +313,12 @@ class _ShipScreenState extends State<ShipScreen>
   }) {
     return Column(
       children: [
-        _Header(collected: collected, onBack: onBack),
+        // Шапка фиксированной высоты — шрифт не крупнее 1,0, иначе два ряда
+        // текста переполняют её (D-018).
+        MediaQuery.withClampedTextScaling(
+          maxScaleFactor: 1.0,
+          child: _Header(collected: collected, onBack: onBack),
+        ),
         Expanded(child: SizedBox.expand(child: ship)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),

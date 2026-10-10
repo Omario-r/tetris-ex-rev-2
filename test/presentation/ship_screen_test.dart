@@ -379,7 +379,7 @@ void main() {
       );
       await tester.pump();
 
-      // В тестах kDebugMode = true — дев-кнопка есть.
+      // kDevTools по умолчанию true — дев-кнопка есть.
       await tester.tap(find.byKey(const Key('ship_dev_reset')));
       await _pumpFrames(tester);
 

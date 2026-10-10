@@ -14,7 +14,7 @@
 - `GameScreen({levelIndex=0})` — `StatefulWidget` на **ядре укладки** (эпик «Укладка»,
   Стори 02 T2). **Уровень строит `prepareLevel`**
   (Ронин-1/07 T2): `_rebuild()` зовёт `prepareLevel(RoninParts.parts[levelIndex].mask,
-  seed: part.seed + _seedOffset)` и берёт `silhouette`, `slice`. Нарезка одна — «Крупные
+  seed: part.seed)` и берёт `silhouette`, `slice`. Нарезка одна — «Крупные
   куски» (вариант «Колючие куски» и переключатель конфигураций сняты, Ронин-1/06 T1). Поле —
   10×14; экран геометрию поля не выводит,
   читает размер из `silhouette`. `LevelMap` остался источником `fragmentIndex`. Уложенные
@@ -68,15 +68,17 @@
   полевой), `h` — наибольшая высота куска уровня (`max(cell.y)+1`); считается один раз в
   `_rebuild()`, та же величина и по ширине — ряд лотка не выше 160 px при любом куске
   (Ронин-1/07 T2).
-- **Пересборка нарезки**: `_seedOffset` — сдвиг от канонного `RoninPartDef.seed` детали
-  (стартует с 0); «Пересобрать нарезку» = `_seedOffset++` + `_restartLevel()` (пересборка
-  текущего уровня, сброс драга).
+- **Системный шрифт** (Ронин-1/13 T1, D-018): зоны фиксированной высоты (топбар, строка
+  прогресса, кнопки паузы; шапка `ShipScreen`) обёрнуты в
+  `MediaQuery.withClampedTextScaling(maxScaleFactor: 1.0)` (`_fixedText`) — иначе при
+  шрифте > ×1 они переполняются. Лоток и поле текста не имеют. Регрессия —
+  `test/presentation/text_scale_overflow_test.dart` (×1,0/1,2/1,5, 375×667…430×932).
 - Топбар (канон `.topbar`/`.title`/`.pausebtn` мокапа `ukladka-field.html`, высота 44,
   Ронин-1/01 T4): слева заголовок из двух строк — `.kick` «ДЕТАЛЬ N / M»
   (N=`fragmentIndex+1`, M=`RoninParts.parts.length`=15) и `.name` название детали заглавными
   (`RoninParts.parts[fragmentIndex].title.toUpperCase()`, напр. «НОС»); свотча
   материала в топбаре больше нет (был у прежнего чипа, Стори 02 T3). Справа dev-кнопки
-  (`Key('cheat_button')` под `kDebugMode`, `Key('ship_button')`). Виджеты `_PartTitle`
+  (`Key('cheat_button')` под `kDevTools`, `Key('ship_button')`). Виджеты `_PartTitle`
   (заменил `_PartChip`/`_Swatch`) / `_DevButton`. Заголовок — `Expanded` (зазор 8 до кнопок),
   строка `.name` в `FittedBox(scaleDown, centerLeft)`: длинное название ужимается, не
   переносится и не переполняет топбар от 360 dp (Ронин-1/01 T5).
@@ -128,9 +130,8 @@
   pointer-обработчиках). Переходы дожидаются записи прогресса (`_progressSaved`), повторное
   нажатие игнорируется (`_leaving`): «Следующая деталь» → `GameScreen(levelIndex+1)`;
   «К кораблю» → `ShipScreen.afterWin(collectedCount: levelIndex+1, onContinue: →
-  GameScreen(levelIndex+1))`; на последней → `ShipScreen.finale()`. Пересборка уровня
-  дев-читами нарезки снимает паузу. Solve-хук `_solveAll()`
-  (раскладка по `PackSlice.solution`) — дев-кнопка `Key('cheat_solve')` И programmatic-хук
+  GameScreen(levelIndex+1))`; на последней → `ShipScreen.finale()`. Solve-хук `_solveAll()`
+  (раскладка по `PackSlice.solution`) — чит `Key('cheat_finish_level')` И programmatic-хук
   для тестов (доводит до `isComplete` без симуляции drag). Поле рисуется
   `PackingPainter(assembled: _done)`: в укладке — плитки, на паузе — собранная деталь
   целиком с чёткой кромкой (Ронин-1/10, D-016).
@@ -158,16 +159,17 @@
 - `ShipScreen.finale({art, animateLast = true})` — финал «Ронина-1»: собрано N (15 / 15),
   последняя деталь въезжает при `animateLast`; ни «Назад», ни кнопок; на месте кнопки
   (высота 44) — `Key('ship_finale_text')` «ПРОДОЛЖЕНИЕ СЛЕДУЕТ» (стиль «ДЕТАЛЬ СОБРАНА»);
-  только в `kDebugMode` под ней `TextButton` `Key('ship_dev_reset')` «Сброс прогресса (dev)» →
+  только с `kDevTools` под ней `TextButton` `Key('ship_dev_reset')` «Сброс прогресса (dev)» →
   `ProgressService.reset()` → `pushReplacement(GameScreen(0))`. Прогресс финал не трогает.
-- `CheatMenu({onSelectLevel, onInstantWin, onSetShipParts,
-  onReshuffle, onSolve, levelCount?})` / `showCheatMenu(...)` — дев-читы (bottom sheet).
-  Только вид: логика — колбэки в `GameScreen`. Вход — `Key('cheat_button')`, виден лишь под
-  `kDebugMode`. Секции: выбор уровня (прогресс не меняет), мгновенная победа (пауза
-  «деталь собрана», `_markDone`), состояние корабля (N=0..`RoninParts.parts.length`, пишет
-  `setCollectedCount(N)` — «15» даёт 15 / 15), **нарезка (dev)** (`Key('cheat_reshuffle')` — пересобрать; `Key('cheat_solve')`
-  — solve-хук). Зарядов взрыва и «Прототипа укладки» больше нет (выпил в Стори 02).
-  `levelCount` по умолчанию `null` → `RoninParts.parts.length` уровней.
+- `CheatMenu({onSelectLevel, onResetGame, onFinishLevel, levelCount?})` /
+  `showCheatMenu(...)` — чит-меню (bottom sheet, D-018). Только вид: логика — колбэки в
+  `GameScreen`. Вход — `Key('cheat_button')`, виден при `kDevTools` (по умолчанию да, в любой
+  сборке). Состав: «Чит-меню» + `Key('cheat_build')` «Сборка: `buildLabel()`»; «Уровень»
+  — кнопки 1…N (`cheat_level_$i`, `i` 0-based): `setCollectedCount(i)` → `GameScreen(i)`
+  (корабль собран до детали); `cheat_reset` «Сбросить на начало» — `ProgressService.reset()` →
+  `GameScreen(0)`; `cheat_finish_level` «Закончить уровень» — `_solveAll()` → обычная пауза
+  «деталь собрана» с засчитыванием. Прежние читы (победить, состояние корабля, пересобрать
+  нарезку, решить) сняты. `levelCount` по умолчанию `null` → `RoninParts.parts.length`.
 
 ## Зависит от
 
@@ -227,10 +229,10 @@
   рамки и перестаёт совпадать с `boardPixelWidth`/`Height` (на них держится якорь драга,
   `_anchorAt`/`_globalToLocal`). Канон — `SizedBox`(внешний габарит) → `DecoratedBox`(красит
   без вставки отступа) → `ClipRRect`(скругление) → `Padding(_boardPadding)` → `CustomPaint`.
-- Чит-меню — только дев-сборка: вход рисуется под `if (kDebugMode)`; читы «выбор уровня»/
-  «мгновенная победа»/«состояние корабля» имитируются на мета-уровне (`ProgressService` +
-  навигация), ядро укладки не трогают; «подача»/«пересобрать»/«решить» работают с ядром
-  экрана через `setState`.
+- Чит-меню и «Сброс прогресса (dev)» живут под `kDevTools` (`application/build_info.dart`),
+  а не под `kDebugMode`: в любой сборке, пока флаг включён (D-018). Читы имитируют
+  мета-уровень (`ProgressService` + навигация); «Закончить уровень» работает с ядром экрана
+  через `_solveAll`. До публикации флаг выключить (BACKLOG).
 - `CheatMenu` — контент внутри `SingleChildScrollView` (`showModalBottomSheet(...,
   isScrollControlled: true)`): на маленьких экранах без скролла контент переполняет sheet
   (`RenderFlex overflow`, hotfix 2026-07-11). Новую секцию читов добавлять — не забывать,
@@ -240,4 +242,4 @@
 
 `flutter test test/presentation/game_screen_test.dart test/navigation_test.dart
 test/presentation/ship_screen_test.dart test/presentation/cheat_menu_test.dart
-test/presentation/win_flow_test.dart`.
+test/presentation/win_flow_test.dart test/presentation/text_scale_overflow_test.dart`.

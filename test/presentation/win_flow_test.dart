@@ -15,7 +15,7 @@ import 'package:explosive_tetris/presentation/screens/ship_screen.dart';
 /// «продолжение следует» без сброса прогресса.
 ///
 /// Полный прогон всего контента: каждый уровень доводится до `isComplete`
-/// solve-хуком (`Key('cheat_solve')`) — без симуляции drag-жестов.
+/// solve-хуком (`Key('cheat_finish_level')`) — без симуляции drag-жестов.
 Future<void> _pump(WidgetTester t) async {
   await t.pump();
   await t.pump(const Duration(milliseconds: 600));
@@ -26,7 +26,7 @@ Future<void> _pump(WidgetTester t) async {
 Future<void> _solve(WidgetTester t) async {
   await t.tap(find.byKey(const Key('cheat_button')));
   await _pump(t);
-  await t.tap(find.byKey(const Key('cheat_solve')));
+  await t.tap(find.byKey(const Key('cheat_finish_level')));
   await _pump(t);
 }
 
