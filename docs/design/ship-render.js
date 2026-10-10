@@ -21,7 +21,12 @@
     layer  — 'all' (с фоном) | 'hull' (обшивка и покраска, без фона и предметов)
              | 'objects' (только предметы слоя 1, прозрачный фон);
     edges  — false: без кромок деталей и контура корпуса (поле укладки);
-    lights — false: без щелей-огней (поле укладки во время сборки).
+    lights — false: без света — щели-огни, огни гондол, строб и огонёк датчика,
+             стекло визора (поле укладки во время сборки);
+    paint  — false: без покраски — шеврон, «VV-77», «77», «РОНИН», полосы люков.
+  Клетка поля во время сборки — три вида (решение PO 2026-10-10): основа
+  (однотонная, из рисунка без краски и света), краска поверх основы (может
+  занимать часть клетки), свет (однотонный, светится, краски поверх нет).
   window.__SHIP.off — рисунок по window.__SHIP_RES / window.__SHIP_NO_OBJECTS
   (совместимость со страницами v2).
 */
@@ -139,7 +144,7 @@ function render(opt){
 opt=opt||{};
 const RES=opt.res||2, LAYER=opt.layer||'all';
 const BG=LAYER==='all', HULL=LAYER!=='objects', OBJ=LAYER!=='hull';
-const EDGES=opt.edges!==false, LIGHTS=opt.lights!==false;
+const EDGES=opt.edges!==false, LIGHTS=opt.lights!==false, PAINT=opt.paint!==false;
 const off=document.createElement('canvas'); off.width=W*RES; off.height=H*RES;
 const g=off.getContext('2d'); g.setTransform(RES,0,0,RES,0,0);
 
@@ -260,6 +265,7 @@ g.restore();
 ================================================================ */
 
 /* --- нос: шеврон + датчик-блок + строб --- */
+if(PAINT){
 g.save(); g.beginPath();
 g.rect(px(span[0][0]),py(0),(span[0][1]-span[0][0]+1)*C,2*C); g.clip();
 g.fillStyle=hsl(M.ORAN,0,.95);
@@ -282,9 +288,11 @@ g.font='bold 26px "Arial Narrow","DejaVu Sans",sans-serif';
 g.fillStyle='rgba(228,234,240,.78)';
 g.fillText('7 7', px(4.85), py(7.28));
 g.restore();
+}   /* /PAINT */
 
 /* --- маркировка «РОНИН» --- */
 (function(){
+  if(!PAINT) return;
   const word='РОНИН';
   g.font='bold 21px "Arial Narrow","DejaVu Sans",sans-serif';
   g.fillStyle='rgba(30,18,8,.92)';
@@ -370,7 +378,7 @@ function pod(side){
   g.fillStyle='rgba(0,0,0,.42)';
   for(let i=0;i<2;i++) g.fillRect(bx+bw*.2,byt+bh-.72*C+i*7,bw*.6,2.6);
   // навигационный огонь на внешней скуле
-  glowDot(g,side<0?bx+3.5:bx+bw-3.5,byt+.5*C,2.4,side<0?'rgba(255,80,70,.95)':'rgba(90,255,140,.95)');
+  if(LIGHTS) glowDot(g,side<0?bx+3.5:bx+bw-3.5,byt+.5*C,2.4,side<0?'rgba(255,80,70,.95)':'rgba(90,255,140,.95)');
 }
 pod(-1); pod(1);
 
@@ -606,8 +614,10 @@ g.fillStyle=hsl(M.GUN,6);
 g.fillRect(cx-.26*C,py(-.95),.52*C,.42*C);
 g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=1.5;
 g.strokeRect(cx-.5*C,py(-.55),1*C,.6*C); g.strokeRect(cx-.26*C,py(-.95),.52*C,.42*C);
+if(LIGHTS){
 g.fillStyle='rgba(180,220,255,.9)'; g.fillRect(cx-.18*C,py(-.78),.36*C,2.2);
 glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
+}
 }
 
 /* --- мостик: визор со щелями --- */
@@ -615,6 +625,7 @@ glowDot(g,cx,py(-1.06),2.2,'rgba(255,255,255,.95)');
   const vx=px(4.65),vy=py(2.48),vw=5.7*C,vh=.86*C;   /* v3: выше v2 (.58) — три ряда клеток, средний стекло */
   rr(g,vx,vy,vw,vh,4); g.fillStyle='#101318'; g.fill();
   g.strokeStyle='rgba(255,255,255,.18)'; g.lineWidth=1.5; g.stroke();
+  if(!LIGHTS) return;
   const sl=[[5.0,1.0],[6.4,1.0],[7.8,1.0],[9.2,.85]];
   g.save(); g.shadowColor='rgba(150,210,255,.9)'; g.shadowBlur=9;
   for(const [sx,sw] of sl){
@@ -633,7 +644,7 @@ for(const s of [-1,1]){
   g.strokeStyle='rgba(0,0,0,.65)';g.lineWidth=1.6; rr(g,tx,ty,.84*C,.66*C,3); g.stroke();
   g.strokeStyle='rgba(255,255,255,.14)';g.lineWidth=1;
   g.beginPath();g.moveTo(tx+.42*C,ty+3);g.lineTo(tx+.42*C,ty+.66*C-3);g.stroke();
-  g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2);
+  if(PAINT){ g.fillStyle='rgba(224,131,55,.85)'; g.fillRect(tx+2,ty-2.6,.84*C-4,2); }
 }
 
 /* --- RCS-квады --- */

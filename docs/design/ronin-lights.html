@@ -23,71 +23,104 @@
 </head>
 <body>
 
-<h1>Огни на поле — мелкие детали с приоритетом цвета</h1>
-<p class="lead">Доработка к КТ-2 (PO, 2026-10-09). Мелкие детали рисунка — щели-огни на боковых плитах,
-строб и огонёк датчика, оранжевая полоска люка — остаются частью своей детали, но во время сборки
-клетка, на которую они попадают, берёт их цвет. Сейчас по D-016 огни до сборки скрыты, и боковые
-плиты на поле однотонные.</p>
-<p class="lead">Какая клетка «огневая»: в ней ≥ 15 % пикселей огня и не меньше 70 % от соседа
-сверху/снизу/слева/справа (так тонкая щель ложится в один ряд клеток, а не в два бледных).
-Пиксели огня у плиты — разница рисунка с огнями и без; у предмета — пиксели заметно ярче
-преобладающего цвета клетки. Цвет — среднее пикселей огня. Все куски уложены, деталь ещё
-не собрана; справа — собранная деталь.</p>
+<h1>Клетка поля: основа, краска, свет</h1>
+<p class="lead">Доработка к КТ-2 (PO, 2026-10-10). Во время сборки клетка — один из трёх видов:</p>
 <ul class="vars">
-  <li><b>Сейчас</b> — как в игре: огней нет, клетка предмета — преобладающий цвет.</li>
-  <li><b>А — клетка целиком</b> — огневая клетка залита цветом огня, рельеф и заклёпки как у всех.</li>
-  <li><b>Б — целиком со свечением</b> — как А, плюс мягкий ореол на соседние клетки.</li>
-  <li><b>В — полоса</b> — клетка остаётся плитой, через середину — полоса цвета огня на всю ширину.</li>
+  <li><b>Основа</b> — часть детали, всегда однотонная: преобладающий цвет рисунка без краски и света.
+    Поверх может лежать краска.</li>
+  <li><b>Краска</b> — шеврон, «VV-77», «77», полоса люка. Ложится поверх основы и может занимать
+    часть клетки.</li>
+  <li><b>Свет</b> — щели-огни, строб и огонёк датчика, стёкла визора. Однотонная и светится
+    (ореол на соседей); краски поверх нет.</li>
 </ul>
+<p class="lead">Клетка световая, если свет занимает ≥ 40 % клетки, или ≥ 15 % и не меньше 70 % от
+соседа сверху/снизу/слева/справа — тонкая щель ложится в один ряд. Цвет света — среднее его
+пикселей. Цвет основы — преобладающий; почти чёрная обводка и тень предмета не берутся, если их
+меньше 70 % клетки (иначе у люка и датчика по краям чёрные «дыры»).
+Все куски уложены, деталь ещё не собрана; справа — собранная деталь (рисунок целиком, как сейчас).</p>
 
 <div id="parts"></div>
 
 <script src="ronin-parts.js?v=3"></script>
 <script>window.__SHIP_RES = 4;</script>
-<script src="ship-render.js?lights"></script>
+<script src="ship-render.js?layers"></script>
 <script src="ronin-objects.js?v=3"></script>
 <script src="ronin-draw.js?v=3"></script>
 <script>
 "use strict";
-const SHIP = window.__SHIP, P = window.RONIN_PARTS, D = window.RONIN_DRAW, U = 34;
+const SHIP = window.__SHIP, P = window.RONIN_PARTS, D = window.RONIN_DRAW, U = 34, RES = 2;
 
-/* ---------- рисунки и пиксели ---------- */
-const BUILD = D.pic('build'), OBJ = D.pic('obj');
-const LIT = { cv: SHIP.render({ res:2, layer:'hull', edges:false, lights:true }), res:2 };
-const IMG = new WeakMap();
-function pixels(p){ const k = p.cv; if (!IMG.has(k)) IMG.set(k, k.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, k.width, k.height)); return IMG.get(k); }
+/* ---------- слои рисунка ---------- */
+const rnd = o => ({ cv: SHIP.render(Object.assign({ res:RES }, o)), res:RES });
+const HULL = { layer:'hull', edges:false }, OBJS = { layer:'objects' };
+const L = {};
+for (const [k, base] of [['hull', HULL], ['obj', OBJS]]){
+  L[k] = {
+    base:  rnd(Object.assign({}, base, { lights:false, paint:false })),   // основа
+    paint: rnd(Object.assign({}, base, { lights:false })),                // основа + краска
+    light: rnd(Object.assign({}, base, { paint:false })),                 // основа + свет
+  };
+}
+const img = p => p.img || (p.img = p.cv.getContext('2d', {willReadFrequently:true}).getImageData(0, 0, p.cv.width, p.cv.height));
 const lum = (d, i) => (0.2126*d[i] + 0.7152*d[i+1] + 0.0722*d[i+2]) / 255;
 const lumRgb = ([r, g, b]) => (0.2126*r + 0.7152*g + 0.0722*b) / 255;
-const rgb = a => `rgb(${a.map(v => v|0).join(',')})`;
+const rgb = (a, al) => al == null ? `rgb(${a.map(v => v|0).join(',')})` : `rgba(${a.map(v => v|0).join(',')},${al})`;
 
-/* доля пикселей огня в клетке и их средний цвет */
+/* краска отдельно: пиксели «основа + краска», которые отличаются от основы; остальное прозрачно */
+for (const k of ['hull', 'obj']){
+  const b = img(L[k].base).data, p = img(L[k].paint), d = p.data;
+  const out = new ImageData(p.width, p.height), o = out.data;
+  for (let i = 0; i < d.length; i += 4){
+    if (Math.abs(d[i]-b[i]) + Math.abs(d[i+1]-b[i+1]) + Math.abs(d[i+2]-b[i+2]) + Math.abs(d[i+3]-b[i+3]) < 24) continue;
+    o[i] = d[i]; o[i+1] = d[i+1]; o[i+2] = d[i+2]; o[i+3] = d[i+3];
+  }
+  const cv = document.createElement('canvas'); cv.width = p.width; cv.height = p.height;
+  cv.getContext('2d').putImageData(out, 0, 0); L[k].paintOnly = cv;
+}
+
+/* доля пикселей света в клетке и их средний цвет */
 function cellLight(part, c, r){
-  const [x, y, cs] = D.cellRect(part, c, r), obj = part.layer === 1;
-  const src = obj ? OBJ : LIT, k = src.res, img = pixels(src), d = img.data, W = img.width;
-  const base = obj ? null : pixels(BUILD).data, domL = obj ? lumRgb(D.domColor(OBJ, x, y, cs)) : 0;
-  const x0 = Math.round(x*k), y0 = Math.round(y*k), n = Math.max(1, Math.round(cs*k));
-  let hit = 0, tot = 0, sum = [0, 0, 0];
+  const [x, y, cs] = D.cellRect(part, c, r), S = L[part.layer === 1 ? 'obj' : 'hull'];
+  const lt = img(S.light), d = lt.data, b = img(S.base).data, W = lt.width;
+  const x0 = Math.round(x*RES), y0 = Math.round(y*RES), n = Math.max(1, Math.round(cs*RES));
+  let hit = 0, tot = 0; const sum = [0, 0, 0];
   for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
     const q = ((y0+j)*W + x0+i) * 4; if (d[q+3] < 128) continue; tot++;
-    const on = obj ? lum(d, q) - domL > 0.3 : lum(d, q) - lum(base, q) > 0.25;
-    if (on){ hit++; sum[0] += d[q]; sum[1] += d[q+1]; sum[2] += d[q+2]; }
+    if (lum(d, q) - lum(b, q) > 0.25){ hit++; sum[0] += d[q]; sum[1] += d[q+1]; sum[2] += d[q+2]; }
   }
   return { f: tot ? hit/tot : 0, col: hit ? sum.map(v => v/hit) : null };
 }
-/* огневые клетки детали: ≥ 15 % и не меньше 70 % от любого соседа */
+/* световая клетка: свет ≥ 40 % клетки; или ≥ 15 % и не меньше 70 % от любого соседа */
 function lightCells(part){
-  const L = new Map(); D.eachCell(part, (c, r) => L.set(c+','+r, cellLight(part, c, r)));
+  const F = new Map(); D.eachCell(part, (c, r) => F.set(c+','+r, cellLight(part, c, r)));
   const out = new Map();
-  for (const [k, v] of L){
+  for (const [k, v] of F){
     if (v.f < 0.15) continue;
     const [c, r] = k.split(',').map(Number);
-    const nb = Math.max(0, ...[[1,0],[-1,0],[0,1],[0,-1]].map(([a, b]) => (L.get((c+a)+','+(r+b)) || {f:0}).f));
-    if (v.f >= 0.7*nb) out.set(k, v.col);
+    const nb = Math.max(0, ...[[1,0],[-1,0],[0,1],[0,-1]].map(([a, b]) => (F.get((c+a)+','+(r+b)) || {f:0}).f));
+    if (v.f >= 0.4 || v.f >= 0.7*nb) out.set(k, v.col);
   }
   return out;
 }
 
-/* ---------- клетка во время сборки (как ronin-draw.js 'build') ---------- */
+/* цвет основы: самая частая корзина квантованного цвета; почти чёрное (обводка, тень)
+   не берётся, если его меньше 70 % клетки */
+function baseColor(src, x, y, cs){
+  const d = img(src).data, W = img(src).width;
+  const x0 = Math.round(x*RES), y0 = Math.round(y*RES), n = Math.max(1, Math.round(cs*RES));
+  const bins = new Map(); let dark = 0, tot = 0;
+  for (let j = 0; j < n; j++) for (let i = 0; i < n; i++){
+    const q = ((y0+j)*W + x0+i) * 4; if (d[q+3] < 128) continue; tot++;
+    const isDark = lum(d, q) < 0.03; if (isDark) dark++;
+    const key = (isDark ? 1<<12 : 0) | (d[q]>>4)<<8 | (d[q+1]>>4)<<4 | (d[q+2]>>4), b = bins.get(key) || [0,0,0,0,isDark];
+    b[0]+=d[q]; b[1]+=d[q+1]; b[2]+=d[q+2]; b[3]++; bins.set(key, b);
+  }
+  const skipDark = tot && dark/tot < 0.7;
+  let best = null; for (const b of bins.values()) if (!(skipDark && b[4]) && (!best || b[3] > best[3])) best = b;
+  return best ? [best[0]/best[3], best[1]/best[3], best[2]/best[3]] : [23, 26, 30];
+}
+
+/* ---------- клетка во время сборки ---------- */
 function rrPath(x, y, w, h, r){ const p = new Path2D(); p.moveTo(x+r,y); p.arcTo(x+w,y,x+w,y+h,r);
   p.arcTo(x+w,y+h,x,y+h,r); p.arcTo(x,y+h,x,y,r); p.arcTo(x,y,x+w,y,r); p.closePath(); return p; }
 function tileRelief(g, x, y, w, h, s, k){
@@ -101,66 +134,57 @@ function rivets(g, x, y, w, h, s, dark){
   g.fillStyle = dark ? 'rgba(0,0,0,.85)' : 'rgba(0,0,0,.45)';
   for (const [a, b] of [[x+4*s,y+4*s],[x+w-4*s,y+4*s],[x+4*s,y+h-4*s],[x+w-4*s,y+h-4*s]]){ g.beginPath(); g.arc(a, b, 1.5*s, 0, 7); g.fill(); }
 }
-/* base — рисунок клетки; extra(g, X, Y, u) — что положить поверх до рельефа */
-function tile(g, part, c, r, X, Y, u, fill, extra){
-  const [x, y, cs] = D.cellRect(part, c, r), obj = part.layer === 1;
-  const s = u/34, i = s, w = u - 2*i;
-  const dom = fill || D.domColor(obj ? OBJ : BUILD, x, y, cs);
+/* light — цвет света или null (тогда основа + краска) */
+function cell(g, part, c, r, X, Y, u, light){
+  const [x, y, cs] = D.cellRect(part, c, r), S = L[part.layer === 1 ? 'obj' : 'hull'];
+  const s = u/34, i = s, w = u - 2*i, col = light || baseColor(S.base, x, y, cs);
   g.save(); g.clip(rrPath(X+i, Y+i, w, w, 3*s));
-  if (fill || obj){ g.fillStyle = rgb(dom); g.fillRect(X, Y, u, u); }
-  else g.drawImage(BUILD.cv, x*BUILD.res, y*BUILD.res, cs*BUILD.res, cs*BUILD.res, X, Y, u, u);
-  if (extra) extra(g, X, Y, u);
+  g.fillStyle = rgb(col); g.fillRect(X, Y, u, u);
+  if (!light) g.drawImage(S.paintOnly, x*RES, y*RES, cs*RES, cs*RES, X, Y, u, u);
   tileRelief(g, X+i, Y+i, w, w, s, 1.4);
   g.restore();
-  rivets(g, X+i, Y+i, w, w, s, lumRgb(fill || D.domColor(obj ? OBJ : BUILD, x, y, cs)) < 0.2);
+  rivets(g, X+i, Y+i, w, w, s, lumRgb(col) < 0.2);
 }
 
-const VARIANTS = {
-  now: { t:'Сейчас', cell:(g, p, c, r, X, Y, u) => D.drawCell(g, p, c, r, X, Y, u, 'build') },
-  A:   { t:'А — клетка целиком', light:(g, p, c, r, X, Y, u, col) => tile(g, p, c, r, X, Y, u, col) },
-  B:   { t:'Б — со свечением', glow:true, light:(g, p, c, r, X, Y, u, col) => tile(g, p, c, r, X, Y, u, col) },
-  C:   { t:'В — полоса', light:(g, p, c, r, X, Y, u, col) => tile(g, p, c, r, X, Y, u, null, (g, X, Y, u) => {
-          g.save(); g.shadowColor = rgb(col); g.shadowBlur = .3*u; g.fillStyle = rgb(col);
-          g.fillRect(X, Y + .32*u, u, .36*u); g.restore(); }) },
-};
-
-function field(cv, part, key, lights){
-  const v = VARIANTS[key], u = U;
-  const w = Math.max(...part.mask.map(l => l.length)), h = part.mask.length;
+function field(cv, part, mode, lights){
+  const u = U, w = Math.max(...part.mask.map(l => l.length)), h = part.mask.length;
   const g = D.dpr(cv, (w+2)*u, (h+2)*u);
   g.fillStyle = 'hsl(219,13%,10%)'; g.fillRect(0, 0, (w+2)*u, (h+2)*u);
-  if (key === 'done'){ D.drawField(g, part, u, 1, 1, 'done'); return; }
+  if (mode === 'done'){ D.drawField(g, part, u, 1, 1, 'done'); return; }
+  if (mode === 'now'){ D.eachCell(part, (c, r) => D.drawCell(g, part, c, r, (c+1)*u, (r+1)*u, u, 'build')); return; }
   const lit = [];
   D.eachCell(part, (c, r) => {
-    const X = (c+1)*u, Y = (r+1)*u, col = v.light && lights.get(c+','+r);
-    if (col) lit.push([c, r, X, Y, col]);
-    else (v.cell || VARIANTS.now.cell)(g, part, c, r, X, Y, u);
+    const X = (c+1)*u, Y = (r+1)*u, col = lights.get(c+','+r);
+    if (col) lit.push([c, r, X, Y, col]); else cell(g, part, c, r, X, Y, u, null);
   });
-  if (v.glow) for (const [, , X, Y, col] of lit){           /* ореол — под огневыми клетками, на соседей */
-    g.save(); g.shadowColor = `rgba(${col.map(x => x|0).join(',')},.9)`; g.shadowBlur = .7*u;
+  for (const [, , X, Y, col] of lit){                       /* ореол света — на соседей */
+    g.save(); g.shadowColor = rgb(col, .9); g.shadowBlur = .7*u;
     g.fillStyle = rgb(col); g.fill(rrPath(X+2, Y+2, u-4, u-4, 3)); g.restore();
   }
-  for (const [c, r, X, Y, col] of lit) v.light(g, part, c, r, X, Y, u, col);
+  for (const [c, r, X, Y, col] of lit) cell(g, part, c, r, X, Y, u, col);
 }
 
 /* ---------- вывод ---------- */
 const SHOW = [
-  ['fwd1_l',  'Плита: носовой пояс, левая скула', 'Голубая щель-огонь, пример PO.'],
-  ['fwd1_r',  'Плита: носовой пояс, правая скула', 'Вторая щель, зеркально.'],
-  ['sensor',  'Предмет: датчик носа', 'Строб и белый огонёк на кончике.'],
-  ['hatch_l', 'Предмет: торпедный люк', 'Оранжевая полоска сверху.'],
-  ['visor_l', 'Предмет: визор, левая половина', 'Проверка, что правило не ломает визор: стекло уже среднего ряда, ореол стекла не должен красить раму.'],
+  ['prow',     'Плита: нос', 'Краска: шеврон. Основа однотонная, шеврон лежит поверх и режет клетки.'],
+  ['fwd1_cl',  'Плита: носовой пояс, левее киля', 'Краска: «VV-77» (надпись делят две детали).'],
+  ['fwd1_l',   'Плита: носовой пояс, левая скула', 'Свет: голубая щель — пример PO.'],
+  ['fwd1_r',   'Плита: носовой пояс, правая скула', 'Свет: вторая щель.'],
+  ['fwd2_l',   'Плита: носовой пояс, низ слева', 'Краска: «77».'],
+  ['sensor',   'Предмет: датчик носа', 'Свет: строб и белый огонёк на кончике.'],
+  ['hatch_l',  'Предмет: торпедный люк', 'Краска: оранжевая полоса сверху — поверх тёмной основы, на часть клетки.'],
+  ['visor_l',  'Предмет: визор, левая половина', 'Свет: стёкла — средний ряд светится.'],
 ];
 const root = document.getElementById('parts');
 for (const [id, t, an] of SHOW){
   const part = P.parts.find(p => p.id === id), lights = lightCells(part);
-  root.insertAdjacentHTML('beforeend', `<div class="sect">${part.order}. ${t} · ${part.cells} кл., огневых — ${lights.size}</div>`);
+  root.insertAdjacentHTML('beforeend', `<div class="sect">${part.order}. ${t} · ${part.cells} кл., световых — ${lights.size}</div>`);
   const row = document.createElement('div'); row.className = 'row'; root.appendChild(row);
-  for (const key of ['now', 'A', 'B', 'C', 'done']){
+  for (const [mode, title] of [['now', 'Сейчас'], ['new', 'Основа, краска, свет'], ['done', 'Собрана']]){
     const card = document.createElement('div'), b = document.createElement('div'), cv = document.createElement('canvas');
     card.className = 'card'; b.className = 'board'; b.appendChild(cv);
-    card.innerHTML = `<h2>${key === 'done' ? 'Собрана' : VARIANTS[key].t}</h2>`; card.appendChild(b); row.appendChild(card);
-    field(cv, part, key, lights);
+    card.innerHTML = `<h2>${title}</h2>`; card.appendChild(b); row.appendChild(card);
+    field(cv, part, mode, lights);
   }
   root.insertAdjacentHTML('beforeend', `<p class="an">${an}</p>`);
 }
