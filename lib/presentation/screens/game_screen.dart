@@ -58,6 +58,11 @@ class _GameScreenState extends State<GameScreen>
   static const double _trayPaddingV = 12.0;
   static const double _trayBottomSpace = 20.0; // было зазор 6 + подпись 14
 
+  /// Внешний горизонтальный отступ контейнера лотка и зазор справа от каждого
+  /// куска ряда (ширина слота куска = ширина куска + [_trayPieceGap]).
+  static const double _trayMarginH = 12.0;
+  static const double _trayPieceGap = 12.0;
+
   /// Высота зоны лотка: 2·1 + 2·12 + 160 + 20 = 206. Её же вычитает расчёт
   /// клетки поля ([_computeCellSize]).
   static const double _trayZoneHeight =
@@ -152,6 +157,11 @@ class _GameScreenState extends State<GameScreen>
 
   final GlobalKey _stackKey = GlobalKey();
   final GlobalKey _boardKey = GlobalKey();
+
+  /// Контейнер лотка с внешними отступами ([_trayMarginH]) и вьюпорт ряда
+  /// кусков: по ним определяется «над лотком» и место куска в ряду.
+  final GlobalKey _trayKey = GlobalKey();
+  final GlobalKey _trayViewportKey = GlobalKey();
 
   @override
   void initState() {
@@ -504,6 +514,7 @@ class _GameScreenState extends State<GameScreen>
     final fromTray = _dragFromTray;
     final pointer = _dragGlobalPos;
 
+    var trayChanged = false;
     setState(() {
       final anchor = _anchorAt(pointer);
       if (anchor != null) {
@@ -512,16 +523,111 @@ class _GameScreenState extends State<GameScreen>
         } else {
           _controller.move(pieceId, anchor.x, anchor.y);
         }
+      } else if (pointer != null) {
+        // Якоря на поле нет: кусок встаёт в лоток на ближайшее место. Над
+        // лотком — к точке отпускания (перестановка для куска из лотка);
+        // иначе с поля — к пальцу по горизонтали в видимой части ряда, из
+        // лотка — без изменений.
+        final overTray = _isOverTray(pointer);
+        if (overTray || !fromTray) {
+          final index = _trayIndexAt(pointer, pieceId, clampToView: !overTray);
+          if (fromTray) {
+            _controller.moveInTray(pieceId, index);
+          } else {
+            _controller.remove(pieceId, at: index);
+          }
+          trayChanged = true;
+        }
       } else if (!fromTray) {
-        // Отпустили уложенный кусок вне поля — вернуть в лоток.
+        // Точки нет (не должна случаться) — вернуть в конец лотка.
         _controller.remove(pieceId);
+        trayChanged = true;
       }
 
       _dragPieceId = null;
       _dragGlobalPos = null;
       _dragFromTray = false;
     });
+    if (trayChanged) _revealInTray(pieceId);
     if (_controller.state.isComplete) _markDone();
+  }
+
+  // --- Место куска в лотке (Ронин-1/12 T1) ---
+
+  /// Ширина слота куска в ряду лотка: сам кусок + зазор справа.
+  double _traySlotWidth(int id) =>
+      _pieceBoundsPx(_pieceById(id), _trayCellSize).width + _trayPieceGap;
+
+  /// Палец [global] внутри прямоугольника контейнера лотка
+  /// (`Key('packing_tray')`, без внешних отступов [_trayMarginH]).
+  bool _isOverTray(Offset global) {
+    final local = _globalToLocal(_trayKey, global);
+    final box = _trayKey.currentContext?.findRenderObject();
+    if (local == null || box is! RenderBox) return false;
+    return local.dx >= _trayMarginH &&
+        local.dx <= box.size.width - _trayMarginH &&
+        local.dy >= 0 &&
+        local.dy <= box.size.height;
+  }
+
+  /// Индекс места в ряду лотка для пальца [global]: число кусков ряда (без
+  /// [excludeId] — тащимого), чей центр левее пальца. `x` — в координатах
+  /// содержимого ряда (локальная `x` вьюпорта + прокрутка). [clampToView] —
+  /// палец вне лотка: `x` зажимается в видимую часть ряда.
+  int _trayIndexAt(Offset global, int excludeId, {required bool clampToView}) {
+    final box = _trayViewportKey.currentContext?.findRenderObject();
+    final local = _globalToLocal(_trayViewportKey, global);
+    if (local == null || box is! RenderBox) {
+      return _controller.state.trayOrder.length;
+    }
+    var viewX = local.dx;
+    if (clampToView) viewX = viewX.clamp(0.0, box.size.width).toDouble();
+    final scroll = _trayScroll.hasClients ? _trayScroll.offset : 0.0;
+    final x = viewX + scroll;
+    var index = 0;
+    var left = 0.0;
+    for (final id in _controller.state.trayOrder) {
+      if (id == excludeId) continue;
+      final width = _traySlotWidth(id) - _trayPieceGap;
+      if (left + width / 2 < x) index++;
+      left += width + _trayPieceGap;
+    }
+    return index;
+  }
+
+  /// После кадра прокручивает лоток так, чтобы кусок [id] был виден целиком
+  /// (если помещается); короткая анимация — без мигания.
+  void _revealInTray(int id) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_trayScroll.hasClients) return;
+      var left = 0.0;
+      var found = false;
+      for (final other in _controller.state.trayOrder) {
+        if (other == id) {
+          found = true;
+          break;
+        }
+        left += _traySlotWidth(other);
+      }
+      if (!found) return;
+      final position = _trayScroll.position;
+      final right = left + _traySlotWidth(id) - _trayPieceGap;
+      var target = position.pixels;
+      if (left < target) {
+        target = left;
+      } else if (right > target + position.viewportDimension) {
+        target = right - position.viewportDimension;
+      }
+      target = target
+          .clamp(position.minScrollExtent, position.maxScrollExtent)
+          .toDouble();
+      if (target == position.pixels) return;
+      _trayScroll.animateTo(
+        target,
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   /// Прямоугольник поднятого куска (глобальные координаты) при пальце в
@@ -798,10 +904,11 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// «Очистить поле»: отменяет идущий драг и возвращает все куски в лоток
-  /// (`PackController.clear`).
+  /// (`PackController.clear`), лоток прокручивается в начало.
   void _onClearField() {
     _cancelDrag();
     setState(() => _controller.clear());
+    if (_trayScroll.hasClients) _trayScroll.jumpTo(0.0);
   }
 
   static const TextStyle _progressLabelStyle = TextStyle(
@@ -895,60 +1002,64 @@ class _GameScreenState extends State<GameScreen>
 
     // Контейнер лотка фиксирован по размеру ([_trayZoneHeight], во всю ширину):
     // по мере опустения лоток не сжимается, поле над ним не прыгает.
-    return Container(
-      key: const Key('packing_tray'),
-      width: double.infinity,
-      height: _trayZoneHeight,
-      margin: const EdgeInsets.symmetric(horizontal: 12.0),
-      padding: const EdgeInsets.symmetric(
-        vertical: _trayPaddingV,
-        horizontal: 6.0,
-      ),
-      decoration: BoxDecoration(
-        color: PackingPainter.trayBg,
-        border: Border.all(
-          color: BlockMaterial.gunmetal.color,
-          width: _trayBorderWidth,
+    return KeyedSubtree(
+      key: _trayKey,
+      child: Container(
+        key: const Key('packing_tray'),
+        width: double.infinity,
+        height: _trayZoneHeight,
+        margin: const EdgeInsets.symmetric(horizontal: _trayMarginH),
+        padding: const EdgeInsets.symmetric(
+          vertical: _trayPaddingV,
+          horizontal: 6.0,
         ),
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(14.0)),
-      ),
-      child: Column(
-        children: [
-          SizedBox(
-            height: _trayRowMaxHeight,
-            child: SingleChildScrollView(
-              controller: _trayScroll,
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  for (final id in visible)
-                    if (!(id == _dragPieceId && _dragFromTray))
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12.0),
-                        child: Listener(
-                          key: Key('tray_piece_$id'),
-                          onPointerDown: (event) =>
-                              _onTrayPointerDown(id, event),
-                          onPointerMove: _onTrayPointerMove,
-                          onPointerUp: _onTrayPointerUp,
-                          onPointerCancel: _onTrayPointerCancel,
-                          child: CustomPaint(
-                            size: _pieceBoundsPx(_pieceById(id), _trayCellSize),
-                            painter: _PieceCellsPainter(
-                              piece: _pieceById(id),
-                              cellSize: _trayCellSize,
-                              material: BlockMaterial.graphite,
+        decoration: BoxDecoration(
+          color: PackingPainter.trayBg,
+          border: Border.all(
+            color: BlockMaterial.gunmetal.color,
+            width: _trayBorderWidth,
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(14.0)),
+        ),
+        child: Column(
+          children: [
+            SizedBox(
+              key: _trayViewportKey,
+              height: _trayRowMaxHeight,
+              child: SingleChildScrollView(
+                controller: _trayScroll,
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    for (final id in visible)
+                      if (!(id == _dragPieceId && _dragFromTray))
+                        Padding(
+                          padding: const EdgeInsets.only(right: _trayPieceGap),
+                          child: Listener(
+                            key: Key('tray_piece_$id'),
+                            onPointerDown: (event) =>
+                                _onTrayPointerDown(id, event),
+                            onPointerMove: _onTrayPointerMove,
+                            onPointerUp: _onTrayPointerUp,
+                            onPointerCancel: _onTrayPointerCancel,
+                            child: CustomPaint(
+                              size: _pieceBoundsPx(_pieceById(id), _trayCellSize),
+                              painter: _PieceCellsPainter(
+                                piece: _pieceById(id),
+                                cellSize: _trayCellSize,
+                                material: BlockMaterial.graphite,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: _trayBottomSpace),
-        ],
+            const SizedBox(height: _trayBottomSpace),
+          ],
+        ),
       ),
     );
   }

@@ -114,29 +114,144 @@ void main() {
     });
   });
 
+  group('PackController.remove(at:) — место в лотке', () {
+    // Три кусочка 1×2 на силуэте 2×3: лоток [0, 1, 2], уложить можно любой.
+    const mask = TargetMask(rows: ['##', '##', '##']);
+    const p0 = PackPiece(id: 0, cells: [(x: 0, y: 0), (x: 1, y: 0)]);
+    const p1 = PackPiece(id: 1, cells: [(x: 0, y: 0), (x: 1, y: 0)]);
+    const p2 = PackPiece(id: 2, cells: [(x: 0, y: 0), (x: 1, y: 0)]);
+    const p3 = PackPiece(id: 3, cells: [(x: 0, y: 0), (x: 1, y: 0)]);
+
+    /// Лоток [1, 2, 3], кусок 0 уложен.
+    PackController placedZero() {
+      final c = PackController(
+        PackState(
+          silhouette: mask,
+          placements: const {},
+          pieces: const [p0, p1, p2, p3],
+          trayOrder: const [0, 1, 2, 3],
+        ),
+      );
+      c.place(0, 0, 0);
+      return c;
+    }
+
+    test('at: 0 — в начало лотка', () {
+      final c = placedZero()..remove(0, at: 0);
+      expect(c.state.trayOrder, [0, 1, 2, 3]);
+      expect(c.state.placements, isEmpty);
+    });
+
+    test('at: 1 — в середину лотка, соседи сдвигаются', () {
+      final c = placedZero()..remove(0, at: 1);
+      expect(c.state.trayOrder, [1, 0, 2, 3]);
+    });
+
+    test('at за концом и отрицательный — клампинг', () {
+      final end = placedZero()..remove(0, at: 99);
+      expect(end.state.trayOrder, [1, 2, 3, 0]);
+      final start = placedZero()..remove(0, at: -5);
+      expect(start.state.trayOrder, [0, 1, 2, 3]);
+    });
+
+    test('без at — в конец лотка (как было)', () {
+      final c = placedZero()..remove(0);
+      expect(c.state.trayOrder, [1, 2, 3, 0]);
+    });
+
+    test('не уложенный кусочек с at — no-op', () {
+      final c = placedZero()..remove(1, at: 0);
+      expect(c.state.trayOrder, [1, 2, 3]);
+      expect(c.state.placements, {0: (x: 0, y: 0)});
+    });
+  });
+
+  group('PackController.moveInTray', () {
+    const mask = TargetMask(rows: ['##', '##']);
+    const pieces = [
+      PackPiece(id: 0, cells: [(x: 0, y: 0), (x: 1, y: 0)]),
+      PackPiece(id: 1, cells: [(x: 0, y: 0), (x: 1, y: 0)]),
+      PackPiece(id: 2, cells: [(x: 0, y: 0), (x: 1, y: 0)]),
+      PackPiece(id: 3, cells: [(x: 0, y: 0), (x: 1, y: 0)]),
+    ];
+
+    PackController fresh() => PackController(
+      PackState(
+        silhouette: mask,
+        placements: const {},
+        pieces: pieces,
+        trayOrder: const [0, 1, 2, 3],
+      ),
+    );
+
+    test('вперёд: индекс — в списке без этого кусочка', () {
+      final c = fresh()..moveInTray(0, 2);
+      expect(c.state.trayOrder, [1, 2, 0, 3]);
+    });
+
+    test('назад', () {
+      final c = fresh()..moveInTray(3, 1);
+      expect(c.state.trayOrder, [0, 3, 1, 2]);
+    });
+
+    test('на своё место — порядок прежний', () {
+      final c = fresh()..moveInTray(2, 2);
+      expect(c.state.trayOrder, [0, 1, 2, 3]);
+    });
+
+    test('клампинг: за концом — последним, отрицательный — первым', () {
+      final end = fresh()..moveInTray(0, 99);
+      expect(end.state.trayOrder, [1, 2, 3, 0]);
+      final start = fresh()..moveInTray(3, -1);
+      expect(start.state.trayOrder, [3, 0, 1, 2]);
+    });
+
+    test('уложенный кусочек (не в лотке) — no-op', () {
+      final c = fresh()..place(0, 0, 0);
+      c.moveInTray(0, 1);
+      expect(c.state.trayOrder, [1, 2, 3]);
+      expect(c.state.placements, {0: (x: 0, y: 0)});
+    });
+
+    test('clear после перестановок возвращает исходный порядок', () {
+      final c = fresh()
+        ..moveInTray(0, 2)
+        ..place(1, 0, 0)
+        ..remove(1, at: 0);
+      expect(c.state.trayOrder, [1, 2, 0, 3]);
+      c.place(2, 0, 0);
+      c.clear();
+      expect(c.state.trayOrder, [0, 1, 2, 3]);
+    });
+  });
+
   group('PackController.canPlace — свес за окно маски (регрессия краша)', () {
-    test('якорь за правым краем — обе клетки вне окна, false без исключения',
-        () {
-      final controller = _freshController();
+    test(
+      'якорь за правым краем — обе клетки вне окна, false без исключения',
+      () {
+        final controller = _freshController();
 
-      // _rowB — клетки (0,0)/(1,0); якорь atX=3 в окне 2×2 (width=2) даёт
-      // localX=3 и 4 — это ровно случай "бит-индекс -1" из трейса краша
-      // (localY*width+localX=4 > totalBits-1=3).
-      final result = PackController.canPlace(controller.state, 1, 3, 0);
+        // _rowB — клетки (0,0)/(1,0); якорь atX=3 в окне 2×2 (width=2) даёт
+        // localX=3 и 4 — это ровно случай "бит-индекс -1" из трейса краша
+        // (localY*width+localX=4 > totalBits-1=3).
+        final result = PackController.canPlace(controller.state, 1, 3, 0);
 
-      expect(result, isFalse);
-    });
+        expect(result, isFalse);
+      },
+    );
 
-    test('якорь за нижним краем — обе клетки вне окна, false без исключения',
-        () {
-      final controller = _freshController();
+    test(
+      'якорь за нижним краем — обе клетки вне окна, false без исключения',
+      () {
+        final controller = _freshController();
 
-      // _rowB — клетки (0,0)/(1,0); якорь atY=3 в окне 2×2 (height=2) даёт
-      // localY=3 для обеих клеток — тот же класс "отрицательный сдвиг".
-      final result = PackController.canPlace(controller.state, 1, 0, 3);
+        // _rowB — клетки (0,0)/(1,0); якорь atY=3 в окне 2×2 (height=2) даёт
+        // localY=3 для обеих клеток — тот же класс "отрицательный сдвиг".
+        final result = PackController.canPlace(controller.state, 1, 0, 3);
 
-      expect(result, isFalse);
-    });
+        expect(result, isFalse);
+      },
+    );
   });
 
   group('Полное заполнение фикстуры', () {

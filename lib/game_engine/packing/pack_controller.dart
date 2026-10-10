@@ -89,15 +89,28 @@ class PackController {
     _state = _state.copyWith(placements: placements);
   }
 
-  /// Снимает уложенный кусочек обратно в конец лотка. No-op, если кусочек
-  /// не уложен.
-  void remove(int pieceId) {
+  /// Снимает уложенный кусочек обратно в лоток: на индекс [at] (клампится в
+  /// `0..trayOrder.length`), без [at] — в конец. No-op, если кусочек не уложен.
+  void remove(int pieceId, {int? at}) {
     if (!_state.placements.containsKey(pieceId)) return;
 
     final placements = Map<int, ({int x, int y})>.from(_state.placements)
       ..remove(pieceId);
-    final trayOrder = List<int>.from(_state.trayOrder)..add(pieceId);
+    final trayOrder = List<int>.from(_state.trayOrder);
+    final index = at == null ? trayOrder.length : at.clamp(0, trayOrder.length);
+    trayOrder.insert(index, pieceId);
     _state = _state.copyWith(placements: placements, trayOrder: trayOrder);
+  }
+
+  /// Переставляет кусочек лотка на индекс [to]. Индекс — в списке лотка
+  /// **без** этого кусочка, клампится в `0..trayOrder.length-1`. No-op, если
+  /// кусочка нет в лотке.
+  void moveInTray(int pieceId, int to) {
+    if (!_state.trayOrder.contains(pieceId)) return;
+
+    final trayOrder = List<int>.from(_state.trayOrder)..remove(pieceId);
+    trayOrder.insert(to.clamp(0, trayOrder.length), pieceId);
+    _state = _state.copyWith(trayOrder: trayOrder);
   }
 
   /// Возвращает все уложенные кусочки в лоток в исходном порядке. No-op, если

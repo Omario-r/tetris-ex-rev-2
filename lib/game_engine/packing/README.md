@@ -20,9 +20,12 @@
   снапшот: `occupiedCells` (клетки уложенных кусочков в координатах силуэта),
   `isComplete` (силуэт покрыт полностью, без дыр и пересечений), `copyWith`.
 - `PackController(initial)` — `state`; `place(pieceId, atX, atY)`,
-  `move(pieceId, atX, atY)`, `remove(pieceId)`, `clear()` (все уложенные — в лоток в исходном порядке; no-op на
+  `move(pieceId, atX, atY)`, `remove(pieceId, {at})` (снять в лоток на индекс `at`,
+  клампится в `0..trayOrder.length`; без `at` — в конец), `moveInTray(pieceId, to)`
+  (переставить кусочек лотка; `to` — индекс в списке лотка без этого кусочка, клампится;
+  Ронин-1/12), `clear()` (все уложенные — в лоток в исходном порядке; no-op на
   пустом поле) — все no-op при невалидной
-  команде; статик `PackController.canPlace(state, pieceId, atX, atY, {ignoreId})`
+  команде (в т.ч. `moveInTray` не-лотковому кусочку, `remove` не уложенному); статик `PackController.canPlace(state, pieceId, atX, atY, {ignoreId})`
   — чистая функция валидации (внутри силуэта + без пересечений).
 - `slicePolyomino(silhouette, {seed})` → `PackSlice` — детерминированный
   генератор нарезки: режет `TargetMask` на связные полиомино-кусочки по 3..5

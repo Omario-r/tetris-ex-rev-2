@@ -755,6 +755,272 @@ void main() {
     });
   });
 
+  group('GameScreen — кусок встаёт в лоток на ближайшее место (Ронин-1/12)', () {
+    const liftGap = 32.0;
+
+    PreparedLevel level0() => prepareLevel(
+      RoninParts.parts[0].mask,
+      seed: RoninParts.parts[0].seed,
+    );
+
+    Future<void> pumpNarrow(WidgetTester tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(const MaterialApp(home: GameScreen()));
+      await tester.pump();
+    }
+
+    ScrollPosition trayScroll(WidgetTester tester) => tester
+        .state<ScrollableState>(
+          find.descendant(
+            of: find.byKey(const Key('packing_tray')),
+            matching: find.byType(Scrollable),
+          ),
+        )
+        .position;
+
+    List<int> trayOrder(WidgetTester tester) =>
+        packingPainter(tester).state.trayOrder;
+
+    Rect trayRect(WidgetTester tester) =>
+        tester.getRect(find.byKey(const Key('packing_tray')));
+
+    /// Кладёт `level.trayOrder[0]` жестом в эталонную клетку; возвращает id.
+    Future<int> layFirstPiece(WidgetTester tester, PreparedLevel level) async {
+      final id = level.trayOrder[0];
+      final target = level.slice.solution[id]!;
+      final piece = level.slice.pieces.firstWhere((p) => p.id == id);
+      var w = 0;
+      var h = 0;
+      for (final c in piece.cells) {
+        if (c.x + 1 > w) w = c.x + 1;
+        if (c.y + 1 > h) h = c.y + 1;
+      }
+      final origin = tester.getTopLeft(
+        find.byWidgetPredicate(
+          (x) => x is CustomPaint && x.painter is PackingPainter,
+        ),
+      );
+      final cell = packingPainter(tester).cellSize;
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_$id'))),
+      );
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveTo(
+        Offset(
+          origin.dx + target.x * cell + 0.3 * cell + w * cell / 2,
+          origin.dy + target.y * cell - 0.3 * cell + h * cell + liftGap,
+        ),
+      );
+      await tester.pump();
+      await gesture.up();
+      await tester.pump();
+      expect(packingPainter(tester).state.placements[id], target);
+      return id;
+    }
+
+    /// Берёт уложенный кусок [id] с поля за одну из его клеток.
+    Future<TestGesture> grabFromField(
+      WidgetTester tester,
+      PreparedLevel level,
+      int id,
+    ) async {
+      final target = level.slice.solution[id]!;
+      final piece = level.slice.pieces.firstWhere((p) => p.id == id);
+      final origin = tester.getTopLeft(
+        find.byWidgetPredicate(
+          (x) => x is CustomPaint && x.painter is PackingPainter,
+        ),
+      );
+      final cell = packingPainter(tester).cellSize;
+      final c0 = piece.cells.first;
+      final gesture = await tester.startGesture(
+        origin +
+            Offset(
+              (target.x + c0.x + 0.5) * cell,
+              (target.y + c0.y + 0.5) * cell,
+            ),
+      );
+      await tester.pump();
+      expect(find.byKey(const Key('packing_drag_feedback')), findsOneWidget);
+      return gesture;
+    }
+
+    /// Число кусков ряда лотка, чей центр левее [x] (глобальная точка).
+    int piecesLeftOf(WidgetTester tester, double x) {
+      var n = 0;
+      for (final id in trayOrder(tester)) {
+        final finder = find.byKey(Key('tray_piece_$id'));
+        if (finder.evaluate().isEmpty) continue;
+        if (tester.getCenter(finder).dx < x) n++;
+      }
+      return n;
+    }
+
+    testWidgets('кусок с поля, отпущенный над первым куском лотка, встаёт '
+        'первым', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = await layFirstPiece(tester, level);
+      final before = trayOrder(tester);
+      final first = tester.getTopLeft(find.byKey(Key('tray_piece_${before[0]}')));
+
+      final gesture = await grabFromField(tester, level, id);
+      await gesture.moveTo(Offset(first.dx + 1, trayRect(tester).bottom - 8));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(packingPainter(tester).state.placements, isEmpty);
+      expect(trayOrder(tester), [id, ...before]);
+    });
+
+    testWidgets('кусок с поля, отпущенный над серединой лотка, встаёт между '
+        'соседями', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = await layFirstPiece(tester, level);
+      final before = trayOrder(tester);
+      // Правее центра второго куска — место 2 (после двух первых).
+      final second = tester.getCenter(find.byKey(Key('tray_piece_${before[1]}')));
+
+      final gesture = await grabFromField(tester, level, id);
+      await gesture.moveTo(Offset(second.dx + 3, trayRect(tester).bottom - 8));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(trayOrder(tester),
+          [before[0], before[1], id, ...before.sublist(2)]);
+    });
+
+    testWidgets('кусок лотка, перетащенный левее первого, — первый '
+        '(перестановка)', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final order = level.trayOrder;
+      final first = tester.getTopLeft(find.byKey(Key('tray_piece_${order[0]}')));
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_${order[1]}'))),
+      );
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      expect(find.byKey(const Key('packing_drag_feedback')), findsOneWidget);
+      await gesture.moveTo(Offset(first.dx + 1, trayRect(tester).bottom - 8));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(packingPainter(tester).state.placements, isEmpty);
+      expect(trayOrder(tester), [order[1], order[0], ...order.sublist(2)]);
+    });
+
+    testWidgets('кусок лотка, отпущенный вне поля и лотка, остаётся на своём '
+        'месте', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final order = level.trayOrder;
+
+      final gesture = await tester.startGesture(
+        tester.getCenter(find.byKey(Key('tray_piece_${order[1]}'))),
+      );
+      await gesture.moveBy(const Offset(0, -30));
+      await tester.pump();
+      await gesture.moveTo(const Offset(5, 10));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      expect(trayOrder(tester), order);
+    });
+
+    testWidgets('кусок с поля, отпущенный вне поля и лотка при прокрученном '
+        'ряде, встаёт у пальца, а не в конец', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = await layFirstPiece(tester, level);
+      final scroll = trayScroll(tester);
+      expect(scroll.maxScrollExtent, greaterThan(0.0),
+          reason: 'ряд лотка должен листаться на узком экране');
+      scroll.jumpTo(scroll.maxScrollExtent / 2);
+      await tester.pump();
+      final offsetBefore = scroll.pixels;
+      const fingerX = 180.0;
+      final expected = piecesLeftOf(tester, fingerX);
+      final count = trayOrder(tester).length;
+      expect(expected, inInclusiveRange(1, count - 1),
+          reason: 'точка пальца внутри ряда: не в начале и не в конце');
+
+      final gesture = await grabFromField(tester, level, id);
+      // Над топбаром: ни поле, ни лоток.
+      await gesture.moveTo(const Offset(fingerX, 10));
+      await tester.pump();
+      await gesture.up();
+      await tester.pump(const Duration(seconds: 1));
+
+      final after = trayOrder(tester);
+      expect(packingPainter(tester).state.placements, isEmpty);
+      expect(after.indexOf(id), expected);
+      expect(after.last, isNot(id));
+      expect(scroll.pixels, offsetBefore,
+          reason: 'место было видно — лоток не двигается');
+    });
+
+    testWidgets('возврат на место вне видимой части: лоток прокручивается к '
+        'куску', (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      final id = await layFirstPiece(tester, level);
+      final scroll = trayScroll(tester);
+      final gesture = await grabFromField(tester, level, id);
+      // Палец у правого края экрана: x зажимается в видимую часть ряда,
+      // кусок встаёт у правого края и может выступать за него.
+      await gesture.moveTo(const Offset(359, 10));
+      await tester.pump();
+      await gesture.up();
+      // Кадр с новым рядом; прокрутка стартует после него и идёт анимацией.
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(milliseconds: 16));
+      await tester.pump(const Duration(seconds: 1));
+
+      final order = trayOrder(tester);
+      expect(order.contains(id), isTrue);
+      expect(order.last, isNot(id));
+      final rect = tester.getRect(find.byKey(Key('tray_piece_$id')));
+      final viewport = tester.getRect(find
+          .descendant(
+            of: find.byKey(const Key('packing_tray')),
+            matching: find.byType(Scrollable),
+          )
+          .first);
+      expect(rect.left, greaterThanOrEqualTo(viewport.left - 0.01));
+      expect(rect.right, lessThanOrEqualTo(viewport.right + 0.01));
+      expect(scroll.pixels, greaterThan(0.0),
+          reason: 'место справа вне видимой части — лоток прокручен');
+    });
+
+    testWidgets('«Очистить поле» при прокрученном лотке — лоток в начало',
+        (tester) async {
+      await pumpNarrow(tester);
+      final level = level0();
+      await layFirstPiece(tester, level);
+      final scroll = trayScroll(tester);
+      scroll.jumpTo(scroll.maxScrollExtent);
+      await tester.pump();
+      expect(scroll.pixels, greaterThan(0.0));
+
+      await tester.tap(find.byKey(const Key('clear_field')));
+      await tester.pump();
+
+      expect(scroll.pixels, 0.0);
+      expect(trayOrder(tester), level.trayOrder);
+    });
+  });
+
   group('GameScreen — нарезка «Крупные куски» (Ронин-1/07)', () {
     testWidgets('поле 10×14, клетка 34, число кусков из prepareLevel', (
       tester,
